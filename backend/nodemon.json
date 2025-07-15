@@ -1,10 +1,21 @@
 {
   "watch": ["src"],
   "ext": "ts,json",
-  "ignore": ["src/**/*.spec.ts", "src/**/*.test.ts"],
+  "ignore": [
+    "src/**/*.spec.ts", 
+    "src/**/*.test.ts",
+    "src/**/*.log",
+    "**/node_modules/**",
+    "**/.git/**",
+    "**/uploads/**",
+    "**/logs/**"
+  ],
   "exec": "ts-node -r tsconfig-paths/register src/index.ts",
   "env": {
     "NODE_ENV": "development"
   },
-  "delay": 1000
+  "delay": 2000,
+  "restartable": "rs",
+  "verbose": false,
+  "colours": true
 } 

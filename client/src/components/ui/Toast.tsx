@@ -122,7 +122,7 @@ export const ToastContainer: React.FC = () => {
       
       addToast({
         type: 'success',
-        title: '🎉 Quiz Passed!',
+        title: 'Quiz Passed!',
         message: `You passed "${title}" with ${score}%${isImprovement ? ' (New personal best!)' : ''} on attempt ${attempts}/${maxAttempts}`,
         duration: 6000,
       });

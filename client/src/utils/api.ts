@@ -17,6 +17,8 @@ interface ApiResponse<T = any> {
   data?: T;
   message?: string;
   error?: string;
+  offline?: boolean;
+  queued?: boolean;
 }
 
 // IndexedDB token storage to match AuthContext's SecureAuthStorage
@@ -251,12 +253,13 @@ class ApiClient {
       const url = `${this.baseURL}${endpoint}`;
       
       // Log the request details for debugging
-      console.log('🌐 API Request:', {
+      console.log('API Request:', {
         method: options.method || 'GET',
         url: url,
         endpoint: endpoint,
         hasAuth: !!(await this.getToken()),
-        retryCount: retryCount
+        retryCount: retryCount,
+        isOnline: navigator.onLine
       });
       
       const response = await fetch(url, {
@@ -267,17 +270,33 @@ class ApiClient {
         },
       });
 
+      // Check if this is an offline-queued response from service worker
+      const isOfflineQueued = response.headers.get('X-Offline-Queued') === 'true';
+      
+      if (isOfflineQueued) {
+        const queuedData = await response.json();
+        console.log('Request queued for offline sync:', endpoint);
+        
+        // Show user-friendly offline message
+        return {
+          success: true,
+          data: queuedData,
+          message: 'Saved offline. Will sync when you\'re back online.',
+          offline: true
+        };
+      }
+
       // Handle 401 Unauthorized - try to refresh token
       if (response.status === 401 && retryCount === 0) {
-        console.log('🔄 Token expired, attempting to refresh...');
+        console.log('Token expired, attempting to refresh...');
         
         const refreshSuccess = await this.attemptTokenRefresh();
         if (refreshSuccess) {
-          console.log('✅ Token refreshed successfully, retrying request...');
+          console.log('Token refreshed successfully, retrying request...');
           // Retry the original request with the new token
           return this.makeRequest(endpoint, options, retryCount + 1);
         } else {
-          console.error('❌ Token refresh failed, redirecting to login...');
+          console.error('Token refresh failed, redirecting to login...');
           this.handleAuthFailure();
           return {
             success: false,
@@ -304,7 +323,7 @@ class ApiClient {
             errorMessage = errorResponse.details;
           }
           
-          console.error('❌ API Error Response:', {
+          console.error('API Error Response:', {
             status: response.status,
             statusText: response.statusText,
             url: response.url,
@@ -319,7 +338,7 @@ class ApiClient {
           };
         } catch (jsonError) {
           // If we can't parse the error response, use the generic message
-          console.error('❌ Failed to parse error response:', jsonError);
+          console.error('Failed to parse error response:', jsonError);
           return {
             success: false,
             error: errorMessage
@@ -331,7 +350,7 @@ class ApiClient {
       const data = await response.json();
       
       // Log successful response for debugging
-      console.log('✅ API Response:', {
+      console.log('API Response:', {
         status: response.status,
         url: response.url,
         success: data.success !== false
@@ -339,7 +358,29 @@ class ApiClient {
       
       return data;
     } catch (error) {
-      console.error('❌ API Request failed:', error);
+      console.error('API Request failed:', error);
+      
+      // Enhanced offline error handling
+      if (!navigator.onLine || error instanceof TypeError && error.message.includes('fetch')) {
+        // Network error - likely offline
+        if (options.method && options.method !== 'GET') {
+          // For non-GET requests, show that it will be queued
+          return {
+            success: true,
+            message: 'Request queued for when you\'re back online',
+            offline: true,
+            queued: true
+          };
+        } else {
+          // For GET requests, try to get from cache
+          return {
+            success: false,
+            error: 'You\'re offline. Some content may not be available.',
+            offline: true
+          };
+        }
+      }
+      
       return {
         success: false,
         error: error instanceof Error ? error.message : 'An unknown error occurred',
@@ -379,15 +420,15 @@ class ApiClient {
             localStorage.setItem('refreshToken', data.data.refreshToken);
           }
           
-          console.log('✅ Token refresh successful');
+          console.log('Token refresh successful');
           return true;
         }
       }
       
-      console.error('❌ Token refresh failed:', response.status, response.statusText);
+      console.error('Token refresh failed:', response.status, response.statusText);
       return false;
     } catch (error) {
-      console.error('❌ Token refresh error:', error);
+      console.error('Token refresh error:', error);
       return false;
     }
   }
@@ -771,6 +812,11 @@ class ApiClient {
 
   async getUserProfile(): Promise<ApiResponse> {
     return this.makeRequest('/users/profile');
+  }
+
+  // Alias for getProfile to match caching system expectations
+  async getProfile(): Promise<ApiResponse> {
+    return this.getUserProfile();
   }
 
   async updateUserProfile(userData: any): Promise<ApiResponse> {

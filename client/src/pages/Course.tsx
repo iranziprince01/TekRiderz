@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
+import { essentialDataCache } from '../utils/offlineDataCache';
 import { getCourse, getCourses, enrollInCourse, getCourseContent, getUserProgress, getUserCourseProgress, getFileUrl, getCourseQuizzes, submitQuiz, getQuizResults, markLessonComplete, updateLessonProgress, getCourseProgress, getInstructorAnalytics, getCourseStats, updateCourseProgress, apiClient } from '../utils/api';
 import { getCoursePermissions, CoursePermissions } from '../utils/coursePermissions';
 import CourseLayout from '../components/layout/CourseLayout';
@@ -34,7 +36,11 @@ import {
   Info,
   ArrowLeft,
   ArrowRight,
-  Send
+  Send,
+  Wifi,
+  WifiOff,
+  Download,
+  Eye
 } from 'lucide-react';
 import { AutoGradedQuiz } from '../components/quiz/AutoGradedQuiz';
 import { ToastContainer } from '../components/ui/Toast';
@@ -356,10 +362,10 @@ const CourseHome = ({ courseData, onEnrollmentUpdate }: {
                   onLoad={() => {
                     setThumbnailLoaded(true);
                     setThumbnailError(false);
-                    console.log('✅ Thumbnail loaded successfully:', thumbnailUrl);
+                    console.log('Thumbnail loaded successfully:', thumbnailUrl);
                   }}
                 onError={(e) => {
-                    console.error('❌ Thumbnail failed to load:', thumbnailUrl);
+                    console.error('Thumbnail failed to load:', thumbnailUrl);
                     setThumbnailError(true);
                 }}
                   loading="eager"
@@ -617,7 +623,7 @@ const CourseModules = ({ courseData }: { courseData: CourseData }) => {
           const completedLessons = userProgress?.completedLessons || [];
           const lessonProgress = userProgress?.lessonProgress || {};
           
-          console.log('📊 Loading course progress:', {
+          console.log('Loading course progress:', {
             courseId: course.id,
             completedLessons: completedLessons.length,
             totalLessons: Object.keys(initialProgress).length,
@@ -677,7 +683,7 @@ const CourseModules = ({ courseData }: { courseData: CourseData }) => {
                 },
               };
               
-              console.log('🔄 Restored partial progress:', {
+              console.log('Restored partial progress:', {
                 lessonKey,
                 currentPosition,
                 estimatedDuration,
@@ -701,7 +707,7 @@ const CourseModules = ({ courseData }: { courseData: CourseData }) => {
             }
           });
           
-          console.log('✅ Course progress loaded successfully:', {
+          console.log('Course progress loaded successfully:', {
             courseId: course.id,
             completedLessons: completedLessons.length,
             overallProgress: enrollment?.progress || 0,
@@ -720,7 +726,7 @@ const CourseModules = ({ courseData }: { courseData: CourseData }) => {
             const completedLessons = Object.values(initialProgress).filter(p => p.isCompleted).length;
             const calculatedProgress = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
             
-            console.log('📊 Progress calculation after load:', {
+            console.log('Progress calculation after load:', {
               totalLessons,
               completedLessons,
               calculatedProgress,
@@ -729,7 +735,7 @@ const CourseModules = ({ courseData }: { courseData: CourseData }) => {
           }, 100);
         }
       } catch (error) {
-        console.error('❌ Error loading user progress:', error);
+        console.error('Error loading user progress:', error);
       }
       
     setModuleProgress(initialProgress);
@@ -921,7 +927,7 @@ const CourseModules = ({ courseData }: { courseData: CourseData }) => {
       videoProgressTimers.current[saveKey] = now;
       saveVideoProgress(lessonKey, currentTime, duration, percentageWatched);
       
-      console.log('💾 Enhanced progress save:', {
+      console.log('Enhanced progress save:', {
         lessonKey,
         currentTime: Math.round(currentTime),
         percentageWatched,
@@ -1163,14 +1169,14 @@ const CourseModules = ({ courseData }: { courseData: CourseData }) => {
         }]
       });
       
-      console.log('💾 Video progress saved:', {
+      console.log('Video progress saved:', {
         lessonId,
         currentTime: Math.round(currentTime),
         duration: Math.round(duration),
         percentageWatched,
       });
     } catch (error) {
-      console.error('❌ Error saving video progress:', error);
+      console.error('Error saving video progress:', error);
     }
   };
 
@@ -1312,7 +1318,7 @@ const CourseModules = ({ courseData }: { courseData: CourseData }) => {
         // Check if course is now completed - show completion notification instead of refresh
         if (overallProgress >= 100) {
           // Course completed - show completion notification without interrupting user flow
-          console.log('🎉 Course completed! Completion status will be updated automatically');
+          console.log('Course completed! Completion status will be updated automatically');
           
           // Emit completion event for UI updates
           window.dispatchEvent(new CustomEvent('courseCompleted', { 
@@ -1342,7 +1348,7 @@ const CourseModules = ({ courseData }: { courseData: CourseData }) => {
         // Show quiz after video is marked as done
     setShowQuiz(lessonKey);
         
-        console.log('✅ Lesson completion saved successfully:', {
+        console.log('Lesson completion saved successfully:', {
           lessonKey,
           lessonId,
           courseId: course.id,
@@ -1355,11 +1361,11 @@ const CourseModules = ({ courseData }: { courseData: CourseData }) => {
           lessonType: isVideoLesson ? 'video' : 'non-video',
         });
       } else {
-        console.error('❌ Failed to mark lesson as complete:', completionResponse.error);
+        console.error('Failed to mark lesson as complete:', completionResponse.error);
         throw new Error(completionResponse.error || 'Failed to mark lesson as complete');
       }
     } catch (error) {
-      console.error('❌ Failed to mark video as watched:', error);
+      console.error('Failed to mark video as watched:', error);
       
       // Revert local state on error
       setModuleProgress(prev => ({
@@ -1379,7 +1385,7 @@ const CourseModules = ({ courseData }: { courseData: CourseData }) => {
       }));
       
       // Show user-friendly error message
-      console.error('❌ Failed to mark lesson as done. Please try again.');
+      console.error('Failed to mark lesson as done. Please try again.');
       // You could add a toast notification here if available
     }
   };
@@ -1507,7 +1513,7 @@ const CourseModules = ({ courseData }: { courseData: CourseData }) => {
     const progress = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
     
     // Log progress calculation for debugging
-    console.log('📊 Progress calculation:', {
+    console.log('Progress calculation:', {
       totalLessons,
       completedLessons,
       progress,
@@ -1523,7 +1529,7 @@ const CourseModules = ({ courseData }: { courseData: CourseData }) => {
   // Update overall progress when moduleProgress changes
   useEffect(() => {
     const progress = calculateProgress();
-    console.log('📊 Progress updated:', progress);
+    console.log('Progress updated:', progress);
   }, [moduleProgress]);
 
   return (
@@ -1722,7 +1728,7 @@ const CourseModules = ({ courseData }: { courseData: CourseData }) => {
                                               const duration = video.duration;
                                               const percentageWatched = duration > 0 ? Math.round((currentTime / duration) * 100) : 0;
                                               
-                                              console.log('⏸️ Video paused, saving progress:', {
+                                              console.log('Video paused, saving progress:', {
                                                 lessonKey,
                                                 currentTime: Math.round(currentTime),
                                                 percentageWatched
@@ -1927,11 +1933,11 @@ const CourseModules = ({ courseData }: { courseData: CourseData }) => {
                     </div>
                     
                     <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-4">
-                      <span>📝 {section.moduleQuiz.questions.length} questions</span>
+                                              <span>{section.moduleQuiz.questions.length} questions</span>
                       <span>•</span>
-                      <span>⏱️ No time limit</span>
+                                              <span>No time limit</span>
                       <span>•</span>
-                      <span>🎯 {section.moduleQuiz.settings?.passingScore || 70}% to pass</span>
+                                              <span>{section.moduleQuiz.settings?.passingScore || 70}% to pass</span>
                     </div>
                     
                     <InlineQuiz
@@ -2613,7 +2619,7 @@ const CourseGrades = ({ courseData }: { courseData: CourseData }) => {
     const handleQuizSuccess = (event: CustomEvent) => {
       const { title, score, isImprovement, attempts, maxAttempts } = event.detail;
       
-      let message = `🎉 Congratulations! You passed "${title}" with ${score}%`;
+      let message = `Congratulations! You passed "${title}" with ${score}%`;
       if (isImprovement) {
         message += ' (New personal best!)';
       }
@@ -3980,15 +3986,20 @@ const InlineQuiz = ({ quiz, lessonKey, onComplete, courseId }: {
 // Main Course Component
 const Course = () => {
   const { id } = useParams<{ id: string }>();
-  const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { language } = useLanguage();
+  const { isOnline } = useNetworkStatus();
+
+  // Add offline course availability state
+  const [isOfflineCourseAvailable, setIsOfflineCourseAvailable] = useState(false);
+
+  const location = useLocation();
   const [courseData, setCourseData] = useState<CourseData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<string>('home');
   const [availableCourses, setAvailableCourses] = useState<any[]>([]);
-  const { language } = useLanguage();
 
   // Handle enrollment state updates
   const handleEnrollmentUpdate = (isEnrolled: boolean, enrollmentId?: string) => {
@@ -4289,6 +4300,31 @@ const Course = () => {
     }
   };
 
+  useEffect(() => {
+    // Check if course is available offline
+    const checkOfflineAvailability = async () => {
+      if (id && user?.id) {
+        try {
+          const offlineSettings = localStorage.getItem(`course_preloaded_${id}`);
+          const hasOfflineData = !!offlineSettings;
+          setIsOfflineCourseAvailable(hasOfflineData);
+        } catch (error) {
+          console.warn('Failed to check offline course availability:', error);
+        }
+      }
+    };
+
+    checkOfflineAvailability();
+  }, [id, user?.id]);
+
+  // Auto-redirect to offline course if online course fails and offline is available
+  useEffect(() => {
+    if (!isOnline && isOfflineCourseAvailable && id) {
+      console.log('🔌 Device offline, redirecting to offline course...');
+      navigate(`/offline-course/${id}`, { replace: true });
+    }
+  }, [isOnline, isOfflineCourseAvailable, id, navigate]);
+
   // Render the appropriate component based on current view
   const renderCurrentView = () => {
     if (!courseData) return null;
@@ -4392,6 +4428,35 @@ const Course = () => {
   return (
     <>
       <ToastContainer />
+      
+      {/* Offline Mode Indicator and Navigation */}
+      {(!isOnline || isOfflineCourseAvailable) && (
+        <div className="fixed top-4 right-4 z-50">
+          <div className="flex gap-2">
+            {/* Offline Status Indicator */}
+            {!isOnline && (
+              <div className="bg-orange-100 border border-orange-200 rounded-lg px-3 py-2 flex items-center gap-2 text-orange-800 text-sm shadow-lg">
+                <WifiOff className="w-4 h-4" />
+                <span>{language === 'rw' ? 'Muri offline' : 'You\'re offline'}</span>
+              </div>
+            )}
+            
+            {/* Switch to Offline Course Button */}
+            {isOnline && isOfflineCourseAvailable && (
+              <Button
+                onClick={() => navigate(`/offline-course/${id}`)}
+                variant="outline"
+                size="sm"
+                className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+              >
+                <Eye className="w-4 h-4 mr-1" />
+                {language === 'rw' ? 'Reba offline' : 'View Offline'}
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+      
       <CourseLayout 
         courseTitle={courseData.course.title || 'Untitled Course'}
         courseProgress={0} // Will be calculated based on user progress

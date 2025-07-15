@@ -17,6 +17,7 @@ import courseRoutes from './routes/courses';
 import { adminRoutes } from './routes/admin';
 import { fileUploadRoutes } from './routes/fileUpload';
 import { certificateRoutes } from './routes/certificates';
+import syncRoutes from './routes/sync';
 import { globalRateLimiter, getRateLimitStatus, clearRateLimit } from './middleware/rateLimiter';
 
 const app = express();
@@ -174,6 +175,7 @@ app.use('/api/v1/courses', courseRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/upload', fileUploadRoutes);
 app.use('/api/v1/certificates', certificateRoutes);
+app.use('/api/v1/sync', syncRoutes);
 
 // Rate limiting status endpoint
 app.get('/api/v1/rate-limit/status', getRateLimitStatus);

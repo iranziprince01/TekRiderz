@@ -1,461 +1,427 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
+import { useNetworkStatus } from '../../hooks/useNetworkStatus';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
-import { useAuth } from '../../contexts/AuthContext';
-import { useLanguage } from '../../contexts/LanguageContext';
-import { useSimpleImageLoader } from '../../hooks/useImageLoader';
 import { 
-  Play, 
+  BookOpen, 
   Clock, 
   Users, 
-  Star, 
-  BookOpen, 
-  Edit, 
-  Trash2, 
-  Eye, 
-  MoreVertical,
-  ChevronRight,
-  Award,
+  Star,
+  Play,
+  Plus,
   CheckCircle,
-  XCircle
+  Download,
+  Eye,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
+import { apiClient, getFileUrl } from '../../utils/api';
+import { offlineOperations } from '../../utils/offlineOperations';
+import { useCoursePreloading } from '../../hooks/useCoursePreloading';
 
 interface EnhancedCourseCardProps {
-  course: {
-    id: string;
-    title: string;
-    description: string;
-    shortDescription?: string;
-    thumbnail: string;
-    instructorName: string;
-    instructorAvatar?: string;
-    category: string;
-    level: 'beginner' | 'intermediate' | 'advanced';
-    status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'published' | 'under_review';
-    rating: { average: number; count: number };
-    enrollmentCount: number;
-    totalDuration: number;
-    totalLessons: number;
-
-  
-    tags: string[];
-    createdAt: string;
-    updatedAt: string;
-    progress?: number;
-    isEnrolled?: boolean;
-    certificate?: boolean;
-    language?: string;
-  };
-  variant?: 'learner' | 'tutor' | 'admin';
-  onEdit?: (courseId: string) => void;
-  onDelete?: (courseId: string) => void;
-  onApprove?: (courseId: string) => void;
-  onReject?: (courseId: string) => void;
-  onEnroll?: (courseId: string) => void;
-  onView?: (courseId: string) => void;
-  loading?: boolean;
-  compact?: boolean;
+  course: any;
+  showProgress?: boolean;
+  onEnrollmentChange?: () => void;
 }
 
-export const EnhancedCourseCard: React.FC<EnhancedCourseCardProps> = ({ 
+const EnhancedCourseCard: React.FC<EnhancedCourseCardProps> = ({ 
   course, 
-  variant = 'learner', 
-  onEdit, 
-  onDelete, 
-  onApprove,
-  onReject,
-  onEnroll,
-  onView,
-  loading = false,
-  compact = false 
+  showProgress = false,
+  onEnrollmentChange 
 }) => {
-  const navigate = useNavigate();
   const { user } = useAuth();
-  const { language } = useLanguage();
-  const [showMenu, setShowMenu] = useState(false);
+  const { isOnline } = useNetworkStatus();
+  const { t } = useLanguage();
   const [isEnrolling, setIsEnrolling] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [isApproving, setIsApproving] = useState(false);
-  const [isRejecting, setIsRejecting] = useState(false);
+  const [enrollmentStatus, setEnrollmentStatus] = useState<'none' | 'enrolled' | 'pending'>('none');
+  const [isOfflineAvailable, setIsOfflineAvailable] = useState(false);
+  
+  // Course preloading functionality
+  const { 
+    preloadStatus, 
+    preloadCourse, 
+    cancelPreload, 
+    clearPreloadedCourse 
+  } = useCoursePreloading();
 
-  // Use robust image loader for course thumbnail
-  const thumbnail = useSimpleImageLoader(course.thumbnail, 'thumbnail');
+  // Check if user is already enrolled
+  const isEnrolled = course.enrollment || course.isEnrolled;
 
-  const formatDuration = (seconds: number): string => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
+  // Check if course is available offline
+  useEffect(() => {
+    const checkOfflineAvailability = async () => {
+      if (course.id && user?.id) {
+        try {
+          const offlineSettings = localStorage.getItem(`course_preloaded_${course.id}`);
+          setIsOfflineAvailable(!!offlineSettings);
+        } catch (error) {
+          console.warn('Failed to check offline course availability:', error);
+        }
+      }
+    };
+
+    checkOfflineAvailability();
+  }, [course.id, user?.id, preloadStatus]);
+
+  // Handle course download for offline access
+  const handleDownloadCourse = async () => {
+    if (!course.id) return;
     
-    if (hours > 0) {
-      return `${hours}h ${minutes}m`;
-    }
-    return `${minutes}m`;
-  };
-
-  const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString();
-  };
-
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      draft: { variant: 'default' as const, text: language === 'rw' ? 'Igishushanyo' : 'Draft' },
-      submitted: { variant: 'warning' as const, text: language === 'rw' ? 'Byoherejwe' : 'Submitted' },
-      approved: { variant: 'success' as const, text: language === 'rw' ? 'Byemejwe' : 'Approved' },
-      rejected: { variant: 'error' as const, text: language === 'rw' ? 'Byanze' : 'Rejected' },
-      published: { variant: 'success' as const, text: language === 'rw' ? 'Byatangajwe' : 'Published' },
-      under_review: { variant: 'warning' as const, text: language === 'rw' ? 'Birasuzumwa' : 'Under Review' }
-    };
-
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.draft;
-    return <Badge variant={config.variant}>{config.text}</Badge>;
-  };
-
-  const getLevelBadge = (level: string) => {
-    const levelConfig = {
-      beginner: { color: 'bg-green-100 text-green-800', text: language === 'rw' ? 'Intangiriro' : 'Beginner' },
-      intermediate: { color: 'bg-yellow-100 text-yellow-800', text: language === 'rw' ? 'Hagati' : 'Intermediate' },
-      advanced: { color: 'bg-red-100 text-red-800', text: language === 'rw' ? 'Byimvugo' : 'Advanced' }
-    };
-
-    const config = levelConfig[level as keyof typeof levelConfig] || levelConfig.beginner;
-    return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
-        {config.text}
-      </span>
-    );
-  };
-
-  const handleEnroll = async () => {
-    if (!onEnroll) return;
-    setIsEnrolling(true);
     try {
-      await onEnroll(course.id);
+      await preloadCourse(course.id, {
+        includeVideos: true,
+        includeAssets: true
+      });
+      
+      // Recheck offline availability after successful preload
+      setIsOfflineAvailable(true);
+    } catch (error) {
+      console.error('Failed to download course:', error);
+    }
+  };
+
+  // Handle removing offline course
+  const handleRemoveOfflineCourse = async () => {
+    if (!course.id) return;
+    
+    try {
+      await clearPreloadedCourse(course.id);
+      setIsOfflineAvailable(false);
+    } catch (error) {
+      console.error('Failed to remove offline course:', error);
+    }
+  };
+  const isInProgress = course.progress?.percentage > 0 && course.progress?.percentage < 100;
+  const isCompleted = course.progress?.percentage >= 100;
+
+  // Handle course enrollment (works offline)
+  const handleEnroll = async () => {
+    if (!user || isEnrolling) return;
+
+    setIsEnrolling(true);
+    
+    try {
+      const userId = user.id || (user as any)._id;
+      
+      if (isOnline) {
+        // Online enrollment
+        const response = await apiClient.enrollInCourse(course.id || course._id);
+        if (response.success) {
+          setEnrollmentStatus('enrolled');
+          onEnrollmentChange?.();
+        } else {
+          throw new Error(response.error || 'Enrollment failed');
+        }
+      } else {
+        // Offline enrollment - queue for sync
+        await offlineOperations.enrollInCourse(course.id || course._id, userId);
+        setEnrollmentStatus('pending');
+        onEnrollmentChange?.();
+      }
+    } catch (error) {
+      console.error('Failed to enroll in course:', error);
+      // Show user-friendly error (you might want to add a toast notification here)
     } finally {
       setIsEnrolling(false);
     }
   };
 
-  const handleDelete = async () => {
-    if (!onDelete) return;
-    setIsDeleting(true);
-    try {
-      await onDelete(course.id);
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  const handleApprove = async () => {
-    if (!onApprove) return;
-    setIsApproving(true);
-    try {
-      await onApprove(course.id);
-    } finally {
-      setIsApproving(false);
-    }
-  };
-
-  const handleReject = async () => {
-    if (!onReject) return;
-    setIsRejecting(true);
-    try {
-      await onReject(course.id);
-    } finally {
-      setIsRejecting(false);
-    }
-  };
-
-  const handleView = () => {
-    if (onView) {
-      onView(course.id);
-    } else {
-      navigate(`/course/${course.id}`);
-    }
-  };
-
-  const renderActions = () => {
-    if (variant === 'learner') {
+  // Get enrollment button text and status
+  const getEnrollmentButton = () => {
+    if (isEnrolled || enrollmentStatus === 'enrolled') {
       return (
-        <div className="flex items-center space-x-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleView}
-          >
-            <Eye className="w-4 h-4 mr-2" />
-            {language === 'rw' ? 'Kureba' : 'Preview'}
-          </Button>
-          {course.isEnrolled ? (
-            <Button
-              size="sm"
-              onClick={() => navigate(`/course/${course.id}/learn`)}
-            >
-              <Play className="w-4 h-4 mr-2" />
-              {language === 'rw' ? 'Komeza' : 'Continue'}
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              onClick={handleEnroll}
-              disabled={isEnrolling}
-            >
-              {isEnrolling ? (
-                <LoadingSpinner size="sm" />
-              ) : (
-                <ChevronRight className="w-4 h-4 mr-2" />
-              )}
-              {language === 'rw' ? 'Kwiyandikisha' : 'Enroll'}
-            </Button>
-          )}
-        </div>
-      );
-    }
-
-    if (variant === 'tutor') {
-      return (
-        <div className="flex items-center space-x-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleView}
-          >
-            <Eye className="w-4 h-4 mr-2" />
-            {language === 'rw' ? 'Kureba' : 'View'}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => onEdit?.(course.id)}
-          >
-            <Edit className="w-4 h-4 mr-2" />
-            {language === 'rw' ? 'Guhindura' : 'Edit'}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleDelete}
-            disabled={isDeleting}
-            className="text-red-600 hover:text-red-700"
-          >
-            {isDeleting ? (
-              <LoadingSpinner size="sm" />
+        <Link to={`/course/${course.id || course._id}`}>
+          <Button className="w-full flex items-center gap-2">
+            {isCompleted ? (
+              <>
+                <CheckCircle className="w-4 h-4" />
+                {t('Review Course')}
+              </>
             ) : (
-              <Trash2 className="w-4 h-4 mr-2" />
+              <>
+                <Play className="w-4 h-4" />
+                {t('Continue Learning')}
+              </>
             )}
-            {language === 'rw' ? 'Gusiba' : 'Delete'}
           </Button>
-        </div>
+        </Link>
       );
     }
 
-    if (variant === 'admin') {
+    if (enrollmentStatus === 'pending') {
       return (
-        <div className="flex items-center space-x-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleView}
-          >
-            <Eye className="w-4 h-4 mr-2" />
-            {language === 'rw' ? 'Kureba' : 'View'}
-          </Button>
-          {(course.status === 'submitted' || course.status === 'under_review') && (
-            <>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleApprove}
-                disabled={isApproving}
-                className="text-green-600 hover:text-green-700"
-              >
-                {isApproving ? (
-                  <LoadingSpinner size="sm" />
-                ) : (
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                )}
-                {language === 'rw' ? 'Kwemeza' : 'Approve'}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleReject}
-                disabled={isRejecting}
-                className="text-red-600 hover:text-red-700"
-              >
-                {isRejecting ? (
-                  <LoadingSpinner size="sm" />
-                ) : (
-                  <XCircle className="w-4 h-4 mr-2" />
-                )}
-                {language === 'rw' ? 'Kwanga' : 'Reject'}
-              </Button>
-            </>
-          )}
-        </div>
+        <Button disabled className="w-full flex items-center gap-2">
+          <Clock className="w-4 h-4" />
+          {t('Enrollment Pending')}
+        </Button>
       );
     }
-  };
 
-  if (loading) {
     return (
-      <Card className="p-6">
-        <div className="animate-pulse">
-          <div className="h-48 bg-gray-200 dark:bg-gray-700 rounded-lg mb-4"></div>
-          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-2"></div>
-          <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
-        </div>
-      </Card>
+      <Button 
+        onClick={handleEnroll}
+        disabled={isEnrolling}
+        className="w-full flex items-center gap-2"
+      >
+        {isEnrolling ? (
+          <LoadingSpinner className="w-4 h-4" />
+        ) : (
+          <Plus className="w-4 h-4" />
+        )}
+        {isEnrolling ? t('Enrolling...') : t('Enroll Now')}
+      </Button>
     );
-  }
+  };
 
   return (
-    <Card className={`group hover:shadow-lg transition-shadow duration-200 ${compact ? 'p-4' : 'p-6'}`}>
+    <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-300">
       {/* Course Thumbnail */}
-      <div className="relative mb-4">
-        <div className="w-full aspect-video bg-gray-200 dark:bg-gray-700 rounded-lg overflow-hidden relative">
-          {thumbnail.isLoading ? (
-            <div className="flex items-center justify-center h-full">
-              <LoadingSpinner size="md" />
-            </div>
-          ) : thumbnail.hasError ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center text-gray-400">
-                <BookOpen className="w-12 h-12 mx-auto mb-2" />
-                <p className="text-sm">Image not available</p>
-              </div>
-            </div>
-          ) : (
-            <img
-              src={thumbnail.src}
-              alt={course.title}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-              onLoad={thumbnail.onLoad}
-              onError={thumbnail.onError}
-            />
+      <div className="relative h-48 bg-gradient-to-br from-gray-100 to-gray-200">
+        {course.thumbnail ? (
+          <img
+            src={getFileUrl(course.thumbnail, 'thumbnail')}
+            alt={course.title}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <BookOpen className="w-12 h-12 text-gray-400" />
+          </div>
+        )}
+        
+        {/* Course Status Badge */}
+        <div className="absolute top-3 left-3 flex flex-col gap-1">
+          {course.featured && (
+            <Badge variant="default" className="text-xs">
+              {t('Featured')}
+            </Badge>
+          )}
+          
+          {/* Offline Availability Badge */}
+          {isOfflineAvailable && (
+            <Badge variant="success" className="text-xs flex items-center gap-1">
+              <Download className="w-3 h-3" />
+              {t('Offline Ready')}
+            </Badge>
           )}
         </div>
-        
-        {/* Status Badge */}
-        <div className="absolute top-2 left-2">
-          {getStatusBadge(course.status)}
-        </div>
-        
-        {/* Duration Badge */}
-        <div className="absolute top-2 right-2">
-          <Badge variant="default" className="bg-black bg-opacity-75 text-white">
-            <Clock className="w-3 h-3 mr-1" />
-            {formatDuration(course.totalDuration)}
-          </Badge>
-        </div>
-        
-        {/* Progress Bar (for enrolled courses) */}
-        {course.isEnrolled && course.progress !== undefined && (
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-200 dark:bg-gray-700">
-            <div 
-              className="h-full bg-blue-500 transition-all duration-300"
-              style={{ width: `${course.progress}%` }}
-            />
+
+                 {/* Course Level Badge */}
+         <div className="absolute top-3 right-3">
+           {course.level && (
+             <Badge variant="info" className="text-xs">
+               {t(course.level)}
+             </Badge>
+           )}
+         </div>
+
+        {/* Progress Overlay for enrolled courses */}
+        {showProgress && course.progress && (
+          <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white p-2">
+            <div className="flex items-center justify-between text-sm">
+              <span>{course.progress.percentage}% {t('Complete')}</span>
+              <span>{course.progress.completedLessons}/{course.progress.totalLessons} {t('Lessons')}</span>
+            </div>
+            <div className="w-full bg-gray-600 rounded-full h-1 mt-1">
+              <div 
+                className="bg-green-400 h-1 rounded-full transition-all duration-300"
+                style={{ width: `${course.progress.percentage}%` }}
+              />
+            </div>
           </div>
         )}
       </div>
 
-      {/* Course Info */}
-      <div className="mb-4">
-        <div className="flex items-start justify-between mb-2">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex-1 overflow-hidden">
-            <span className="block overflow-hidden text-ellipsis whitespace-nowrap">
-              {course.title}
-            </span>
-          </h3>
-          {variant !== 'learner' && (
-            <button
-              onClick={() => setShowMenu(!showMenu)}
-              className="ml-2 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
-            >
-              <MoreVertical className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-            </button>
+      {/* Course Content */}
+      <div className="p-6">
+                 {/* Course Category */}
+         {course.category && (
+           <div className="flex items-center gap-2 mb-2">
+             <Badge variant="info" className="text-xs">
+               {t(course.category)}
+             </Badge>
+             {course.difficulty && (
+               <Badge variant="warning" className="text-xs">
+                 {t(course.difficulty)}
+               </Badge>
+             )}
+           </div>
+         )}
+
+        {/* Course Title */}
+        <h3 className="font-bold text-lg text-gray-900 mb-2 line-clamp-2">
+          {course.title}
+        </h3>
+
+        {/* Course Description */}
+        <p className="text-gray-600 text-sm mb-4 line-clamp-3">
+          {course.description}
+        </p>
+
+        {/* Course Metadata */}
+        <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
+          {course.duration && (
+            <div className="flex items-center gap-1">
+              <Clock className="w-4 h-4" />
+              <span>{course.duration}</span>
+            </div>
+          )}
+          
+          {course.studentsCount && (
+            <div className="flex items-center gap-1">
+              <Users className="w-4 h-4" />
+              <span>{course.studentsCount} {t('students')}</span>
+            </div>
+          )}
+          
+          {course.rating && (
+            <div className="flex items-center gap-1">
+              <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+              <span>{course.rating}</span>
+            </div>
           )}
         </div>
-        
-        <div className="text-sm text-gray-600 dark:text-gray-400 mb-3 overflow-hidden">
-          <p className="overflow-hidden text-ellipsis whitespace-nowrap">
-            {course.shortDescription || course.description}
-          </p>
-        </div>
-        
-        {/* Instructor Info */}
-        <div className="flex items-center space-x-2 mb-3">
-          <div className="w-6 h-6 bg-gray-300 dark:bg-gray-600 rounded-full flex items-center justify-center">
-            {course.instructorAvatar ? (
-              <img
-                src={course.instructorAvatar}
-                alt={course.instructorName || 'Instructor'}
-                className="w-full h-full rounded-full object-cover"
-              />
+
+        {/* Instructor */}
+        {course.instructorName && (
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-bold">
+              {course.instructorName.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-900">{course.instructorName}</p>
+              {course.instructorTitle && (
+                <p className="text-xs text-gray-500">{course.instructorTitle}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Course Price */}
+        {course.price !== undefined && (
+          <div className="mb-4">
+            {course.price === 0 ? (
+              <Badge variant="success" className="text-sm">
+                {t('Free')}
+              </Badge>
             ) : (
-              <span className="text-xs text-gray-600 dark:text-gray-400">
-                {course.instructorName?.charAt(0) || '?'}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-bold text-gray-900">
+                  ${course.price}
+                </span>
+                {course.originalPrice && course.originalPrice > course.price && (
+                  <span className="text-sm text-gray-500 line-through">
+                    ${course.originalPrice}
+                  </span>
+                )}
+              </div>
             )}
           </div>
-          <span className="text-sm text-gray-600 dark:text-gray-400">
-            {course.instructorName || 'Unknown Instructor'}
-          </span>
-        </div>
-        
-        {/* Course Meta */}
-        <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400 mb-3">
-          <div className="flex items-center space-x-1">
-            <Star className="w-4 h-4 text-yellow-500" />
-            <span>{course.rating.average.toFixed(1)}</span>
-            <span>({course.rating.count})</span>
-          </div>
-          <div className="flex items-center space-x-1">
-            <Users className="w-4 h-4" />
-            <span>{course.enrollmentCount}</span>
-          </div>
-          <div className="flex items-center space-x-1">
-            <BookOpen className="w-4 h-4" />
-            <span>{course.totalLessons} {language === 'rw' ? 'amasomo' : 'lessons'}</span>
-          </div>
-        </div>
-        
-        {/* Tags */}
-        <div className="flex flex-wrap gap-1 mb-3">
-          {getLevelBadge(course.level)}
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-            {course.category}
-          </span>
-          {course.certificate && (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-              <Award className="w-3 h-3 mr-1" />
-              {language === 'rw' ? 'Icyemezo' : 'Certificate'}
-            </span>
+        )}
+
+        {/* Enrollment Button */}
+        <div className="space-y-2">
+          {getEnrollmentButton()}
+          
+          {/* Offline Access Buttons for Enrolled Users */}
+          {isEnrolled && (
+            <div className="flex gap-2">
+              {/* Continue/Start Course Button */}
+              <Link 
+                to={`/course/${course.id}`}
+                className="flex-1"
+              >
+                <Button variant="primary" size="sm" className="w-full">
+                  <Play className="w-4 h-4 mr-1" />
+                  {course.progress?.percentage > 0 ? t('Continue') : t('Start')}
+                </Button>
+              </Link>
+              
+              {/* Offline Course Access */}
+              {isOfflineAvailable && (
+                <Link to={`/offline-course/${course.id}`}>
+                  <Button variant="outline" size="sm" className="flex items-center gap-1">
+                    <Eye className="w-4 h-4" />
+                    {!isOnline ? t('View') : t('Offline')}
+                  </Button>
+                </Link>
+              )}
+            </div>
+          )}
+          
+          {/* Offline indicator for enrollment */}
+          {!isOnline && !isEnrolled && (
+            <p className="text-xs text-center text-amber-600">
+              {t('Enrollment will sync when you\'re back online')}
+            </p>
+          )}
+          
+          {/* Course Download/Remove for Offline Access */}
+          {isEnrolled && (
+            <div className="border-t pt-2">
+              {preloadStatus.isPreloading && preloadStatus.currentItem ? (
+                <div className="flex items-center gap-2 text-sm text-blue-600">
+                  <LoadingSpinner className="w-4 h-4" />
+                  <div className="flex-1">
+                    <div className="text-xs">{t('Downloading...')}</div>
+                    <div className="text-xs text-gray-500 truncate">
+                      {preloadStatus.currentItem}
+                    </div>
+                    {preloadStatus.progress > 0 && (
+                      <div className="w-full bg-gray-200 rounded-full h-1 mt-1">
+                        <div 
+                          className="bg-blue-500 h-1 rounded-full transition-all duration-300"
+                          style={{ width: `${preloadStatus.progress}%` }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <Button
+                    onClick={cancelPreload}
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs px-2 py-1"
+                  >
+                    {t('Cancel')}
+                  </Button>
+                </div>
+              ) : isOfflineAvailable ? (
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2 text-green-600">
+                    <Download className="w-4 h-4" />
+                    <span>{t('Downloaded for offline')}</span>
+                  </div>
+                  <Button
+                    onClick={handleRemoveOfflineCourse}
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs px-2 py-1 text-red-600 hover:text-red-700"
+                  >
+                    {t('Remove')}
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  onClick={handleDownloadCourse}
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-xs flex items-center gap-2"
+                  disabled={!isOnline}
+                >
+                  <Download className="w-4 h-4" />
+                  {t('Download for offline')}
+                </Button>
+              )}
+            </div>
           )}
         </div>
       </div>
-
-      {/* Actions */}
-      <div className="flex items-center justify-between">
-        <div className="text-lg font-semibold text-green-600">
-          {language === 'rw' ? 'Ubuntu' : 'Free'}
-        </div>
-        
-        {renderActions()}
-      </div>
-      
-      {/* Additional Info for Admin/Tutor */}
-      {variant !== 'learner' && (
-        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
-            <span>{language === 'rw' ? 'Byashyizweho' : 'Created'}: {formatDate(course.createdAt)}</span>
-            <span>{language === 'rw' ? 'Byavuguruwe' : 'Updated'}: {formatDate(course.updatedAt)}</span>
-          </div>
-        </div>
-      )}
     </Card>
   );
 };

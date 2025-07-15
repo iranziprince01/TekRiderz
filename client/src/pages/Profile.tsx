@@ -1,83 +1,48 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
+import { useLanguage } from '../contexts/LanguageContext';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { LoadingSpinner } from '../components/ui/LoadingSpinner';
-import { Alert } from '../components/ui/Alert';
 import { Badge } from '../components/ui/Badge';
+import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { 
-  User,
-  Mail,
+  User, 
+  Mail, 
+  Calendar, 
+  MapPin, 
+  Globe, 
   Phone,
-  Globe,
-  Calendar,
-  Settings,
+  Edit3,
   Save,
-  Edit,
-  Camera,
   X,
-  Check,
-  Upload,
-  Trash2,
-  ImageIcon
+  Camera,
+  CheckCircle,
+  Award,
+  BookOpen,
+  Clock,
+  TrendingUp
 } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
-import { getUserProfile, updateUserProfile, uploadAvatar } from '../utils/api';
-
-interface UserProfile {
-  id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  bio?: string;
-  avatar?: string;
-  role: string;
-  status: string;
-  verified: boolean;
-  createdAt: string;
-  updatedAt: string;
-  profile?: {
-    bio?: string;
-    location?: string;
-    website?: string;
-    phone?: string;
-    expertise?: string[];
-    education?: string;
-    experience?: string;
-    socialMedia?: {
-      twitter?: string;
-      linkedin?: string;
-      github?: string;
-    };
-  };
-  preferences?: {
-    language: string;
-    notifications: {
-      email: boolean;
-      push: boolean;
-      marketing?: boolean;
-    };
-  };
-  stats?: {
-    totalEnrollments: number;
-    completedCourses: number;
-    averageProgress: number;
-    timeSpent: number;
-  };
-}
+import { useComprehensiveDashboardData } from '../hooks/useComprehensiveDashboardData';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
+import { apiClient } from '../utils/api';
 
 const Profile: React.FC = () => {
-  const { user, isAuthenticated } = useAuth();
-  
-  // Simple profile system - fetches data from CouchDB users database
-  console.log('✅ Using simplified profile system with CouchDB');
-  
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
+  const { t } = useLanguage();
+  const { isOnline } = useNetworkStatus();
+  const {
+    user,
+    stats,
+    enrolledCourses,
+    certificates,
+    isLoading,
+    error,
+    refreshData
+  } = useComprehensiveDashboardData();
+
   const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState('');
+  const [editSuccess, setEditSuccess] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     bio: '',
@@ -87,512 +52,545 @@ const Profile: React.FC = () => {
     education: '',
     experience: '',
     expertise: [] as string[],
-    language: 'en',
-    notifications: {
-      email: true,
-      push: true,
-      marketing: false
-    },
     socialMedia: {
       twitter: '',
       linkedin: '',
       github: ''
     }
   });
-  const [avatarUploading, setAvatarUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  
-  // Simple direct avatar URL approach
-  const getDirectAvatarUrl = (avatar?: string): string => {
-    if (!avatar) return '';
-    
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
-    const directUrl = `${baseUrl}/uploads/users/avatars/${avatar}`;
-    
-    console.log('🔗 Direct avatar URL:', directUrl);
-    return directUrl;
-  };
 
-  // Load profile data from CouchDB
-  const loadProfile = async () => {
-    try {
-      setLoading(true);
-      setError('');
-      
-      if (!user || !isAuthenticated) {
-        setError('Please log in to view your profile');
-        return;
-      }
+  // Initialize form data when user data is available
+  React.useEffect(() => {
+    if (user && !isEditing) {
+      setFormData({
+        name: user.name || '',
+        bio: user.profile?.bio || '',
+        location: user.profile?.location || '',
+        website: user.profile?.website || '',
+        phone: user.profile?.phone || '',
+        education: user.profile?.education || '',
+        experience: user.profile?.experience || '',
+        expertise: user.profile?.expertise || [],
+        socialMedia: {
+          twitter: user.profile?.socialMedia?.twitter || '',
+          linkedin: user.profile?.socialMedia?.linkedin || '',
+          github: user.profile?.socialMedia?.github || ''
+        }
+      });
+    }
+  }, [user, isEditing]);
 
-      const response = await getUserProfile();
-      
-      if (response.success && response.data) {
-        const userData = response.data.user;
-        setProfile(userData);
-        
-        // Initialize form with profile data
-        setFormData({
-          name: userData.name || '',
-          bio: userData.profile?.bio || '',
-          location: userData.profile?.location || '',
-          website: userData.profile?.website || '',
-          phone: userData.profile?.phone || userData.phone || '',
-          education: userData.profile?.education || '',
-          experience: userData.profile?.experience || '',
-          expertise: userData.profile?.expertise || [],
-          language: userData.preferences?.language || 'en',
-          notifications: {
-            email: userData.preferences?.notifications?.email ?? true,
-            push: userData.preferences?.notifications?.push ?? true,
-            marketing: userData.preferences?.notifications?.marketing ?? false
-          },
-          socialMedia: {
-            twitter: userData.profile?.socialMedia?.twitter || '',
-            linkedin: userData.profile?.socialMedia?.linkedin || '',
-            github: userData.profile?.socialMedia?.github || ''
-          }
-        });
-      } else {
-        setError(response.error || 'Failed to load profile');
-      }
-    } catch (error) {
-      console.error('Error loading profile:', error);
-      setError('Failed to load profile. Please try again.');
-    } finally {
-      setLoading(false);
+  // Calculate user statistics
+  const userStats = React.useMemo(() => {
+    const totalEnrolled = enrolledCourses?.length || 0;
+    const totalCompleted = enrolledCourses?.filter((course: any) => 
+      course.enrollment?.status === 'completed' || 
+      course.progress?.percentage >= 100
+    ).length || 0;
+    const totalCertificates = certificates?.length || 0;
+    const totalTimeSpent = stats?.timeSpent || 0;
+    const averageProgress = stats?.averageProgress || 0;
+    
+    return {
+      totalEnrolled,
+      totalCompleted,
+      totalCertificates,
+      totalTimeSpent: Math.round(totalTimeSpent / 60), // Convert to minutes
+      averageProgress,
+      completionRate: totalEnrolled > 0 ? Math.round((totalCompleted / totalEnrolled) * 100) : 0
+    };
+  }, [enrolledCourses, certificates, stats]);
+
+  // Handle form changes
+  const handleInputChange = (field: string, value: any) => {
+    if (field.includes('.')) {
+      const [parent, child] = field.split('.');
+      setFormData(prev => ({
+        ...prev,
+        [parent]: {
+          ...(prev as any)[parent],
+          [child]: value
+        }
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [field]: value
+      }));
     }
   };
 
-  // Save profile data to CouchDB
-  const handleSaveProfile = async () => {
+  // Handle expertise changes
+  const handleExpertiseChange = (value: string) => {
+    const expertiseArray = value.split(',').map(item => item.trim()).filter(Boolean);
+    setFormData(prev => ({
+      ...prev,
+      expertise: expertiseArray
+    }));
+  };
+
+  // Handle profile update
+  const handleSave = async () => {
+    if (!isOnline) {
+      setEditError(t('You need to be online to update your profile'));
+      return;
+    }
+
+    setSaving(true);
+    setEditError('');
+    setEditSuccess('');
+
     try {
-      setSaving(true);
-      setError('');
-      setSuccessMessage('');
-
-      const updateData = {
+      const response = await apiClient.updateUserProfile({
         name: formData.name,
-        bio: formData.bio,
-        location: formData.location,
-        website: formData.website,
-        phone: formData.phone,
-        education: formData.education,
-        experience: formData.experience,
-        expertise: formData.expertise,
-        preferences: {
-          language: formData.language,
-          notifications: formData.notifications
-        },
-        socialMedia: formData.socialMedia
-      };
+        profile: {
+          bio: formData.bio,
+          location: formData.location,
+          website: formData.website,
+          phone: formData.phone,
+          education: formData.education,
+          experience: formData.experience,
+          expertise: formData.expertise,
+          socialMedia: formData.socialMedia
+        }
+      });
 
-      const response = await updateUserProfile(updateData);
-      
       if (response.success) {
-        setSuccessMessage('Profile updated successfully!');
+        setEditSuccess(t('Profile updated successfully'));
         setIsEditing(false);
-        // Reload profile data
-        await loadProfile();
+        // Refresh data to get updated profile
+        await refreshData();
       } else {
-        setError(response.error || 'Failed to update profile');
+        setEditError(response.error || t('Failed to update profile'));
       }
     } catch (error) {
-      console.error('Error saving profile:', error);
-      setError('Failed to save profile. Please try again.');
+      console.error('Profile update error:', error);
+      setEditError(t('Failed to update profile. Please try again.'));
     } finally {
       setSaving(false);
     }
   };
 
-  // Handle avatar upload
-  const handleAvatarUpload = async (file: File) => {
-    try {
-      setAvatarUploading(true);
-      setError('');
-
-      const response = await uploadAvatar(file);
-      
-      if (response.success) {
-        setSuccessMessage('Avatar updated successfully!');
-        await loadProfile(); // Reload to get updated avatar
-      } else {
-        setError(response.error || 'Failed to upload avatar');
-      }
-    } catch (error) {
-      console.error('Error uploading avatar:', error);
-      setError('Failed to upload avatar. Please try again.');
-    } finally {
-      setAvatarUploading(false);
+  // Handle cancel editing
+  const handleCancel = () => {
+    setIsEditing(false);
+    setEditError('');
+    setEditSuccess('');
+    // Reset form data to original values
+    if (user) {
+      setFormData({
+        name: user.name || '',
+        bio: user.profile?.bio || '',
+        location: user.profile?.location || '',
+        website: user.profile?.website || '',
+        phone: user.profile?.phone || '',
+        education: user.profile?.education || '',
+        experience: user.profile?.experience || '',
+        expertise: user.profile?.expertise || [],
+        socialMedia: {
+          twitter: user.profile?.socialMedia?.twitter || '',
+          linkedin: user.profile?.socialMedia?.linkedin || '',
+          github: user.profile?.socialMedia?.github || ''
+        }
+      });
     }
   };
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      handleAvatarUpload(file);
-    }
-  };
-
-  const triggerFileUpload = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  const handleNestedInputChange = (section: string, field: string, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      [section]: {
-        ...(prev[section as keyof typeof prev] as any),
-        [field]: value
-      }
-    }));
-  };
-
-  const addExpertise = (expertise: string) => {
-    if (expertise.trim() && !formData.expertise.includes(expertise.trim())) {
-      setFormData(prev => ({
-        ...prev,
-        expertise: [...prev.expertise, expertise.trim()]
-      }));
-    }
-  };
-
-  const removeExpertise = (expertise: string) => {
-    setFormData(prev => ({
-      ...prev,
-      expertise: prev.expertise.filter(e => e !== expertise)
-    }));
-  };
-
-  const getRoleDisplayName = (role: string) => {
-    return role.charAt(0).toUpperCase() + role.slice(1);
-  };
-
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      loadProfile();
-    }
-  }, [isAuthenticated, user]);
-
-      if (loading) {
-      return (
-        <div className="flex items-center justify-center min-h-screen">
-          <LoadingSpinner size="lg" />
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <LoadingSpinner className="mx-auto mb-4" />
+          <p className="text-gray-600">
+            {t('Loading your profile...')}
+          </p>
         </div>
-      );
-    }
+      </div>
+    );
+  }
 
-    if (!isAuthenticated || !user) {
-      return (
-        <div className="flex items-center justify-center min-h-screen">
-          <Alert variant="error">
-            <X className="h-4 w-4" />
-            <div>Please log in to view your profile</div>
-          </Alert>
-        </div>
-      );
-    }
+  if (!user || error) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Card className="p-8 text-center">
+          <User className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            {t('Unable to load profile')}
+          </h3>
+          <p className="text-gray-600">
+            {error || t('Profile information is not available')}
+          </p>
+        </Card>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-6">
-      {error && (
-        <Alert variant="error">
-          <X className="h-4 w-4" />
-          <div>{error}</div>
-        </Alert>
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900">
+          {t('My Profile')}
+        </h1>
+        <p className="text-gray-600 mt-1">
+          {t('Manage your personal information and preferences')}
+        </p>
+      </div>
+
+      {/* Error/Success Messages */}
+      {editError && (
+        <Card className="p-4 bg-red-50 border-red-200">
+          <p className="text-red-700">{editError}</p>
+        </Card>
       )}
 
-      {successMessage && (
-        <Alert>
-          <Check className="h-4 w-4" />
-          <div>{successMessage}</div>
-        </Alert>
+      {editSuccess && (
+        <Card className="p-4 bg-green-50 border-green-200">
+          <p className="text-green-700">{editSuccess}</p>
+        </Card>
       )}
 
-      {profile && (
-        <>
-          {/* Profile Header */}
+      {/* Profile Content */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column - Profile Info */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Basic Information */}
           <Card className="p-6">
-            <div className="flex items-center space-x-6">
-                              <div className="relative">
-                  <div className="w-24 h-24 rounded-full border-4 border-white shadow-lg overflow-hidden bg-gray-200">
-                    {profile.avatar ? (
-                      <img
-                        src={getDirectAvatarUrl(profile.avatar)}
-                        alt="Profile"
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          console.log('❌ Avatar image failed to load');
-                          e.currentTarget.style.display = 'none';
-                          e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                        }}
-                      />
-                    ) : null}
-                    <div className={`w-full h-full flex items-center justify-center bg-gray-300 ${profile.avatar ? 'hidden' : ''}`}>
-                      <User className="w-8 h-8 text-gray-500" />
-                    </div>
-                  </div>
-                <button
-                  onClick={triggerFileUpload}
-                  disabled={avatarUploading}
-                  className="absolute bottom-0 right-0 bg-blue-500 text-white p-2 rounded-full hover:bg-blue-600 disabled:opacity-50"
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold">{t('Basic Information')}</h2>
+              {!isEditing ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsEditing(true)}
+                  disabled={!isOnline}
+                  className="flex items-center gap-2"
                 >
-                                      {avatarUploading ? (
-                      <LoadingSpinner size="sm" />
+                  <Edit3 className="w-4 h-4" />
+                  {t('Edit')}
+                </Button>
+              ) : (
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="flex items-center gap-2"
+                  >
+                    {saving ? (
+                      <LoadingSpinner className="w-4 h-4" />
                     ) : (
-                      <Camera className="h-4 w-4" />
+                      <Save className="w-4 h-4" />
                     )}
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                />
-              </div>
-              
-              <div className="flex-1">
-                <div className="flex items-center space-x-3">
-                  <h1 className="text-2xl font-bold text-gray-900">{profile.name}</h1>
-                                      <Badge variant="info">
-                      {getRoleDisplayName(profile.role)}
-                    </Badge>
-                    {profile.verified && (
-                      <Badge variant="success">Verified</Badge>
-                    )}
-                </div>
-                <p className="text-gray-600 mt-1">{profile.email}</p>
-                <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
-                  <div className="flex items-center space-x-1">
-                    <Calendar className="h-4 w-4" />
-                    <span>Joined {new Date(profile.createdAt).toLocaleDateString()}</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="flex space-x-2">
-                {!isEditing ? (
-                  <Button onClick={() => setIsEditing(true)} variant="outline">
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit Profile
+                    {saving ? t('Saving...') : t('Save')}
                   </Button>
-                ) : (
-                  <div className="flex space-x-2">
-                    <Button onClick={handleSaveProfile} disabled={saving}>
-                      {saving ? <LoadingSpinner size="sm" /> : <Save className="h-4 w-4 mr-2" />}
-                      Save
-                    </Button>
-                    <Button onClick={() => setIsEditing(false)} variant="outline">
-                      <X className="h-4 w-4 mr-2" />
-                      Cancel
-                    </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleCancel}
+                    disabled={saving}
+                    className="flex items-center gap-2"
+                  >
+                    <X className="w-4 h-4" />
+                    {t('Cancel')}
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              {/* Avatar */}
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
+                    {user.avatar ? (
+                      <img 
+                        src={user.avatar} 
+                        alt={user.name}
+                        className="w-full h-full rounded-full object-cover"
+                      />
+                    ) : (
+                      user.name?.charAt(0)?.toUpperCase() || 'U'
+                    )}
                   </div>
-                )}
+                  {isEditing && (
+                    <button className="absolute bottom-0 right-0 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white">
+                      <Camera className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold">{user.name}</h3>
+                  <p className="text-gray-600 capitalize">{user.role}</p>
+                  <Badge variant={user.status === 'active' ? 'success' : 'default'} className="text-xs mt-1">
+                    {t(user.status)}
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Form Fields */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t('Full Name')}
+                  </label>
+                  {isEditing ? (
+                    <Input
+                      value={formData.name}
+                      onChange={(e) => handleInputChange('name', e.target.value)}
+                      placeholder={t('Enter your full name')}
+                    />
+                  ) : (
+                    <p className="text-gray-900">{user.name || t('Not provided')}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t('Email')}
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-gray-400" />
+                    <p className="text-gray-900">{user.email}</p>
+                    {user.verified && (
+                      <CheckCircle className="w-4 h-4 text-green-500" />
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t('Location')}
+                  </label>
+                  {isEditing ? (
+                    <Input
+                      value={formData.location}
+                      onChange={(e) => handleInputChange('location', e.target.value)}
+                      placeholder={t('Enter your location')}
+                    />
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-gray-400" />
+                      <p className="text-gray-900">{user.profile?.location || t('Not provided')}</p>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t('Phone')}
+                  </label>
+                  {isEditing ? (
+                    <Input
+                      value={formData.phone}
+                      onChange={(e) => handleInputChange('phone', e.target.value)}
+                      placeholder={t('Enter your phone number')}
+                    />
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-4 h-4 text-gray-400" />
+                      <p className="text-gray-900">{user.profile?.phone || t('Not provided')}</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t('Website')}
+                  </label>
+                  {isEditing ? (
+                    <Input
+                      value={formData.website}
+                      onChange={(e) => handleInputChange('website', e.target.value)}
+                      placeholder={t('Enter your website URL')}
+                    />
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Globe className="w-4 h-4 text-gray-400" />
+                      {user.profile?.website ? (
+                        <a 
+                          href={user.profile.website} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800"
+                        >
+                          {user.profile.website}
+                        </a>
+                      ) : (
+                        <p className="text-gray-900">{t('Not provided')}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t('Bio')}
+                  </label>
+                  {isEditing ? (
+                    <textarea
+                      value={formData.bio}
+                      onChange={(e) => handleInputChange('bio', e.target.value)}
+                      placeholder={t('Tell us about yourself')}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  ) : (
+                    <p className="text-gray-900">{user.profile?.bio || t('No bio provided')}</p>
+                  )}
+                </div>
               </div>
             </div>
           </Card>
 
-          {/* Stats */}
-          {profile.stats && (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Card className="p-4 text-center">
-                <div className="text-2xl font-bold text-blue-600">{profile.stats.totalEnrollments}</div>
-                <div className="text-sm text-gray-600">Courses</div>
-              </Card>
-              <Card className="p-4 text-center">
-                <div className="text-2xl font-bold text-green-600">{profile.stats.completedCourses}</div>
-                <div className="text-sm text-gray-600">Completed</div>
-              </Card>
-              <Card className="p-4 text-center">
-                <div className="text-2xl font-bold text-purple-600">{profile.stats.averageProgress}%</div>
-                <div className="text-sm text-gray-600">Progress</div>
-              </Card>
-              <Card className="p-4 text-center">
-                <div className="text-2xl font-bold text-orange-600">{Math.round(profile.stats.timeSpent / 60)}h</div>
-                <div className="text-sm text-gray-600">Time Spent</div>
-              </Card>
-            </div>
-          )}
-
-          {/* Profile Information */}
+          {/* Professional Information */}
           <Card className="p-6">
-            <h2 className="text-xl font-semibold mb-4">Personal Information</h2>
+            <h2 className="text-xl font-semibold mb-4">{t('Professional Information')}</h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-                {isEditing ? (
-                  <Input
-                    value={formData.name}
-                    onChange={(e) => handleInputChange('name', e.target.value)}
-                    placeholder="Enter your name"
-                  />
-                ) : (
-                  <p className="text-gray-900">{profile.name}</p>
-                )}
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                <p className="text-gray-600">{profile.email}</p>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                {isEditing ? (
-                  <Input
-                    value={formData.phone}
-                    onChange={(e) => handleInputChange('phone', e.target.value)}
-                    placeholder="Enter your phone number"
-                  />
-                ) : (
-                  <p className="text-gray-900">{profile.profile?.phone || profile.phone || 'Not provided'}</p>
-                )}
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
-                {isEditing ? (
-                  <Input
-                    value={formData.location}
-                    onChange={(e) => handleInputChange('location', e.target.value)}
-                    placeholder="Enter your location"
-                  />
-                ) : (
-                  <p className="text-gray-900">{profile.profile?.location || 'Not provided'}</p>
-                )}
-              </div>
-              
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
-                {isEditing ? (
-                  <textarea
-                    value={formData.bio}
-                    onChange={(e) => handleInputChange('bio', e.target.value)}
-                    placeholder="Tell us about yourself"
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                  />
-                ) : (
-                  <p className="text-gray-900">{profile.profile?.bio || 'No bio provided'}</p>
-                )}
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
-                {isEditing ? (
-                  <Input
-                    value={formData.website}
-                    onChange={(e) => handleInputChange('website', e.target.value)}
-                    placeholder="https://your-website.com"
-                  />
-                ) : (
-                  <p className="text-gray-900">{profile.profile?.website || 'Not provided'}</p>
-                )}
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Education</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {t('Education')}
+                </label>
                 {isEditing ? (
                   <Input
                     value={formData.education}
                     onChange={(e) => handleInputChange('education', e.target.value)}
-                    placeholder="Your education background"
+                    placeholder={t('Enter your education background')}
                   />
                 ) : (
-                  <p className="text-gray-900">{profile.profile?.education || 'Not provided'}</p>
+                  <p className="text-gray-900">{user.profile?.education || t('Not provided')}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {t('Experience')}
+                </label>
+                {isEditing ? (
+                  <textarea
+                    value={formData.experience}
+                    onChange={(e) => handleInputChange('experience', e.target.value)}
+                    placeholder={t('Describe your work experience')}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                ) : (
+                  <p className="text-gray-900">{user.profile?.experience || t('Not provided')}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {t('Expertise')} <span className="text-gray-500 text-xs">({t('comma separated')})</span>
+                </label>
+                {isEditing ? (
+                  <Input
+                    value={formData.expertise.join(', ')}
+                    onChange={(e) => handleExpertiseChange(e.target.value)}
+                    placeholder={t('e.g., React, Node.js, Python')}
+                  />
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {user.profile?.expertise?.length > 0 ? (
+                      user.profile.expertise.map((skill: string, index: number) => (
+                        <Badge key={index} variant="default" className="text-xs">
+                          {skill}
+                        </Badge>
+                      ))
+                    ) : (
+                      <p className="text-gray-900">{t('No expertise listed')}</p>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
           </Card>
+        </div>
 
-          {/* Expertise */}
+        {/* Right Column - Statistics and Activity */}
+        <div className="space-y-6">
+          {/* Learning Statistics */}
           <Card className="p-6">
-            <h2 className="text-xl font-semibold mb-4">Expertise</h2>
-            <div className="flex flex-wrap gap-2">
-              {(isEditing ? formData.expertise : profile.profile?.expertise || []).map((skill, index) => (
-                <div key={index} className="flex items-center bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
-                  <span>{skill}</span>
-                  {isEditing && (
-                    <button
-                      onClick={() => removeExpertise(skill)}
-                      className="ml-2 text-blue-600 hover:text-blue-800"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  )}
-                </div>
-              ))}
-              {isEditing && (
-                <div className="flex items-center">
-                  <Input
-                    placeholder="Add expertise"
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        addExpertise(e.currentTarget.value);
-                        e.currentTarget.value = '';
-                      }
-                    }}
-                    className="w-32"
-                  />
-                </div>
-              )}
-            </div>
-          </Card>
-
-          {/* Preferences */}
-          <Card className="p-6">
-            <h2 className="text-xl font-semibold mb-4">Preferences</h2>
+            <h2 className="text-xl font-semibold mb-4">{t('Learning Statistics')}</h2>
             
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Language</label>
-                {isEditing ? (
-                  <select
-                    value={formData.language}
-                    onChange={(e) => handleInputChange('language', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="en">English</option>
-                    <option value="es">Spanish</option>
-                    <option value="fr">French</option>
-                    <option value="de">German</option>
-                  </select>
-                ) : (
-                  <p className="text-gray-900">{profile.preferences?.language || 'English'}</p>
-                )}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-blue-500" />
+                  <span className="text-sm text-gray-600">{t('Enrolled Courses')}</span>
+                </div>
+                <span className="font-semibold">{userStats.totalEnrolled}</span>
               </div>
-              
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                  <span className="text-sm text-gray-600">{t('Completed')}</span>
+                </div>
+                <span className="font-semibold">{userStats.totalCompleted}</span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Award className="w-4 h-4 text-yellow-500" />
+                  <span className="text-sm text-gray-600">{t('Certificates')}</span>
+                </div>
+                <span className="font-semibold">{userStats.totalCertificates}</span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-purple-500" />
+                  <span className="text-sm text-gray-600">{t('Time Spent')}</span>
+                </div>
+                <span className="font-semibold">{userStats.totalTimeSpent}m</span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-orange-500" />
+                  <span className="text-sm text-gray-600">{t('Avg Progress')}</span>
+                </div>
+                <span className="font-semibold">{userStats.averageProgress}%</span>
+              </div>
+            </div>
+          </Card>
+
+          {/* Account Information */}
+          <Card className="p-6">
+            <h2 className="text-xl font-semibold mb-4">{t('Account Information')}</h2>
+            
+            <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Notifications</label>
-                <div className="space-y-2">
-                  {['email', 'push', 'marketing'].map((type) => (
-                    <label key={type} className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={formData.notifications[type as keyof typeof formData.notifications]}
-                        onChange={(e) => handleNestedInputChange('notifications', type, e.target.checked)}
-                        disabled={!isEditing}
-                        className="mr-2"
-                      />
-                      <span className="text-sm text-gray-700">
-                        {type.charAt(0).toUpperCase() + type.slice(1)} notifications
-                      </span>
-                    </label>
-                  ))}
+                <span className="text-sm text-gray-600">{t('Member since')}</span>
+                <div className="flex items-center gap-2 mt-1">
+                  <Calendar className="w-4 h-4 text-gray-400" />
+                  <span className="text-sm">
+                    {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : t('Unknown')}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <span className="text-sm text-gray-600">{t('Last login')}</span>
+                <p className="text-sm mt-1">
+                  {user.lastLogin ? new Date(user.lastLogin).toLocaleString() : t('Unknown')}
+                </p>
+              </div>
+
+              <div>
+                <span className="text-sm text-gray-600">{t('Account status')}</span>
+                <div className="mt-1">
+                  <Badge variant={user.status === 'active' ? 'success' : 'default'}>
+                    {t(user.status)}
+                  </Badge>
                 </div>
               </div>
             </div>
           </Card>
-        </>
-      )}
+        </div>
+      </div>
     </div>
   );
 };

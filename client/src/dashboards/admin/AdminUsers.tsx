@@ -147,14 +147,15 @@ const AdminUsers: React.FC = () => {
         });
         
         // Calculate stats
+        const safeUserData = Array.isArray(userData) ? userData : [];
         const statsData: UserStats = {
           total: paginationData.totalItems || paginationData.total || 0,
-          admins: userData.filter((u: UserData) => u.role === 'admin').length,
-          tutors: userData.filter((u: UserData) => u.role === 'tutor').length,
-          learners: userData.filter((u: UserData) => u.role === 'learner').length,
-          active: userData.filter((u: UserData) => u.status === 'active').length,
-          inactive: userData.filter((u: UserData) => u.status === 'inactive').length,
-          suspended: userData.filter((u: UserData) => u.status === 'suspended').length
+          admins: safeUserData.filter((u: UserData) => u.role === 'admin').length,
+          tutors: safeUserData.filter((u: UserData) => u.role === 'tutor').length,
+          learners: safeUserData.filter((u: UserData) => u.role === 'learner').length,
+          active: safeUserData.filter((u: UserData) => u.status === 'active').length,
+          inactive: safeUserData.filter((u: UserData) => u.status === 'inactive').length,
+          suspended: safeUserData.filter((u: UserData) => u.status === 'suspended').length
         };
         setStats(statsData);
       } else {

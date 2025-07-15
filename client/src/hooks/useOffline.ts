@@ -1,71 +1,55 @@
+/**
+ * Simple offline hook
+ * Provides basic offline status and minimal functionality
+ */
+
 import { useState, useEffect } from 'react';
-import { offlineManager } from '../utils/offline';
+import { useNetworkStatus } from './useNetworkStatus';
+import { essentialDataCache } from '../utils/offlineDataCache';
+import { offlineOperations } from '../utils/offlineOperations';
+
+interface OfflineState {
+  isOnline: boolean;
+  hasOfflineData: boolean;
+  pendingOperations: number;
+}
 
 export const useOffline = () => {
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [pendingActions, setPendingActions] = useState(0);
+  const { isOnline } = useNetworkStatus();
+  const [state, setState] = useState<OfflineState>({
+    isOnline,
+    hasOfflineData: false,
+    pendingOperations: 0
+  });
 
   useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true);
-      offlineManager.syncPendingActions();
-    };
+    setState(prev => ({
+      ...prev,
+      isOnline
+    }));
+  }, [isOnline]);
 
-    const handleOffline = () => {
-      setIsOnline(false);
-    };
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    // Check for pending actions
-    const checkPendingActions = async () => {
-      try {
-        const progress = await offlineManager.getOfflineActions('pendingProgress');
-        const userData = await offlineManager.getOfflineActions('pendingUserData');
-        setPendingActions(progress.length + userData.length);
-      } catch (error) {
-        console.error('Failed to check pending actions:', error);
-      }
-    };
-
-    checkPendingActions();
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-  const storeCourseProgress = async (courseId: string, progress: number, token: string) => {
-    await offlineManager.storeCourseProgress(courseId, progress, token);
-    setPendingActions(prev => prev + 1);
+  // Check for offline data
+  const hasOfflineData = (userId: string): boolean => {
+    return essentialDataCache.hasEssentialData(userId);
   };
 
-  const storeUserData = async (userData: any, token: string) => {
-    await offlineManager.storeUserData(userData, token);
-    setPendingActions(prev => prev + 1);
+  // Get pending operations count
+  const getPendingOperationsCount = (userId?: string): number => {
+    return offlineOperations.getPendingCount(userId);
   };
 
-  const getCachedCourse = async (courseId: string) => {
-    return await offlineManager.getCachedCourse(courseId);
-  };
-
-  const getCachedCourses = async () => {
-    return await offlineManager.getCachedCourses();
-  };
-
-  const cacheCourse = async (course: any) => {
-    await offlineManager.cacheCourse(course);
+  // Simple cache management
+  const clearOfflineData = (userId: string): void => {
+    essentialDataCache.clearUserCache(userId);
+    offlineOperations.clearUserOperations(userId);
   };
 
   return {
-    isOnline,
-    pendingActions,
-    storeCourseProgress,
-    storeUserData,
-    getCachedCourse,
-    getCachedCourses,
-    cacheCourse
+    isOnline: state.isOnline,
+    hasOfflineData,
+    getPendingOperationsCount,
+    clearOfflineData,
+    pendingOperations: state.pendingOperations
   };
 };

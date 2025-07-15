@@ -148,13 +148,14 @@ const TutorCourses: React.FC = () => {
         setMyCourses(processedCourses);
 
         // Calculate comprehensive stats
+        const safeProcessedCourses = Array.isArray(processedCourses) ? processedCourses : [];
         const calculatedStats: CourseStats = {
-          total: processedCourses.length,
-          approved: processedCourses.filter((c: Course) => c.status === 'approved' || c.status === 'published').length,
-          pending: processedCourses.filter((c: Course) => c.status === 'submitted').length,
-          draft: processedCourses.filter((c: Course) => c.status === 'draft').length,
-          rejected: processedCourses.filter((c: Course) => c.status === 'rejected').length,
-          enrollments: processedCourses.reduce((sum: number, course: Course) => sum + course.students, 0),
+          total: safeProcessedCourses.length,
+          approved: safeProcessedCourses.filter((c: Course) => c.status === 'approved' || c.status === 'published').length,
+          pending: safeProcessedCourses.filter((c: Course) => c.status === 'submitted').length,
+          draft: safeProcessedCourses.filter((c: Course) => c.status === 'draft').length,
+          rejected: safeProcessedCourses.filter((c: Course) => c.status === 'rejected').length,
+          enrollments: safeProcessedCourses.reduce((sum: number, course: Course) => sum + course.students, 0),
         };
         
         console.log('Calculated stats:', calculatedStats);

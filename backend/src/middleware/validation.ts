@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { validationResult, FieldValidationError } from 'express-validator';
 import { AuthErrorUtil, AuthErrorType } from '../utils/authErrors';
+import { body } from 'express-validator';
 
 // Enhanced validation middleware with user-friendly error messages
 export const validate = (req: Request, res: Response, next: NextFunction): void => {
@@ -182,5 +183,113 @@ export const validateQuizAnswer = (req: Request, res: Response, next: NextFuncti
   
   next();
 };
+
+// Sync validation middleware for batch operations
+export const validateSync = [
+  body('actions')
+    .isArray({ min: 1, max: 100 })
+    .withMessage('Actions must be an array with 1-100 items'),
+  
+  body('actions.*.id')
+    .isString()
+    .notEmpty()
+    .withMessage('Each action must have a valid ID'),
+  
+  body('actions.*.type')
+    .isIn(['quiz_attempt', 'module_completion', 'progress_update', 'user_data', 'course_enrollment'])
+    .withMessage('Invalid action type'),
+  
+  body('actions.*.data')
+    .isObject()
+    .withMessage('Action data must be an object'),
+  
+  body('actions.*.timestamp')
+    .isNumeric()
+    .withMessage('Timestamp must be a number'),
+  
+  body('clientId')
+    .isString()
+    .notEmpty()
+    .withMessage('Client ID is required'),
+  
+  body('lastSyncTimestamp')
+    .optional()
+    .isNumeric()
+    .withMessage('Last sync timestamp must be a number'),
+  
+  body('deviceInfo')
+    .optional()
+    .isObject()
+    .withMessage('Device info must be an object'),
+  
+  validate // Re-using the existing validate function for error handling
+];
+
+// Quiz attempt validation for sync
+export const validateQuizAttemptSync = [
+  body('data.assessmentId')
+    .isString()
+    .notEmpty()
+    .withMessage('Assessment ID is required'),
+  
+  body('data.answers')
+    .isArray()
+    .withMessage('Answers must be an array'),
+  
+  body('data.score')
+    .isNumeric()
+    .isFloat({ min: 0, max: 100 })
+    .withMessage('Score must be between 0 and 100'),
+  
+  body('data.completedAt')
+    .isISO8601()
+    .withMessage('Completed at must be a valid date'),
+  
+  validate // Re-using the existing validate function for error handling
+];
+
+// Progress update validation for sync
+export const validateProgressSync = [
+  body('data.courseId')
+    .isString()
+    .notEmpty()
+    .withMessage('Course ID is required'),
+  
+  body('data.progressData')
+    .optional()
+    .isObject()
+    .withMessage('Progress data must be an object'),
+  
+  body('data.lastAccessedAt')
+    .optional()
+    .isISO8601()
+    .withMessage('Last accessed at must be a valid date'),
+  
+  validate // Re-using the existing validate function for error handling
+];
+
+// Module completion validation for sync
+export const validateModuleCompletionSync = [
+  body('data.courseId')
+    .isString()
+    .notEmpty()
+    .withMessage('Course ID is required'),
+  
+  body('data.moduleId')
+    .isString()
+    .notEmpty()
+    .withMessage('Module ID is required'),
+  
+  body('data.completedAt')
+    .isISO8601()
+    .withMessage('Completed at must be a valid date'),
+  
+  body('data.completionData')
+    .optional()
+    .isObject()
+    .withMessage('Completion data must be an object'),
+  
+  validate // Re-using the existing validate function for error handling
+];
 
 export default validate; 

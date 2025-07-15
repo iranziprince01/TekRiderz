@@ -1,164 +1,147 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { BookOpen, Play, Clock, CheckCircle, Star, Search, Eye, TrendingUp } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import React, { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { apiClient } from '../../utils/api';
-import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
-import { Alert } from '../../components/ui/Alert';
 import { Card } from '../../components/ui/Card';
-import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { Badge } from '../../components/ui/Badge';
+import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { ProgressBar } from '../../components/common/ProgressBar';
-
-interface Course {
-  id: string;
-  _id?: string;
-  title: string;
-  instructor: string;
-  instructorName?: string;
-  category: string;
-  rating: {
-    average: number;
-    count: number;
-  };
-  duration: string;
-  level: 'beginner' | 'intermediate' | 'advanced';
-  thumbnail?: string;
-  description: string;
-  progress?: number;
-  isEnrolled?: boolean;
-  enrollmentId?: string;
-  completedLessons?: number;
-  totalLessons?: number;
-}
-
-interface CourseStats {
-  totalEnrolled: number;
-  totalCompleted: number;
-  totalHours: number;
-  avgRating: number;
-}
+import { 
+  BookOpen, 
+  Play, 
+  Clock, 
+  CheckCircle, 
+  Search,
+  Award,
+  BarChart3,
+  Target
+} from 'lucide-react';
+import { useComprehensiveDashboardData } from '../../hooks/useComprehensiveDashboardData';
+import { getFileUrl } from '../../utils/api';
 
 const LearnerCourses: React.FC = () => {
-  const { user } = useAuth();
-  const { language } = useLanguage();
-  const navigate = useNavigate();
-  
-  const [activeTab, setActiveTab] = useState<'in-progress' | 'completed'>('in-progress');
-  const [enrolledCourses, setEnrolledCourses] = useState<Course[]>([]);
-  const [stats, setStats] = useState<CourseStats>({
-    totalEnrolled: 0,
-    totalCompleted: 0,
-    totalHours: 0,
-    avgRating: 0
-  });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const { t } = useLanguage();
+  const {
+    user,
+    stats,
+    enrolledCourses,
+    progress,
+    isLoading,
+    error
+  } = useComprehensiveDashboardData();
+
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
 
-  // Load enrolled courses
-  const loadEnrolledCourses = async () => {
-    try {
-      const response = await apiClient.getEnrolledCourses({ limit: 100 });
+  // Process enrolled courses with progress data
+  const processedCourses = useMemo(() => {
+    if (!enrolledCourses) return [];
+    
+    return enrolledCourses.map((course: any) => {
+      // Find matching progress data
+      const courseProgress = progress?.find((p: any) => p.courseId === course.id || p.courseId === course._id);
       
-      if (response.success && response.data) {
-        const coursesData = response.data.courses.map((course: any) => ({
-          ...course,
-          id: course._id || course.id,
-          instructor: course.instructorName || course.instructor,
-          rating: course.rating || { average: 0, count: 0 },
-          duration: course.totalDuration ? `${Math.round(course.totalDuration / 3600)} hours` : '0 hours',
-          progress: course.enrollment?.progress || 0,
-          isEnrolled: true,
-          enrollmentId: course.enrollment?.id,
-          completedLessons: course.progress?.completedLessons || 0,
-          totalLessons: course.totalLessons || 0,
-        }));
-        
-        setEnrolledCourses(coursesData);
-        
-        // Calculate stats
-        const totalHours = coursesData.reduce((sum: number, course: Course) => {
-          const hours = parseInt(course.duration) || 0;
-          return sum + (hours * (course.progress || 0) / 100);
-        }, 0);
-        
-        const avgRating = coursesData.length > 0 ? 
-          coursesData.reduce((sum: number, course: Course) => sum + course.rating.average, 0) / coursesData.length : 0;
-        
-        setStats({
-          totalEnrolled: coursesData.length,
-          totalCompleted: coursesData.filter((c: Course) => (c.progress || 0) >= 100).length,
-          totalHours: Math.round(totalHours),
-          avgRating: Math.round(avgRating * 10) / 10
-        });
-      } else {
-        setError(response.error || 'Failed to load enrolled courses');
+      // Calculate completion percentage
+      const totalLessons = course.totalLessons || course.sections?.reduce((total: number, section: any) => 
+        total + (section.lessons?.length || 0), 0) || 0;
+      const completedLessons = courseProgress?.completedLessons?.length || 0;
+      const progressPercentage = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+      
+      // Determine status
+      let status = 'active';
+      if (course.enrollment?.status) {
+        status = course.enrollment.status;
+      } else if (progressPercentage >= 100) {
+        status = 'completed';
+      } else if (progressPercentage > 0) {
+        status = 'in_progress';
       }
-    } catch (err: any) {
-      console.error('Failed to load enrolled courses:', err);
-      setError(err.message || 'Failed to load enrolled courses');
-    }
-  };
+      
+      return {
+        ...course,
+        progress: {
+          percentage: progressPercentage,
+          completedLessons,
+          totalLessons,
+          timeSpent: courseProgress?.timeSpent || 0,
+          lastWatched: courseProgress?.lastWatched,
+          currentLesson: courseProgress?.currentLesson
+        },
+        status,
+        enrollmentDate: course.enrollment?.enrolledAt || course.enrolledAt
+      };
+    });
+  }, [enrolledCourses, progress]);
 
-  // Initialize data
-  useEffect(() => {
-    if (user) {
-      loadEnrolledCourses().finally(() => setLoading(false));
-    }
-  }, [user]);
+  // Filter courses based on search and filters
+  const filteredCourses = useMemo(() => {
+    return processedCourses.filter((course: any) => {
+      const matchesSearch = !searchTerm || 
+        course.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        course.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        course.instructorName?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesStatus = statusFilter === 'all' || course.status === statusFilter;
+      
+      const matchesCategory = categoryFilter === 'all' || course.category === categoryFilter;
+      
+      return matchesSearch && matchesStatus && matchesCategory;
+    });
+  }, [processedCourses, searchTerm, statusFilter, categoryFilter]);
 
-  // Filter courses based on tab and search
-  const getFilteredCourses = () => {
-    let filtered = enrolledCourses;
+  // Get unique categories
+  const categories = useMemo(() => {
+    const uniqueCategories = [...new Set(processedCourses.map((course: any) => course.category))];
+    return uniqueCategories.filter(Boolean);
+  }, [processedCourses]);
 
-    // Filter by tab
-    if (activeTab === 'completed') {
-      filtered = filtered.filter(course => (course.progress || 0) >= 100);
-    } else if (activeTab === 'in-progress') {
-      filtered = filtered.filter(course => (course.progress || 0) < 100);
-    }
-
-    // Filter by search term
-    if (searchTerm) {
-      filtered = filtered.filter(course => 
-        course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        course.instructor.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        course.category.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    // Filter by category
-    if (categoryFilter !== 'all') {
-      filtered = filtered.filter(course => 
-        course.category.toLowerCase() === categoryFilter.toLowerCase()
-      );
-    }
-
-    return filtered;
-  };
-
-  const getLevelBadge = (level: string) => {
-    const levelColors = {
-      beginner: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
-      intermediate: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300', 
-      advanced: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+  // Calculate summary statistics
+  const summaryStats = useMemo(() => {
+    const totalCourses = processedCourses.length;
+    const completedCourses = processedCourses.filter((course: any) => course.status === 'completed').length;
+    const inProgressCourses = processedCourses.filter((course: any) => course.status === 'in_progress').length;
+    const totalTimeSpent = processedCourses.reduce((total: number, course: any) => total + (course.progress?.timeSpent || 0), 0);
+    const averageProgress = totalCourses > 0 
+      ? Math.round(processedCourses.reduce((total: number, course: any) => total + course.progress.percentage, 0) / totalCourses)
+      : 0;
+    
+    return {
+      totalCourses,
+      completedCourses,
+      inProgressCourses,
+      totalTimeSpent: Math.round(totalTimeSpent / 60), // Convert to minutes
+      averageProgress,
+      completionRate: totalCourses > 0 ? Math.round((completedCourses / totalCourses) * 100) : 0
     };
+  }, [processedCourses]);
 
+  if (isLoading) {
     return (
-      <Badge className={levelColors[level as keyof typeof levelColors] || levelColors.beginner}>
-        {level}
-      </Badge>
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <LoadingSpinner className="mx-auto mb-4" />
+          <p className="text-gray-600">
+            {t('Loading your courses...')}
+          </p>
+        </div>
+      </div>
     );
-  };
+  }
 
-  if (loading) {
+  if (error) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <LoadingSpinner size="lg" />
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Card className="p-8 text-center">
+          <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            {t('Unable to load courses')}
+          </h3>
+          <p className="text-gray-600">
+            {error}
+          </p>
+        </Card>
       </div>
     );
   }
@@ -166,265 +149,272 @@ const LearnerCourses: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            {language === 'rw' ? 'Amasomo Yanjye' : 'My Courses'}
-          </h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            {language === 'rw' 
-              ? 'Komeza urugendo rwawe rwo kwiga'
-              : 'Continue your learning journey'
-            }
-          </p>
-        </div>
-        <div className="mt-4 sm:mt-0">
-          <Button onClick={() => navigate('/dashboard')}>
-            <BookOpen className="w-4 h-4 mr-2" />
-            {language === 'rw' ? 'Shakisha Amasomo' : 'Browse Courses'}
-          </Button>
-        </div>
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900">
+          {t('My Courses')}
+        </h1>
+        <p className="text-gray-600 mt-1">
+          {t('Track your learning progress and continue your studies')}
+        </p>
       </div>
 
-      {/* Error Alert */}
-      {error && (
-        <Alert variant="error">
-          {error}
-        </Alert>
-      )}
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
-                {language === 'rw' ? 'Amasomo Yandikishije' : 'Enrolled Courses'}
-              </p>
-              <p className="text-3xl font-bold text-gray-900 dark:text-white">
-                {stats.totalEnrolled}
-              </p>
+      {/* Summary Statistics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <Card className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="bg-blue-100 p-2 rounded-lg">
+              <BookOpen className="w-5 h-5 text-blue-600" />
             </div>
-            <div className="p-3 bg-blue-100 dark:bg-blue-900 rounded-lg">
-              <BookOpen className="w-7 h-7 text-blue-600 dark:text-blue-400" />
+            <div>
+              <div className="text-xl font-bold">{summaryStats.totalCourses}</div>
+              <div className="text-gray-600 text-sm">{t('Total Courses')}</div>
             </div>
           </div>
         </Card>
 
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
-                {language === 'rw' ? 'Byarangiye' : 'Completed'}
-              </p>
-              <p className="text-3xl font-bold text-gray-900 dark:text-white">
-                {stats.totalCompleted}
-              </p>
+        <Card className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="bg-green-100 p-2 rounded-lg">
+              <CheckCircle className="w-5 h-5 text-green-600" />
             </div>
-            <div className="p-3 bg-green-100 dark:bg-green-900 rounded-lg">
-              <CheckCircle className="w-7 h-7 text-green-600 dark:text-green-400" />
+            <div>
+              <div className="text-xl font-bold">{summaryStats.completedCourses}</div>
+              <div className="text-gray-600 text-sm">{t('Completed')}</div>
             </div>
           </div>
         </Card>
 
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
-                {language === 'rw' ? 'Amasaha Yize' : 'Hours Learned'}
-              </p>
-              <p className="text-3xl font-bold text-gray-900 dark:text-white">
-                {stats.totalHours}
-              </p>
+        <Card className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="bg-yellow-100 p-2 rounded-lg">
+              <Clock className="w-5 h-5 text-yellow-600" />
             </div>
-            <div className="p-3 bg-yellow-100 dark:bg-yellow-900 rounded-lg">
-              <Clock className="w-7 h-7 text-yellow-600 dark:text-yellow-400" />
+            <div>
+              <div className="text-xl font-bold">{summaryStats.inProgressCourses}</div>
+              <div className="text-gray-600 text-sm">{t('In Progress')}</div>
             </div>
           </div>
         </Card>
 
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
-                {language === 'rw' ? 'Ikigereranyo cy\'Amanota' : 'Avg Rating'}
-              </p>
-              <p className="text-3xl font-bold text-gray-900 dark:text-white">
-                {stats.avgRating}
-              </p>
+        <Card className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="bg-purple-100 p-2 rounded-lg">
+              <BarChart3 className="w-5 h-5 text-purple-600" />
             </div>
-            <div className="p-3 bg-purple-100 dark:bg-purple-900 rounded-lg">
-              <Star className="w-7 h-7 text-purple-600 dark:text-purple-400" />
+            <div>
+              <div className="text-xl font-bold">{summaryStats.averageProgress}%</div>
+              <div className="text-gray-600 text-sm">{t('Avg Progress')}</div>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="bg-orange-100 p-2 rounded-lg">
+              <Target className="w-5 h-5 text-orange-600" />
+            </div>
+            <div>
+              <div className="text-xl font-bold">{summaryStats.completionRate}%</div>
+              <div className="text-gray-600 text-sm">{t('Completion Rate')}</div>
             </div>
           </div>
         </Card>
       </div>
 
-      {/* Course Progress Tabs */}
-      <Card>
-        <div className="border-b border-gray-200 dark:border-gray-700">
-          <nav className="flex space-x-8 px-6">
-            <button 
-              onClick={() => setActiveTab('in-progress')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === 'in-progress' 
-                  ? 'border-blue-500 text-blue-600 dark:text-blue-400' 
-                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-              }`}
-            >
-              {language === 'rw' ? 'Byakomeje' : 'In Progress'} ({enrolledCourses.filter((c: Course) => (c.progress || 0) < 100).length})
-            </button>
-            <button 
-              onClick={() => setActiveTab('completed')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === 'completed' 
-                  ? 'border-blue-500 text-blue-600 dark:text-blue-400' 
-                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-              }`}
-            >
-              {language === 'rw' ? 'Byarangiye' : 'Completed'} ({enrolledCourses.filter((c: Course) => (c.progress || 0) >= 100).length})
-            </button>
-          </nav>
-        </div>
-
-        {/* Search and Filter */}
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                type="text"
-                placeholder={language === 'rw' ? 'Shakisha amasomo yawe...' : 'Search your courses...'}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <select 
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="all">{language === 'rw' ? 'Ibyiciro Byose' : 'All Categories'}</option>
-              <option value="programming">Programming</option>
-              <option value="design">Design</option>
-              <option value="business-tech">Business Tech</option>
-              <option value="general-it">General IT</option>
-            </select>
+      {/* Search and Filters */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex-1">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Input
+              type="text"
+              placeholder={t('Search courses, instructors...')}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
           </div>
         </div>
+        
+        <div className="sm:w-48">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="all">{t('All Status')}</option>
+            <option value="active">{t('Active')}</option>
+            <option value="in_progress">{t('In Progress')}</option>
+            <option value="completed">{t('Completed')}</option>
+          </select>
+        </div>
 
-        {/* Courses List */}
-        <div className="p-6">
-          {getFilteredCourses().length === 0 ? (
-            <div className="text-center py-12">
-              <BookOpen className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                {activeTab === 'completed' 
-                  ? (language === 'rw' ? 'Nta masomo byarangiye' : 'No completed courses')
-                  : (language === 'rw' ? 'Nta masomo yakomeje' : 'No courses in progress')
-                }
-              </h3>
-              <p className="text-gray-500 dark:text-gray-400 mb-4">
-                {activeTab === 'completed'
-                  ? (language === 'rw' 
-                      ? 'Rangiza amwe mu masomo yawe kugira ngo ugere hano.'
-                      : 'Complete some of your courses to see them here.'
-                    )
-                  : (language === 'rw' 
-                      ? 'Shakisha kandi wiyandikishe mu masomo mashya.'
-                      : 'Browse and enroll in new courses to get started.'
-                    )
-                }
-              </p>
-              {activeTab === 'in-progress' && (
-                <Button onClick={() => navigate('/dashboard')}>
-                  <BookOpen className="w-4 h-4 mr-2" />
-                  {language === 'rw' ? 'Shakisha Amasomo' : 'Browse Courses'}
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {getFilteredCourses().map((course) => (
-                <Card key={course.id} className="p-6 hover:shadow-lg transition-shadow">
-                  <div className="flex items-start space-x-4">
+        <div className="sm:w-48">
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="all">{t('All Categories')}</option>
+            {categories.map((category) => (
+              <option key={category} value={category}>
+                {t(category)}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Courses List */}
+      <div>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold">{t('Your Enrolled Courses')}</h2>
+          <Badge variant="default">
+            {filteredCourses.length} {t('courses')}
+          </Badge>
+        </div>
+
+        {filteredCourses.length > 0 ? (
+          <div className="space-y-4">
+            {filteredCourses.map((course: any) => (
+              <Card key={course.id || course._id} className="p-6 hover:shadow-lg transition-shadow">
+                <div className="flex flex-col lg:flex-row gap-6">
+                  {/* Course Thumbnail */}
+                  <div className="lg:w-48 lg:h-32 w-full h-48 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg overflow-hidden flex-shrink-0">
                     {course.thumbnail ? (
                       <img 
-                        src={course.thumbnail} 
+                        src={getFileUrl(course.thumbnail, 'thumbnail')} 
                         alt={course.title}
-                        className="w-24 h-24 object-cover rounded-lg"
+                        className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="w-24 h-24 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
-                        <BookOpen className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+                      <div className="w-full h-full flex items-center justify-center">
+                        <BookOpen className="w-8 h-8 text-gray-400" />
                       </div>
                     )}
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between mb-2">
-                        <div>
-                          <h4 className="font-medium text-gray-900 dark:text-white mb-1">
-                            {course.title}
-                            {(course.progress || 0) >= 100 && (
-                              <span className="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">
-                                {language === 'rw' ? '🏆 Byarangiye' : '🏆 Completed'}
-                              </span>
+                  </div>
+
+                  {/* Course Details */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          {course.category && (
+                            <Badge variant="default" className="text-xs">
+                              {t(course.category)}
+                            </Badge>
+                          )}
+                          <Badge 
+                            variant={course.status === 'completed' ? 'success' : course.status === 'in_progress' ? 'warning' : 'default'}
+                            className="text-xs"
+                          >
+                            {t(course.status)}
+                          </Badge>
+                        </div>
+                        
+                        <h3 className="font-semibold text-gray-900 text-lg mb-2 truncate">
+                          {course.title}
+                        </h3>
+                        
+                        <p className="text-gray-600 text-sm mb-3 line-clamp-2">
+                          {course.description}
+                        </p>
+                        
+                        <div className="flex items-center gap-4 text-sm text-gray-500">
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-4 h-4" />
+                            {Math.round(course.progress.timeSpent / 60)}m {t('spent')}
+                          </span>
+                          {course.instructorName && (
+                            <span>
+                              {t('by')} {course.instructorName}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col sm:items-end gap-3">
+                        <div className="text-right">
+                          <div className="text-2xl font-bold text-blue-600">
+                            {course.progress.percentage}%
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {course.progress.completedLessons}/{course.progress.totalLessons} {t('lessons')}
+                          </div>
+                        </div>
+                        
+                        <Link to={`/course/${course.id || course._id}`}>
+                          <Button className="flex items-center gap-2">
+                            {course.status === 'completed' ? (
+                              <>
+                                <Award className="w-4 h-4" />
+                                {t('Review')}
+                              </>
+                            ) : (
+                              <>
+                                <Play className="w-4 h-4" />
+                                {t('Continue')}
+                              </>
                             )}
-                          </h4>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">
-                            {course.instructor}
-                          </p>
-                        </div>
-                        {getLevelBadge(course.level)}
-                      </div>
-                      
-                      <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400 mb-3">
-                        <div className="flex items-center">
-                          <Star className="w-4 h-4 text-yellow-400 fill-current mr-1" />
-                          {course.rating.average.toFixed(1)}
-                        </div>
-                        <span>{course.duration}</span>
-                        <span>{course.category}</span>
-                      </div>
-
-                      <div className="mb-4">
-                        <div className="flex justify-between text-sm mb-1">
-                          <span className="text-gray-600 dark:text-gray-400">
-                            {language === 'rw' ? 'Iterambere' : 'Progress'}
-                          </span>
-                          <span className="text-gray-900 dark:text-white font-medium">
-                            {Math.round(course.progress || 0)}%
-                          </span>
-                        </div>
-                        <ProgressBar value={course.progress || 0} className="h-2" />
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-500 dark:text-gray-400">
-                          {course.completedLessons}/{course.totalLessons} {language === 'rw' ? 'amasomo' : 'lessons'}
-                        </span>
-                        <div className="flex space-x-2">
-                          <Button size="sm" variant="outline" onClick={() => navigate(`/course/${course.id}`)}>
-                            <Eye className="w-4 h-4 mr-2" />
-                            {language === 'rw' ? 'Kureba' : 'View'}
                           </Button>
-                          <Button size="sm" onClick={() => navigate(`/course/${course.id}`)}>
-                            <Play className="w-4 h-4 mr-2" />
-                            {(course.progress || 0) >= 100 
-                              ? (language === 'rw' ? 'Subiramo' : 'Review')
-                              : (language === 'rw' ? 'Komeza' : 'Continue')
-                            }
-                          </Button>
-                        </div>
+                        </Link>
                       </div>
                     </div>
+
+                    {/* Progress Bar */}
+                    <div className="space-y-2">
+                      <ProgressBar 
+                        value={course.progress.percentage} 
+                        className="h-2"
+                        showLabel={false}
+                      />
+                      {course.progress.currentLesson && (
+                        <p className="text-xs text-gray-500">
+                          {t('Current lesson')}: {course.progress.currentLesson}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
-      </Card>
+                </div>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <Card className="p-8 text-center">
+            <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              {processedCourses.length === 0 
+                ? t('No enrolled courses')
+                : t('No courses match your filters')
+              }
+            </h3>
+            <p className="text-gray-600 mb-4">
+              {processedCourses.length === 0 
+                ? t('Start your learning journey by enrolling in courses')
+                : t('Try adjusting your search or filter criteria')
+              }
+            </p>
+            {processedCourses.length === 0 ? (
+              <Link to="/dashboard">
+                <Button>
+                  {t('Browse Courses')}
+                </Button>
+              </Link>
+            ) : (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSearchTerm('');
+                  setStatusFilter('all');
+                  setCategoryFilter('all');
+                }}
+              >
+                {t('Clear Filters')}
+              </Button>
+            )}
+          </Card>
+        )}
+      </div>
     </div>
   );
 };

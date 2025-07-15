@@ -20,7 +20,7 @@ const couch = nano({
 
 async function setupDatabase() {
   try {
-    console.log('🔧 Setting up database...');
+    console.log('Setting up database...');
     
     // Check if databases exist
     const databases = ['users', 'courses', 'enrollments', 'progress', 'otp'];
@@ -28,13 +28,13 @@ async function setupDatabase() {
     for (const dbName of databases) {
       try {
         await couch.db.get(dbName);
-        console.log(`✅ Database ${dbName} exists`);
+        console.log(`Database ${dbName} exists`);
       } catch (error) {
         if (error.statusCode === 404) {
           await couch.db.create(dbName);
-          console.log(`✅ Created database ${dbName}`);
+          console.log(`Created database ${dbName}`);
         } else {
-          console.error(`❌ Error with database ${dbName}:`, error.message);
+                      console.error(`Error with database ${dbName}:`, error.message);
         }
       }
     }
@@ -54,10 +54,10 @@ async function setupDatabase() {
     // Check for existing courses
     await checkExistingCourses(coursesDb);
     
-    console.log('✅ Database setup complete!');
+    console.log('Database setup complete!');
     
   } catch (error) {
-    console.error('❌ Database setup failed:', error);
+    console.error('Database setup failed:', error);
     process.exit(1);
   }
 }
@@ -119,7 +119,7 @@ async function createUserDesignDoc(usersDb) {
   }
   
   await usersDb.insert(designDoc);
-  console.log('✅ User design document created/updated');
+  console.log('User design document created/updated');
 }
 
 async function createCourseDesignDoc(coursesDb) {
@@ -186,7 +186,7 @@ async function createCourseDesignDoc(coursesDb) {
   }
   
   await coursesDb.insert(designDoc);
-  console.log('✅ Course design document created/updated');
+  console.log('Course design document created/updated');
 }
 
 async function createTestTutorUser(usersDb) {
@@ -201,7 +201,7 @@ async function createTestTutorUser(usersDb) {
     });
     
     if (result.rows.length > 0) {
-      console.log('✅ Test tutor user already exists');
+      console.log('Test tutor user already exists');
       return;
     }
     
@@ -243,10 +243,10 @@ async function createTestTutorUser(usersDb) {
     };
     
     const response = await usersDb.insert(tutorUser);
-    console.log('✅ Test tutor user created:', response.id);
+    console.log('Test tutor user created:', response.id);
     
   } catch (error) {
-    console.error('❌ Error creating test tutor user:', error);
+    console.error('Error creating test tutor user:', error);
   }
 }
 
@@ -262,7 +262,7 @@ async function createAdminUser(usersDb) {
     });
     
     if (result.rows.length > 0) {
-      console.log('✅ Admin user already exists');
+      console.log('Admin user already exists');
       return;
     }
     
@@ -304,11 +304,11 @@ async function createAdminUser(usersDb) {
     };
     
     const response = await usersDb.insert(adminUser);
-    console.log('✅ Admin user created:', response.id);
-    console.log('📧 Admin credentials: admin@tekriders.com / admin123');
+    console.log('Admin user created:', response.id);
+    console.log('Admin credentials: admin@tekriders.com / admin123');
     
   } catch (error) {
-    console.error('❌ Error creating admin user:', error);
+    console.error('Error creating admin user:', error);
   }
 }
 
@@ -318,7 +318,7 @@ async function checkExistingCourses(coursesDb) {
       include_docs: true
     });
     
-    console.log(`📚 Found ${result.rows.length} courses in database`);
+    console.log(`Found ${result.rows.length} courses in database`);
     
     result.rows.forEach(row => {
       const course = row.doc;
@@ -326,7 +326,7 @@ async function checkExistingCourses(coursesDb) {
     });
     
   } catch (error) {
-    console.error('❌ Error checking courses:', error);
+    console.error('Error checking courses:', error);
   }
 }
 

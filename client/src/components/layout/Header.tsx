@@ -6,6 +6,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useSimpleImageLoader } from '../../hooks/useImageLoader';
 import { Button } from '../ui/Button';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
+import NetworkStatusIndicator from '../common/NetworkStatusIndicator';
 import { 
   Moon, 
   Sun, 
@@ -131,6 +132,9 @@ const Header: React.FC<HeaderProps> = ({
                 <Sun className="h-4 w-4" />
               )}
             </Button>
+
+            {/* Network Status Indicator (always visible when user is logged in) */}
+            {user && <NetworkStatusIndicator />}
 
             {user ? (
               <>

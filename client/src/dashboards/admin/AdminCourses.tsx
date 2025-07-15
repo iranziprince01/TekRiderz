@@ -170,15 +170,16 @@ const AdminCourses: React.FC = () => {
         });
         
         // Calculate stats
+        const safeCourseData = Array.isArray(courseData) ? courseData : [];
         const statsData: CourseStats = {
           total: paginationData.totalItems || paginationData.total || 0,
-          draft: courseData.filter((c: CourseData) => c.status === 'draft').length,
-          submitted: courseData.filter((c: CourseData) => c.status === 'submitted' || c.status === 'pending').length,
-          approved: courseData.filter((c: CourseData) => c.status === 'approved').length,
-          published: courseData.filter((c: CourseData) => c.status === 'published').length,
-          rejected: courseData.filter((c: CourseData) => c.status === 'rejected').length,
-          archived: courseData.filter((c: CourseData) => c.status === 'archived').length,
-                      pendingApproval: courseData.filter((c: CourseData) => c.status === 'submitted' || c.status === 'pending').length
+          draft: safeCourseData.filter((c: CourseData) => c.status === 'draft').length,
+          submitted: safeCourseData.filter((c: CourseData) => c.status === 'submitted' || c.status === 'pending').length,
+          approved: safeCourseData.filter((c: CourseData) => c.status === 'approved').length,
+          published: safeCourseData.filter((c: CourseData) => c.status === 'published').length,
+          rejected: safeCourseData.filter((c: CourseData) => c.status === 'rejected').length,
+          archived: safeCourseData.filter((c: CourseData) => c.status === 'archived').length,
+                      pendingApproval: safeCourseData.filter((c: CourseData) => c.status === 'submitted' || c.status === 'pending').length
         };
         setStats(statsData);
       }

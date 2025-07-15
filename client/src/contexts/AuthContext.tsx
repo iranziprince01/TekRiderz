@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../utils/api';
 
@@ -14,6 +14,20 @@ interface User {
   preferences?: any;
   lastLogin?: string;
 }
+
+// Role-based navigation utility
+const RoleBasedNavigation = {
+  getPostLoginRoute: (role: string, currentPath: string) => {
+    if (currentPath === '/login' || currentPath === '/signup') {
+      switch (role) {
+        case 'admin': return '/admin';
+        case 'tutor': return '/tutor';
+        case 'learner': default: return '/dashboard';
+      }
+    }
+    return currentPath;
+  }
+};
 
 interface AuthState {
   user: User | null;
@@ -44,10 +58,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-interface AuthProviderProps {
-  children: React.ReactNode;
-}
-
 // Secure storage using IndexedDB only (no localStorage fallback)
 class SecureAuthStorage {
   private dbName = 'TekRidersSecureAuth';
@@ -67,9 +77,11 @@ class SecureAuthStorage {
       
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result;
+        
         if (!db.objectStoreNames.contains(this.storeName)) {
           const store = db.createObjectStore(this.storeName, { keyPath: 'key' });
-          store.createIndex('timestamp', 'timestamp', { unique: false });
+          store.createIndex('timestamp', 'timestamp');
+          store.createIndex('expires', 'expires');
         }
       };
     });
@@ -139,7 +151,6 @@ class SecureAuthStorage {
           if (result && (!result.expires || result.expires > Date.now())) {
             resolve(result.value);
           } else {
-            // Data expired, clean it up
             if (result) this.removeTempUserData();
             resolve(null);
           }
@@ -175,7 +186,6 @@ class SecureAuthStorage {
           if (result && result.expires > Date.now()) {
             resolve(result.value);
           } else {
-            // Token expired, clean it up
             if (result) this.removeToken();
             resolve(null);
           }
@@ -200,7 +210,6 @@ class SecureAuthStorage {
           if (result && result.expires > Date.now()) {
             resolve(result.value);
           } else {
-            // Refresh token expired, clean it up
             if (result) this.removeRefreshToken();
             resolve(null);
           }
@@ -220,7 +229,10 @@ class SecureAuthStorage {
       
       return new Promise((resolve) => {
         const request = store.get(this.userKey);
-        request.onsuccess = () => resolve(request.result?.value || null);
+        request.onsuccess = () => {
+          const result = request.result;
+          resolve(result ? result.value : null);
+        };
         request.onerror = () => resolve(null);
       });
     } catch {
@@ -300,7 +312,7 @@ class SecureAuthService {
       
       // Handle new error format from backend
       if (errorData.error) {
-        const error = new Error(errorData.error.message || 'An error occurred');
+        const error = new Error(errorData.error.message || 'Request failed');
         (error as any).details = errorData.error;
         throw error;
       }
@@ -323,7 +335,7 @@ class SecureAuthService {
       this.storage.storeRefreshToken(data.data.refreshToken),
       this.storage.storeUser(data.data.user)
     ]);
-
+    
     return {
       user: data.data.user,
       token: data.data.token,
@@ -392,18 +404,12 @@ class SecureAuthService {
   }
 
   async updateProfile(updates: Partial<User>): Promise<User> {
-    const data = await this.makeRequest('/users/profile', {
+    const data = await this.makeRequest('/auth/profile', {
       method: 'PUT',
       body: JSON.stringify(updates),
     });
-    
+
     await this.storage.storeUser(data.data.user);
-    
-    // Emit profile update event for real-time sync
-    window.dispatchEvent(new CustomEvent('profileUpdated', {
-      detail: { user: data.data.user }
-    }));
-    
     return data.data.user;
   }
 
@@ -443,57 +449,9 @@ class SecureAuthService {
   }
 }
 
-// Role-based navigation utility
-class RoleBasedNavigation {
-  static getDefaultRoute(role: User['role']): string {
-    switch (role) {
-      case 'admin':
-        return '/admin/dashboard';
-      case 'tutor':
-        return '/tutor/dashboard';
-      case 'learner':
-        return '/learner/dashboard';
-      default:
-        return '/dashboard';
-    }
-  }
-
-  static getPostLoginRoute(role: User['role'], intendedPath?: string): string {
-    // If user was trying to access a specific path, validate it's appropriate for their role
-    if (intendedPath && intendedPath !== '/login' && intendedPath !== '/signup') {
-      if (this.isRouteAllowedForRole(intendedPath, role)) {
-        return intendedPath;
-      }
-    }
-    
-    return this.getDefaultRoute(role);
-  }
-
-  static isRouteAllowedForRole(path: string, role: User['role']): boolean {
-    const adminRoutes = ['/admin'];
-    const tutorRoutes = ['/tutor', '/create-course'];
-    const learnerRoutes = ['/learner'];
-    
-    if (adminRoutes.some(route => path.startsWith(route))) {
-      return role === 'admin';
-    }
-    
-    if (tutorRoutes.some(route => path.startsWith(route))) {
-      return role === 'tutor' || role === 'admin';
-    }
-    
-    if (learnerRoutes.some(route => path.startsWith(route))) {
-      return role === 'learner' || role === 'admin';
-    }
-    
-    // General routes are accessible to all authenticated users
-    return true;
-  }
-}
-
 const authService = new SecureAuthService();
 
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
@@ -509,61 +467,127 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     const initAuth = async () => {
       try {
+        console.log('🔐 Initializing auth context...');
+        setAuthState(prev => ({ ...prev, isLoading: true }));
+        
         const storage = new SecureAuthStorage();
-        const [storedUser, storedToken] = await Promise.all([
-          storage.getUser(),
-          storage.getToken(),
-        ]);
+        
+        try {
+          const [storedUser, storedToken] = await Promise.all([
+            storage.getUser(),
+            storage.getToken(),
+          ]);
 
-        if (storedUser && storedToken) {
-          try {
-            // Set token in apiClient for API requests
-            await apiClient.setToken(storedToken);
+          if (storedUser && storedToken) {
+            console.log('✅ Found stored credentials');
             
-            // Check if we have a refresh token to attempt token refresh first
-            const refreshToken = await storage.getRefreshToken();
-            if (refreshToken) {
+            // Check if this is an offline session
+            const isOfflineMode = localStorage.getItem('isOfflineMode') === 'true';
+            const offlineSessionId = localStorage.getItem('offlineSessionId');
+            
+            if (isOfflineMode && offlineSessionId && storedToken === 'offline_token') {
+              // Validate offline session
               try {
-                // Try to refresh the token first (in case access token is expired)
-                const { user, token } = await authService.refreshToken();
-                setAuthState(prev => ({
-                  ...prev,
-                  user,
-                  token,
-                  isInitialized: true,
-                }));
-                return;
-              } catch (refreshError) {
-                // Refresh failed, fall back to verifying current token
-                console.warn('Token refresh failed during initialization, verifying current token:', refreshError);
+                const offlineAuthModule = await import('../utils/offlineAuth');
+                const sessionResult = await offlineAuthModule.validateOfflineSession(offlineSessionId);
+                
+                if (sessionResult.valid && sessionResult.userData) {
+                  console.log('✅ Valid offline session restored');
+                  setAuthState(prev => ({
+                    ...prev,
+                    user: sessionResult.userData,
+                    token: 'offline_token',
+                    isInitialized: true,
+                    isLoading: false
+                  }));
+                  return;
+                } else {
+                  console.log('❌ Offline session expired, clearing data');
+                  localStorage.removeItem('isOfflineMode');
+                  localStorage.removeItem('offlineSessionId');
+                  await storage.clear();
+                  // Fall through to regular initialization
+                }
+              } catch (offlineError: any) {
+                console.warn('⚠️ Offline session validation failed:', offlineError?.message);
+                localStorage.removeItem('isOfflineMode');
+                localStorage.removeItem('offlineSessionId');
+                await storage.clear();
+                // Fall through to regular initialization
               }
             }
             
-            // Verify current token is still valid
-            const user = await authService.getCurrentUser();
+            // Regular online session or fallback from failed offline validation
+            // Set token in apiClient for API requests
+            await apiClient.setToken(storedToken);
+            
+            // Store user data for immediate app functionality
+            localStorage.setItem('currentUserId', storedUser.id);
+            localStorage.setItem('userRole', storedUser.role);
+            localStorage.setItem('userEmail', storedUser.email);
+            
             setAuthState(prev => ({
               ...prev,
-              user,
+              user: storedUser,
               token: storedToken,
               isInitialized: true,
+              isLoading: false
             }));
-          } catch (error) {
-            // Token invalid, clear storage
-            console.info('Stored token invalid, clearing auth state:', error);
-            await storage.clear();
-            await apiClient.setToken(null);
-            setAuthState(prev => ({ ...prev, isInitialized: true }));
+            
+            console.log('✅ Auth state restored from storage');
+            
+            // Verify token in background (don't block initialization)
+            setTimeout(async () => {
+              try {
+                await authService.getCurrentUser();
+                console.log('✅ Token verified in background');
+              } catch (error) {
+                console.warn('⚠️ Background token verification failed, user needs to login again');
+                await storage.clear();
+                await apiClient.setToken(null);
+                setAuthState(prev => ({ 
+                  ...prev, 
+                  user: null, 
+                  token: null 
+                }));
+              }
+            }, 1000);
+            
+          } else {
+            console.log('ℹ️ No stored credentials found');
+            setAuthState(prev => ({
+              ...prev,
+              isInitialized: true,
+              isLoading: false
+            }));
           }
-        } else {
-          setAuthState(prev => ({ ...prev, isInitialized: true }));
+        } catch (storageError: any) {
+          console.warn('⚠️ Storage access failed:', storageError?.message || 'Unknown error');
+          setAuthState(prev => ({
+            ...prev,
+            isInitialized: true,
+            isLoading: false
+          }));
         }
-      } catch (error) {
-        console.error('Auth initialization failed:', error);
-        setAuthState(prev => ({ ...prev, isInitialized: true }));
+        
+      } catch (error: any) {
+        console.error('❌ Auth initialization failed:', error?.message || 'Unknown error');
+        setAuthState(prev => ({ 
+          ...prev, 
+          isInitialized: true,
+          isLoading: false
+        }));
       }
     };
 
-    initAuth();
+    initAuth().catch((error: any) => {
+      console.error('❌ Critical auth initialization error:', error?.message || 'Unknown error');
+      setAuthState(prev => ({ 
+        ...prev, 
+        isInitialized: true,
+        isLoading: false
+      }));
+    });
   }, []);
 
   // Auto-refresh token before it expires
@@ -602,27 +626,109 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setAuthState(prev => ({ ...prev, isLoading: true }));
     
     try {
-      const { user, token } = await authService.login(email, password);
+      console.log('🔐 Attempting login for:', email);
       
-      // Set token in apiClient for API requests
-      await apiClient.setToken(token);
-      
-      setAuthState(prev => ({
-        ...prev,
-        user,
-        token,
-        isLoading: false,
-        otpSent: false,
-        tempEmail: null,
-        tempUserData: null,
-      }));
+      // Try online login first
+      try {
+        const { user, token } = await authService.login(email, password);
+        
+        // Set token in apiClient for API requests
+        await apiClient.setToken(token);
+        
+        // Try to cache credentials for offline access (don't let this fail the login)
+        try {
+          if (typeof window !== 'undefined' && 'indexedDB' in window) {
+            // Import and cache offline credentials
+            import('../utils/offlineAuth').then(async (offlineAuthModule) => {
+              try {
+                await offlineAuthModule.cacheUserCredentials(email, password, user);
+                console.log('✅ Credentials cached for offline access');
+              } catch (cacheError: any) {
+                console.warn('⚠️ Failed to cache credentials for offline:', cacheError?.message);
+              }
+            }).catch(() => {
+              console.warn('⚠️ Offline auth module not available');
+            });
+          }
+        } catch (error) {
+          console.warn('⚠️ Offline caching failed, but login successful');
+        }
+        
+        // Store user data for offline access
+        localStorage.setItem('currentUserId', user.id);
+        localStorage.setItem('userRole', user.role);
+        localStorage.setItem('userEmail', user.email);
+        
+        setAuthState(prev => ({
+          ...prev,
+          user,
+          token,
+          isLoading: false,
+          otpSent: false,
+          tempEmail: null,
+          tempUserData: null,
+        }));
 
-      // Auto-redirect based on user role
-      const currentPath = window.location.pathname;
-      const redirectTo = RoleBasedNavigation.getPostLoginRoute(user.role, currentPath);
-      navigate(redirectTo, { replace: true });
+        // Auto-redirect based on user role
+        const currentPath = window.location.pathname;
+        const redirectTo = RoleBasedNavigation.getPostLoginRoute(user.role, currentPath);
+        navigate(redirectTo, { replace: true });
+        
+        console.log('✅ Login successful');
+        return;
+        
+      } catch (onlineError: any) {
+        // If online login fails and we're offline, try offline authentication
+        if (!navigator.onLine || onlineError?.message?.includes('fetch')) {
+          console.log('🔌 Network unavailable, attempting offline login...');
+          
+          try {
+            // Try offline authentication
+            const offlineAuthModule = await import('../utils/offlineAuth');
+            const offlineResult = await offlineAuthModule.validateOfflineLogin(email, password);
+            
+            if (offlineResult.success && offlineResult.userData) {
+              console.log('✅ Offline login successful');
+              
+              // Store offline session info
+              localStorage.setItem('currentUserId', offlineResult.userData.id);
+              localStorage.setItem('userRole', offlineResult.userData.role);
+              localStorage.setItem('userEmail', offlineResult.userData.email);
+              localStorage.setItem('offlineSessionId', offlineResult.sessionId || '');
+              localStorage.setItem('isOfflineMode', 'true');
+              
+              setAuthState(prev => ({
+                ...prev,
+                user: offlineResult.userData,
+                token: 'offline_token', // Special offline token
+                isLoading: false,
+                otpSent: false,
+                tempEmail: null,
+                tempUserData: null,
+              }));
+
+              // Auto-redirect based on user role
+              const currentPath = window.location.pathname;
+              const redirectTo = RoleBasedNavigation.getPostLoginRoute(offlineResult.userData.role, currentPath);
+              navigate(redirectTo, { replace: true });
+              
+              return;
+            } else {
+              console.log('❌ Offline login failed - no cached credentials or invalid password');
+              throw new Error('Invalid credentials. Please check your email and password, or connect to the internet to login.');
+            }
+          } catch (offlineError: any) {
+            console.error('❌ Offline login failed:', offlineError?.message);
+            throw new Error(offlineError?.message || 'Login failed. Please check your credentials or internet connection.');
+          }
+        } else {
+          // Online error but network is available
+          throw onlineError;
+        }
+      }
       
-    } catch (error) {
+    } catch (error: any) {
+      console.error('❌ Login failed:', error?.message);
       setAuthState(prev => ({ ...prev, isLoading: false }));
       throw error;
     }
@@ -658,6 +764,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Set token in apiClient for API requests
       await apiClient.setToken(token);
       
+      // Store user ID and role in localStorage for offline access and PouchDB sync
+      localStorage.setItem('currentUserId', user.id);
+      localStorage.setItem('userRole', user.role);
+      localStorage.setItem('userEmail', user.email);
+      
       setAuthState(prev => ({
         ...prev,
         user,
@@ -669,7 +780,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }));
 
       // Auto-redirect to appropriate dashboard after successful verification
-      const redirectTo = RoleBasedNavigation.getDefaultRoute(user.role);
+      const redirectTo = RoleBasedNavigation.getPostLoginRoute(user.role, '/dashboard');
       navigate(redirectTo, { replace: true });
       
     } catch (error) {
@@ -699,6 +810,40 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Clear token from apiClient
       await apiClient.setToken(null);
       
+      // Clear offline session and cached credentials
+      try {
+        localStorage.removeItem('offlineSessionId');
+        localStorage.removeItem('isOfflineMode');
+        localStorage.removeItem('currentUserId');
+        localStorage.removeItem('userRole');
+        localStorage.removeItem('userEmail');
+      } catch (cleanupError) {
+        console.warn('Failed to clean up local storage:', cleanupError);
+      }
+      
+      setAuthState({
+        user: null,
+        token: null,
+        isLoading: false,
+        isInitialized: true,
+        otpSent: false,
+        tempEmail: null,
+        tempUserData: null,
+      });
+
+      navigate('/login', { replace: true });
+    } catch (error) {
+      // Even if online logout fails, clear offline data
+      try {
+        localStorage.removeItem('offlineSessionId');
+        localStorage.removeItem('isOfflineMode');
+        localStorage.removeItem('currentUserId');
+        localStorage.removeItem('userRole');
+        localStorage.removeItem('userEmail');
+      } catch (cleanupError) {
+        console.warn('Failed to clean up local storage:', cleanupError);
+      }
+      
       setAuthState({
         user: null,
         token: null,
@@ -710,9 +855,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       });
       
       navigate('/login', { replace: true });
-    } catch (error) {
-      setAuthState(prev => ({ ...prev, isLoading: false }));
-      throw error;
     }
   };
 
@@ -722,6 +864,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       // Update token in apiClient
       await apiClient.setToken(token);
+      
+      // Update localStorage for offline access
+      localStorage.setItem('currentUserId', user.id);
+      localStorage.setItem('userRole', user.role);
+      localStorage.setItem('userEmail', user.email);
       
       setAuthState(prev => ({
         ...prev,

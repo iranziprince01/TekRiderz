@@ -19,7 +19,7 @@ const couch = nano({
 
 async function setupNewDatabases() {
   try {
-    console.log('🔧 Setting up new databases for TekRiderz features...');
+    console.log('Setting up new databases for TekRiderz features...');
     
     // Define all new databases needed
     const newDatabases = [
@@ -54,13 +54,13 @@ async function setupNewDatabases() {
     for (const dbName of newDatabases) {
       try {
         await couch.db.get(dbName);
-        console.log(`✅ Database ${dbName} already exists`);
+        console.log(`Database ${dbName} already exists`);
       } catch (error) {
         if (error.statusCode === 404) {
           await couch.db.create(dbName);
-          console.log(`✅ Created database ${dbName}`);
+          console.log(`Created database ${dbName}`);
         } else {
-          console.error(`❌ Error with database ${dbName}:`, error.message);
+                      console.error(`Error with database ${dbName}:`, error.message);
         }
       }
     }
@@ -83,11 +83,11 @@ async function setupNewDatabases() {
     await createLoadBalancingConfigsDesignDoc(couch.db.use('load_balancing_configs'));
     await createMonitoringAlertsDesignDoc(couch.db.use('monitoring_alerts'));
     
-    console.log('✅ All new databases and design documents created successfully!');
-    console.log('🎉 TekRiderz backend is now ready with persistent data storage!');
+    console.log('All new databases and design documents created successfully!');
+    console.log('TekRiderz backend is now ready with persistent data storage!');
     
   } catch (error) {
-    console.error('❌ Database setup failed:', error);
+    console.error('Database setup failed:', error);
     process.exit(1);
   }
 }
@@ -733,7 +733,7 @@ async function insertDesignDoc(db, designDoc, name) {
   }
   
   await db.insert(designDoc);
-  console.log(`✅ ${name} design document created/updated`);
+  console.log(`${name} design document created/updated`);
 }
 
 // Run the setup

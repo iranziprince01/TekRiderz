@@ -441,7 +441,7 @@ export const AutoGradedQuiz: React.FC<AutoGradedQuizProps> = ({
         
         // Show success notification
         if (backendResult.passed) {
-          console.log(`🎉 Quiz Passed! Score: ${backendResult.score}%`);
+          console.log(`Quiz Passed! Score: ${backendResult.score}%`);
           
           // Trigger success notification
           window.dispatchEvent(new CustomEvent('quizSuccess', {
@@ -767,7 +767,7 @@ export const AutoGradedQuiz: React.FC<AutoGradedQuizProps> = ({
             <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
               <div className="flex items-center justify-between mb-2">
                 <h4 className="font-medium text-yellow-800">
-                  💡 Hint {currentHintIndex + 1} of {currentQuestion.hints.length}
+                  Hint {currentHintIndex + 1} of {currentQuestion.hints.length}
                 </h4>
                 {currentHintIndex < currentQuestion.hints.length - 1 && (
                   <Button variant="ghost" size="sm" onClick={nextHint}>
@@ -835,7 +835,7 @@ export const AutoGradedQuiz: React.FC<AutoGradedQuizProps> = ({
           <h2 className="text-3xl font-bold mb-2">{attempt.score}%</h2>
           <p className="text-lg mb-4">
             {attempt.passed ? (
-              <span className="text-green-600 font-medium">🎉 Congratulations! You passed!</span>
+              <span className="text-green-600 font-medium">Congratulations! You passed!</span>
             ) : (
               <span className="text-red-600 font-medium">Keep learning! You can retry.</span>
             )}
