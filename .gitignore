@@ -1,0 +1,300 @@
+# TekRiderz E-Learning Platform - Comprehensive Security .gitignore
+# This file protects sensitive data, credentials, and user privacy information
+# from being committed to version control
+
+# Dependencies
+node_modules/
+
+# Setup and installation files
+!setup.sh
+!backend/env.example
+!client/env.example
+
+# Environment variables and configuration
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.staging
+.env.backup
+config.json
+config.js
+config.ts
+!config/config.example.ts
+
+# Authentication and Security
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cer
+*.jks
+*.keystore
+auth.json
+secrets.json
+private_key*
+public_key*
+jwt_secret*
+session_secret*
+api_keys*
+
+# Database files and credentials
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+database.json
+couchdb_credentials*
+db_backup*
+*.sql
+*.dump
+*.bak
+
+# Logs and runtime files
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+server.log
+app.log
+error.log
+access.log
+combined.log
+backend/logs/
+backend/server.log
+backend/cookies.txt
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Session and cookie files
+sessions/
+cookies.txt
+session_store/
+
+# Uploads - exclude ALL uploaded files (contains sensitive user data)
+backend/uploads/
+!backend/uploads/README.md
+!backend/uploads/.gitkeep
+
+# User data and privacy-sensitive files
+backend/uploads/users/
+backend/uploads/users/avatars/
+backend/uploads/users/documents/
+backend/uploads/courses/
+backend/uploads/courses/thumbnails/
+backend/uploads/courses/videos/
+backend/uploads/courses/materials/
+backend/uploads/lessons/
+backend/uploads/lessons/documents/
+backend/uploads/lessons/materials/
+backend/uploads/lessons/videos/
+backend/uploads/documents/
+backend/uploads/images/
+backend/uploads/certificates/
+backend/uploads/temp/
+backend/uploads/archive/
+
+# Certificate files (HIGHLY SENSITIVE - contains personal information)
+*.pdf
+certificate_*
+certificates/
+cert_*
+diploma_*
+
+# Backup files
+backup/
+backups/
+*.backup
+*.bak
+*.old
+
+# IDE and editor files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Build outputs
+dist/
+dist-ssr/
+build/
+*.local
+backend/dist/
+client/dist/
+client/build/
+client/dev-dist/
+
+# Coverage directory used by tools like istanbul
+coverage/
+
+# nyc test coverage
+.nyc_output
+
+# Temporary folders
+tmp/
+temp/
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# parcel-bundler cache
+.cache
+.parcel-cache
+
+# Next.js build output
+.next
+
+# Nuxt.js build / generate output
+.nuxt
+dist
+
+# Gatsby files
+.cache/
+public
+
+# Storybook build outputs
+.out
+.storybook-out
+
+# Temporary files
+*.tmp
+*.temp
+
+# Development and testing files
+.vscode/settings.json
+.vscode/launch.json
+test-results/
+cypress/videos/
+cypress/screenshots/
+playwright-report/
+test-results/
+
+# Email and notification templates (may contain sensitive info)
+email_templates/
+notification_templates/
+
+# Analytics and tracking data
+analytics/
+tracking/
+metrics/
+
+# Cache directories
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Docker secrets
+docker-compose.override.yml
+docker-compose.production.yml
+.dockerignore.local
+
+# Package manager files
+package-lock.json.backup
+yarn.lock.backup
+.pnpm-debug.log
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Local history files
+.history/
+
+# User-specific files
+.user
+*.user
+*.userosscache
+*.sln.docstates
+
+# Visual Studio Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# Local settings and preferences
+.localhistory/
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+
+# Database and storage
+storage/
+data/
+db/
+database/
+
+# Compiled source
+*.com
+*.class
+*.dll
+*.exe
+*.o
+*.so
+
+# Archives
+*.7z
+*.jar
+*.rar
+*.zip
+*.tar.gz
+*.tgz
+
+# Logs and crash reports
+*.log
+crash.log
+error.log
+debug.log
+
+# Runtime configuration
+runtime.json
+app.config
+local.settings.json
+
+# SSL certificates and keys
+ssl/
+certs/
+*.csr
+*.key
+*.pem
+*.p12
+*.pfx
