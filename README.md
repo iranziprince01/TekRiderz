@@ -1,388 +1,223 @@
 # TekRiders - Modern E-Learning Platform
 
-A comprehensive e-learning platform built with React, TypeScript, and Node.js, featuring robust offline capabilities and PWA functionality.
+> A comprehensive e-learning platform designed for modern education needs, featuring intuitive course management, interactive learning experiences, and robust offline capabilities.
 
-## Recent Major Updates
+![React](https://img.shields.io/badge/React-18-blue?logo=react)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?logo=typescript)
+![Node.js](https://img.shields.io/badge/Node.js-18+-green?logo=node.js)
+![CouchDB](https://img.shields.io/badge/CouchDB-Database-red?logo=apache-couchdb)
 
-### Offline & PWA System - COMPLETELY FIXED (Latest)
+## Project Overview
 
-**ALL BLANK PAGE ISSUES RESOLVED** - The application now has bulletproof offline functionality:
+TekRiders is a full-stack e-learning platform that enables seamless knowledge sharing between instructors and learners. Built with modern web technologies, it provides a complete educational ecosystem with course creation, student enrollment, progress tracking, and certification features.
 
-#### **Fixed Issues:**
-- **TypeError: Class extends value [object Object] constructor errors** → **RESOLVED**
-- **PWA manifest icon 404 errors** → **RESOLVED** 
-- **PouchDB import/export errors** → **RESOLVED**
-- **Service worker conflicts** → **RESOLVED**
-- **Unhandled promise rejections** → **RESOLVED**
-- **Circular dependency issues** → **RESOLVED**
+## Key Features
 
-#### **Implemented Solutions:**
+### **Learning Management**
+- Interactive course creation with multimedia support
+- Real-time progress tracking and analytics
+- Comprehensive quiz and assessment system
+- Automated certificate generation upon completion
 
-1. **Stable PouchDB Architecture**
-   ```typescript
-   // Production-ready PouchDB with CouchDB integration
-   Dual-mode operation (Local IndexedDB + Remote CouchDB)
-   Automatic fallback when CouchDB unavailable
-   Live bidirectional sync with conflict resolution
-   Type-safe TypeScript implementation
-   ```
+### **User Management**
+- Multi-role system (Admin, Tutor, Learner)
+- Secure authentication and user profiles
+- Role-based access control and permissions
+- User activity monitoring and statistics
 
- 2. **📱 Simplified Offline Manager**
-    ```typescript
-    // Clean, reliable storage strategy
-    PouchDB (Primary) → IndexedDB (Secondary) → localStorage (Fallback)
-    Consolidated architecture eliminates redundancy
-    Clear fallback hierarchy with proper error handling
-    Single source of truth prevents conflicts
-    ```
-
-3. **🔧 Simplified Service Worker**
-   ```javascript
-   // Robust caching strategy
-   Network-first with cache fallback
-   Proper error handling for all request types
-   ackground sync capabilities
-   No WebSocket conflicts in development
-   ```
-
-4. ** PWA Manifest & Icons**
-   ```json
-   // Complete PWA setup
-   All icon sizes (16x16 to 512x512) available
-   Correct paths (/icons/ directory)
-   Proper shortcuts and file handlers
-   Mobile app capabilities
-   ```
-
-5. **Global Error Boundaries**
-   ```typescript
-   // Comprehensive error handling
-   React error boundaries for component crashes
-   Global promise rejection handlers
-   Service worker error isolation
-   Offline-specific error recovery
-   ```
-
-#### **System Architecture:**
-
-```mermaid
-graph TB
-    A[React App] --> B[Error Boundary]
-    B --> C[Offline Manager]
-    
-    C --> D[PouchDB Manager]
-    C --> E[IndexedDB Storage]
-    C --> F[localStorage Fallback]
-    
-    D --> G[Local PouchDB]
-    D --> H[Remote CouchDB]
-    
-    G -.->|Sync| H
-    H -.->|Sync| G
-    
-    A --> I[Service Worker]
-    I --> J[Cache Strategy]
-    I --> K[Background Sync]
-    
-    style A fill:#e1f5fe
-    style C fill:#f3e5f5
-    style D fill:#e8f5e8
-    style H fill:#fff3e0
-```
-
-#### **Testing Results:**
-- **TypeScript Compilation:** Zero errors
-- **Frontend Server:** Running perfectly on localhost:5173
-- **PWA Manifest:** Loading correctly with all icons
-- **Service Worker:** Registered and functioning
-- **Error Boundaries:** No more blank pages
-- **Console Logs:** Clean with proper initialization messages
-
-### **Production Ready Features:**
-
-**Offline-First Architecture**
-- Course content caching
-- Progress tracking offline
-- User data synchronization
-- Quiz submissions queuing
-
-**Automatic Synchronization**
-- Real-time sync when online
-- Conflict resolution
-- Retry mechanisms with exponential backoff
-- Network status monitoring
-
-**PWA Capabilities**
-- Install prompts
-- App shortcuts
-- File handling
-- Share targets
-- Background sync
-
-**Error Resilience**
-- Multiple storage fallbacks
-- Graceful degradation
-- Recovery mechanisms
-- User-friendly error messages
-
-### **Academic Presentation Ready**
-This implementation demonstrates:
-- Industry-standard offline-first architecture
-- Modern PWA development practices
-- Robust error handling patterns
-- Scalable data synchronization
-- Professional code organization
-
-## Features
-
-### Core Learning Features
-- Interactive course content with multimedia support
-- Real-time progress tracking
-- Quiz and assessment system
-- Certificate generation
+### **Modern Experience**
+- Responsive design for all devices
+- Progressive Web App (PWA) capabilities
+- Offline learning functionality
 - Multi-language support (English/Kinyarwanda)
 
-### Technical Features
-- **Offline-First PWA**: Complete functionality without internet
-- **Real-time Sync**: Automatic data synchronization
-- **Responsive Design**: Works on all devices
-- **Security**: JWT authentication, input validation
-- **Performance**: Optimized loading, caching strategies
+### **Security & Performance**
+- JWT-based authentication
+- Data encryption and validation
+- Optimized loading and caching
+- Real-time data synchronization
 
 ## Technology Stack
 
-### Frontend
-- **React 18** with TypeScript
-- **Vite** for development and building
-- **Tailwind CSS** for styling
-- **React Router** for navigation
-- **Context API** for state management
+### **Frontend**
+- **React 18** - Modern UI library with hooks
+- **TypeScript** - Type-safe development
+- **Tailwind CSS** - Utility-first styling
+- **Vite** - Fast development and building
+- **React Router** - Client-side routing
 
-### Backend
-- **Node.js** with Express
-- **TypeScript** for type safety
-- **JWT** for authentication
-- **Multer** for file uploads
-- **Rate limiting** and security middleware
+### **Backend**
+- **Node.js** - JavaScript runtime
+- **Express.js** - Web application framework
+- **TypeScript** - Server-side type safety
+- **JWT** - Secure authentication
+- **Multer** - File upload handling
 
-### Database & Storage
-- **CouchDB** for primary data storage
-- **PouchDB** for offline synchronization
-- **IndexedDB** for client-side storage
-- **localStorage** as ultimate fallback
+### **Database & Storage**
+- **CouchDB** - Primary document database
+- **PouchDB** - Client-side synchronization
+- **IndexedDB** - Browser-based storage
+- **Real-time sync** - Automatic data synchronization
 
-### PWA & Offline
-- **Service Workers** for caching and background sync
-- **Web App Manifest** for native app experience
-- **Background Sync API** for offline actions
-- **Cache API** for resource management
-
-## Installation
+## Getting Started
 
 ### Prerequisites
-- Node.js 18+ and npm
-- CouchDB (optional - app works without it)
+- Node.js 18 or higher
+- npm or yarn package manager
+- CouchDB (optional for advanced features)
 
-### Setup
-```bash
-# Clone the repository
-git clone <repository-url>
-cd TekRiderz
+### Installation
 
-# Install dependencies
-npm install
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd TekRiderz
+   ```
 
-# Setup environment variables
-cp backend/env.example backend/.env
-cp client/env.example client/.env
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
 
-# Start development servers
-npm run dev  # Starts both frontend and backend
-```
+3. **Environment setup**
+   ```bash
+   # Copy environment templates
+   cp backend/env.example backend/.env
+   cp client/env.example client/.env
+   ```
 
-### Environment Variables
+4. **Start development servers**
+   ```bash
+   npm run dev
+   ```
 
-**Backend (.env):**
-```env
-PORT=3000
-JWT_SECRET=your-secret-key
-COUCHDB_URL=http://localhost:5984
-SMTP_HOST=your-smtp-host
-SMTP_PORT=587
-SMTP_USER=your-email
-SMTP_PASS=your-password
-```
+The application will be available at:
+- Frontend: `http://localhost:5173`
+- Backend API: `http://localhost:3000`
 
-**Client (.env):**
-```env
-VITE_API_URL=http://localhost:3000/api
-VITE_ENABLE_SW=true
-```
+## User Roles
 
-## Development
+### **Administrator**
+- Manage users and system settings
+- Approve/reject course submissions
+- Monitor platform analytics
+- Control user permissions
 
-### Available Scripts
+### **Tutor/Instructor**
+- Create and manage courses
+- Design quizzes and assessments
+- Track student progress
+- Generate course analytics
 
-```bash
-# Frontend development
-npm run dev:client          # Start Vite dev server
-npm run build:client        # Build for production
-npm run preview:client      # Preview production build
+### **Learner/Student**
+- Browse and enroll in courses
+- Complete lessons and assessments
+- Track learning progress
+- Earn certificates
 
-# Backend development  
-npm run dev:server          # Start backend with nodemon
-npm run build:server        # Compile TypeScript
-npm run start:server        # Start production server
-
-# Combined
-npm run dev                 # Start both frontend and backend
-npm run build               # Build both for production
-```
-
-### Project Structure
+## Project Structure
 
 ```
 TekRiderz/
-├── client/                 # React frontend
+├── client/                 # React frontend application
 │   ├── src/
 │   │   ├── components/     # Reusable UI components
-│   │   ├── pages/          # Route components
-│   │   ├── contexts/       # React contexts
-│   │   ├── hooks/          # Custom hooks
-│   │   ├── utils/          # Utility functions
-│   │   └── types/          # TypeScript definitions
-│   ├── public/             # Static assets
-│   └── dist/               # Production build
-├── backend/                # Node.js backend
+│   │   ├── pages/          # Application pages
+│   │   ├── dashboards/     # Role-specific dashboards
+│   │   ├── contexts/       # React context providers
+│   │   └── utils/          # Utility functions
+│   └── public/             # Static assets
+├── backend/                # Node.js backend application
 │   ├── src/
-│   │   ├── controllers/    # Route handlers
+│   │   ├── controllers/    # Request handlers
+│   │   ├── models/         # Database models
+│   │   ├── routes/         # API endpoints
 │   │   ├── middleware/     # Express middleware
-│   │   ├── models/         # Data models
-│   │   ├── routes/         # API routes
-│   │   ├── services/       # Business logic
-│   │   └── utils/          # Backend utilities
-│   └── uploads/            # File uploads
-└── docs/                   # Documentation
+│   │   └── services/       # Business logic
+│   └── uploads/            # File storage
+└── docs/                   # Project documentation
 ```
 
-## API Documentation
+## Development Commands
 
-### Authentication Endpoints
-```
-POST /api/auth/register     # User registration
-POST /api/auth/login        # User login
-POST /api/auth/verify-otp   # OTP verification
-GET  /api/auth/me           # Get current user
-POST /api/auth/refresh      # Refresh token
-```
-
-### Course Endpoints
-```
-GET    /api/courses         # Get all courses
-GET    /api/courses/:id     # Get specific course
-POST   /api/courses         # Create course (tutor/admin)
-PUT    /api/courses/:id     # Update course
-DELETE /api/courses/:id     # Delete course
-```
-
-### User Management
-```
-GET    /api/users/profile   # Get user profile
-PUT    /api/users/profile   # Update profile
-GET    /api/users/progress  # Get learning progress
-POST   /api/users/progress  # Update progress
-```
-
-## Configuration
-
-### Service Worker Configuration
-The service worker automatically handles:
-- Static asset caching
-- API response caching
-- Offline page fallbacks
-- Background synchronization
-
-### PouchDB Configuration
-```typescript
-// Automatic configuration
-const config = {
-  local: 'IndexedDB',           // Primary local storage
-  remote: 'CouchDB',            // Optional remote sync
-  fallback: 'localStorage'      // Ultimate fallback
-};
-```
-
-## Testing
-
-### Frontend Testing
 ```bash
-cd client
-npm run test                # Run tests
-npm run test:coverage       # Coverage report
+# Start development environment
+npm run dev                 # Both frontend and backend
+
+# Frontend only
+npm run dev:client          # Start React development server
+npm run build:client        # Build for production
+
+# Backend only  
+npm run dev:server          # Start Node.js development server
+npm run build:server        # Compile TypeScript
+
+# Production
+npm run build               # Build both applications
+npm run start               # Start production servers
 ```
 
-### Backend Testing
-```bash
-cd backend  
-npm run test                # Run API tests
-npm run test:integration    # Integration tests
-```
+## Core Functionality
 
-## PWA Features
+### **Course Management**
+- Rich content editor with multimedia support
+- Structured lessons and modules
+- Interactive quizzes and assessments
+- Progress tracking and analytics
 
-### Installation
-- Automatic install prompts
-- Add to home screen
-- Full-screen experience
+### **User Experience**
+- Intuitive dashboard interfaces
+- Real-time notifications
+- Responsive mobile design
+- Offline learning capabilities
 
-### Offline Capabilities
-- Complete course access
-- Progress tracking
-- Quiz submissions
-- User authentication
+### **Data Management**
+- Secure user authentication
+- Real-time data synchronization
+- Automatic backup and recovery
+- Performance optimization
 
-### Background Sync
-- Automatic sync when online
-- Retry failed requests
-- Conflict resolution
+## Progressive Web App
+
+TekRiderz functions as a Progressive Web App, providing:
+- **Offline Access** - Continue learning without internet
+- **Mobile Installation** - Add to home screen like a native app
+- **Background Sync** - Automatic data updates when online
+- **Fast Loading** - Optimized performance and caching
+
+## Security Features
+
+- **Authentication** - Secure JWT-based login system
+- **Authorization** - Role-based access control
+- **Data Protection** - Encrypted data transmission
+- **Input Validation** - Comprehensive server-side validation
+- **Rate Limiting** - Protection against abuse
+
+## Academic Project Goals
+
+This project demonstrates proficiency in:
+- Full-stack web development
+- Modern JavaScript/TypeScript
+- Database design and management
+- User experience design
+- Security best practices
+- Performance optimization
+- Progressive Web App development
+
+## License
+
+This project is developed as an academic project and is available under the MIT License.
 
 ## Contributing
 
+This is an academic project. For educational purposes, please:
 1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Support
-
-If you encounter any issues:
-
-1. Check the [Issues](https://github.com/your-repo/issues) page
-2. Review the troubleshooting guide below
-3. Create a new issue with detailed information
-
-### Troubleshooting
-
-**Blank Pages:**
-- **RESOLVED** - All constructor and initialization issues fixed
-
-**PWA Not Installing:**
-- Ensure HTTPS or localhost
-- Check manifest.json is accessible
-- Verify service worker registration
-
-**Offline Sync Issues:**
-- Check browser console for errors
-- Verify IndexedDB support
-- Test network connectivity
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
 
 ---
 
-**Ready for Academic Presentation & Production Use!**
+**Built with passion for modern education**
 
-The TekRiders platform now provides a robust, offline-first learning experience with industry-standard architecture and comprehensive error handling. 
+*TekRiders - Empowering knowledge through technology* 
