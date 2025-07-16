@@ -158,7 +158,7 @@ export const ToastContainer: React.FC = () => {
       
       addToast({
         type: 'success',
-        title: '🎓 Course Completed!',
+        title: 'Course Completed!',
         message: `Congratulations! You have successfully completed "${courseTitle}". Your certificate is now ready for download.`,
         duration: 10000,
         actions: [{

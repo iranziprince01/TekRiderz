@@ -61,7 +61,7 @@ export const logger = winston.createLogger({
   format: logFormat,
   defaultMeta: { service: 'tekriders-backend' },
   transports: [
-    // Write all logs to console
+    // Write all logs to console (format depends on environment)
     new winston.transports.Console({
       format: config.server.isProduction ? logFormat : consoleFormat,
     }),
@@ -84,13 +84,6 @@ export const logger = winston.createLogger({
     }),
   ],
 });
-
-// If we're not in production, also log to console with colors
-if (!config.server.isProduction) {
-  logger.add(new winston.transports.Console({
-    format: consoleFormat,
-  }));
-}
 
 // Handle winston errors
 logger.on('error', (error) => {

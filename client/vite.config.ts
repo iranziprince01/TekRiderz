@@ -256,8 +256,6 @@ export default defineConfig({
     include: ['bcryptjs']
   },
   server: {
-    port: 5173,
-    strictPort: true, // Fail if port 5173 is not available
     proxy: {
       '/api/v1': {
         target: 'http://localhost:3000',

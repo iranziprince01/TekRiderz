@@ -25,7 +25,8 @@ const LearnerDashboard: React.FC = () => {
     enrolledCourses,
     certificates,
     isLoading,
-    error
+    error,
+    refreshData
   } = useComprehensiveDashboardData();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -54,24 +55,28 @@ const LearnerDashboard: React.FC = () => {
 
   // Filter available courses for enrollment
   const availableCourses = useMemo(() => {
-    if (!courses) return [];
+    if (!courses || !Array.isArray(courses)) {
+      return [];
+    }
     
     const enrolledCourseIds = new Set(
       enrolledCourses?.map((course: any) => course.id || course._id) || []
     );
     
-    return courses
-      .filter((course: any) => !enrolledCourseIds.has(course.id || course._id))
-      .filter((course: any) => course.status === 'published')
+    const filtered = courses
       .filter((course: any) => {
-        if (!searchTerm) return true;
-        return course.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-               course.description?.toLowerCase().includes(searchTerm.toLowerCase());
-      })
-      .filter((course: any) => {
-        if (categoryFilter === 'all') return true;
-        return course.category === categoryFilter;
+        const isNotEnrolled = !enrolledCourseIds.has(course.id || course._id);
+        const isPublished = course.status === 'published';
+        const matchesSearch = !searchTerm || 
+          course.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          course.description?.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesCategory = categoryFilter === 'all' || course.category === categoryFilter;
+        
+        return isNotEnrolled && isPublished && matchesSearch && matchesCategory;
       });
+
+    
+    return filtered;
   }, [courses, enrolledCourses, searchTerm, categoryFilter]);
 
   // Get unique categories for filtering
@@ -226,6 +231,7 @@ const LearnerDashboard: React.FC = () => {
               <EnhancedCourseCard
                 key={course.id || course._id}
                 course={course}
+                onDataRefresh={refreshData}
               />
             ))}
           </div>

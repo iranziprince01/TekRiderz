@@ -45,8 +45,9 @@ export const useComprehensiveDashboardData = (): UseComprehensiveDashboardDataRe
    * Load data seamlessly from cache or API
    */
   const loadData = useCallback(async (forceRefresh = false) => {
-    if (!isAuthenticated || !userId) {
-      return;
+    // Always try to load public course data, even if not authenticated
+    if (!forceRefresh) {
+      setData(prev => ({ ...prev, isLoading: true, error: null }));
     }
 
     // Don't show loading on refresh to maintain seamless experience
@@ -59,34 +60,98 @@ export const useComprehensiveDashboardData = (): UseComprehensiveDashboardDataRe
 
       // First, try to load from cache for instant display
       if (!forceRefresh) {
-        const cachedProfile = essentialDataCache.getProfile(userId);
         const cachedCourses = essentialDataCache.getAllCourses();
-        const cachedEnrollments = essentialDataCache.getEnrolledCourses(userId);
-        const cachedCertificates = essentialDataCache.getCertificates(userId);
-        const cachedStats = essentialDataCache.getStats(userId);
-
-        // If we have any cached data, show it immediately
-        const hasValidCache = !!(cachedProfile || cachedEnrollments.length > 0);
         
-        if (hasValidCache) {
-          setData(prev => ({
-            ...prev,
-            user: cachedProfile || prev.user,
-            stats: cachedStats || prev.stats,
-            courses: cachedCourses,
-            enrolledCourses: cachedEnrollments,
-            certificates: cachedCertificates,
-            isLoading: false,
-            error: null,
-          }));
-          hasData = true;
+        // For authenticated users, load all cached data
+        if (isAuthenticated && userId) {
+          const cachedProfile = essentialDataCache.getProfile(userId);
+          const cachedEnrollments = essentialDataCache.getEnrolledCourses(userId);
+          const cachedCertificates = essentialDataCache.getCertificates(userId);
+          const cachedStats = essentialDataCache.getStats(userId);
+
+          // If we have any cached data, show it immediately
+          const hasValidCache = !!(cachedProfile || cachedEnrollments.length > 0 || cachedCourses.length > 0);
+          
+          if (hasValidCache) {
+            setData(prev => ({
+              ...prev,
+              user: cachedProfile || prev.user,
+              stats: cachedStats || prev.stats,
+              courses: cachedCourses,
+              enrolledCourses: cachedEnrollments,
+              certificates: cachedCertificates,
+              isLoading: false,
+              error: null,
+            }));
+            hasData = true;
+          }
+        } else {
+          // For non-authenticated users, just show cached courses
+          if (cachedCourses.length > 0) {
+            setData(prev => ({
+              ...prev,
+              courses: cachedCourses,
+              isLoading: false,
+              error: null,
+            }));
+            hasData = true;
+          }
         }
       }
 
       // If online, fetch fresh data in background and update cache silently
       if (isOnline) {
         try {
-          const freshData = await essentialDataCache.preloadEssentialData(userId, apiClient);
+          let freshData: any = {};
+
+          // Always load courses first (public data)
+          try {
+            const coursesResponse = await apiClient.getCourses({ status: 'published', limit: 100 });
+            if (coursesResponse.success) {
+              freshData.allCourses = coursesResponse.data?.courses || [];
+              essentialDataCache.cacheAllCourses(freshData.allCourses);
+              
+            }
+          } catch (error) {
+            console.warn('Failed to load public courses:', error);
+            freshData.allCourses = [];
+          }
+
+          if (isAuthenticated && userId) {
+            // Load additional authenticated data
+            try {
+              const [profileRes, enrollmentsRes, certificatesRes, statsRes] = await Promise.allSettled([
+                apiClient.getProfile(),
+                apiClient.getEnrollments(),
+                apiClient.getUserCertificates(),
+                apiClient.getUserStats()
+              ]);
+
+              if (profileRes.status === 'fulfilled' && profileRes.value?.success) {
+                freshData.profile = profileRes.value.data;
+                essentialDataCache.cacheProfile(userId, freshData.profile);
+              }
+
+              if (enrollmentsRes.status === 'fulfilled' && enrollmentsRes.value?.success) {
+                const enrollments = Array.isArray(enrollmentsRes.value.data) ? enrollmentsRes.value.data : [];
+                freshData.enrolledCourses = enrollments;
+                essentialDataCache.cacheEnrolledCourses(userId, enrollments);
+              }
+
+              if (certificatesRes.status === 'fulfilled' && certificatesRes.value?.success) {
+                const certificates = Array.isArray(certificatesRes.value.data) ? certificatesRes.value.data : [];
+                freshData.certificates = certificates;
+                essentialDataCache.cacheCertificates(userId, certificates);
+              }
+
+              if (statsRes.status === 'fulfilled' && statsRes.value?.success) {
+                freshData.stats = statsRes.value.data;
+                essentialDataCache.cacheStats(userId, freshData.stats);
+              }
+            } catch (error) {
+              console.warn('Failed to load some authenticated data:', error);
+            }
+          }
           
           setData(prev => ({
             ...prev,
@@ -115,10 +180,14 @@ export const useComprehensiveDashboardData = (): UseComprehensiveDashboardDataRe
           
           // Only show error if we have no cached data
           if (!hasData) {
+            const errorMessage = isAuthenticated 
+              ? 'Unable to load data. Please check your connection.'
+              : 'Unable to load courses. Please check your connection.';
+              
             setData(prev => ({
               ...prev,
               isLoading: false,
-              error: 'Unable to load data. Please check your connection.',
+              error: errorMessage,
             }));
           }
         }
@@ -153,8 +222,16 @@ export const useComprehensiveDashboardData = (): UseComprehensiveDashboardDataRe
    * Initialize data loading
    */
   useEffect(() => {
-    if (isAuthenticated && userId && !initializeOnceRef.current) {
+    // Initialize for both authenticated and non-authenticated users
+    if (!initializeOnceRef.current) {
       initializeOnceRef.current = true;
+      loadData(false);
+    }
+  }, [loadData]);
+
+  // Reset and reload when authentication state changes
+  useEffect(() => {
+    if (initializeOnceRef.current) {
       loadData(false);
     }
   }, [isAuthenticated, userId, loadData]);
@@ -193,20 +270,18 @@ export const useComprehensiveDashboardData = (): UseComprehensiveDashboardDataRe
   }, []);
 
   /**
-   * Reset state when user logs out
+   * Partial reset when user logs out (keep public courses)
    */
   useEffect(() => {
     if (!isAuthenticated) {
-      initializeOnceRef.current = false;
-      setData({
+      setData(prev => ({
+        ...prev,
         user: null,
         stats: null,
-        courses: [],
         enrolledCourses: [],
         certificates: [],
-        isLoading: false,
-        error: null,
-      });
+        // Keep courses for browsing when logged out
+      }));
     }
   }, [isAuthenticated]);
 

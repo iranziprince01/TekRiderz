@@ -141,7 +141,7 @@ const Login: React.FC = () => {
                     </div>
                     <div className="ml-2 text-sm">
                       <p className="font-medium text-blue-800 dark:text-blue-200">
-                        ✅ {language === 'rw' ? 'Offline credentials ziraboneka' : 'Offline credentials available'}
+                        {language === 'rw' ? 'Offline credentials ziraboneka' : 'Offline credentials available'}
                       </p>
                       <p className="text-blue-600 dark:text-blue-300">
                         {language === 'rw' 

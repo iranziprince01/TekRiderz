@@ -5,27 +5,11 @@ import { Input } from '../../components/ui/Input';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { Badge } from '../../components/ui/Badge';
 import { 
-  Users, 
-  Search, 
-  Filter, 
   Eye, 
-  Edit, 
-  Trash2, 
   UserCheck, 
   UserX, 
-  RefreshCw,
-  Plus,
-  MoreHorizontal,
-  Calendar,
-  Mail,
-  Shield,
-  GraduationCap,
-  BookOpen,
-  X,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  AlertCircle
+  Trash2, 
+  X
 } from 'lucide-react';
 import { apiClient } from '../../utils/api';
 
@@ -71,7 +55,7 @@ interface ToastNotification {
 
 const AdminUsers: React.FC = () => {
   const [users, setUsers] = useState<UserData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Changed from true to false
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
@@ -96,8 +80,53 @@ const AdminUsers: React.FC = () => {
     suspended: 0
   });
 
+  // Cache management
+  const CACHE_KEY = 'admin-users-data';
+  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+  const getCachedData = () => {
+    try {
+      const cached = sessionStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const { data, timestamp } = JSON.parse(cached);
+        const isExpired = Date.now() - timestamp > CACHE_DURATION;
+        if (!isExpired) {
+          return data;
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to parse cached users data:', error);
+    }
+    return null;
+  };
+
+  const setCachedData = (userData: UserData[], paginationData: any, statsData: UserStats) => {
+    try {
+      sessionStorage.setItem(CACHE_KEY, JSON.stringify({
+        data: { users: userData, pagination: paginationData, stats: statsData },
+        timestamp: Date.now()
+      }));
+    } catch (error) {
+      console.warn('Failed to cache users data:', error);
+    }
+  };
+
   useEffect(() => {
-    loadUsers();
+    // Try to load from cache first
+    const cachedData = getCachedData();
+    if (cachedData) {
+      setUsers(cachedData.users || []);
+      setPagination(cachedData.pagination || { page: 1, limit: 12, total: 0, pages: 0 });
+      setStats(cachedData.stats || {
+        total: 0, admins: 0, tutors: 0, learners: 0, 
+        active: 0, inactive: 0, suspended: 0
+      });
+      // Refresh in background without showing loader
+      loadUsers(1, false);
+    } else {
+      // Only show loading if no cached data
+      loadUsers();
+    }
   }, []);
 
   useEffect(() => {
@@ -123,9 +152,11 @@ const AdminUsers: React.FC = () => {
     setToasts(prev => prev.filter(t => t.id !== id));
   };
 
-  const loadUsers = async (page = 1) => {
+  const loadUsers = async (page = 1, showLoader = true) => {
     try {
-      setLoading(true);
+      if (showLoader && users.length === 0) { // Only show loader if no existing data
+        setLoading(true);
+      }
       // setError(''); // Removed as per new_code
 
       const params: any = { page, limit: pagination.limit };
@@ -137,6 +168,11 @@ const AdminUsers: React.FC = () => {
 
       if (response.success && response.data) {
         const { users: userData, pagination: paginationData } = response.data;
+        
+        // Debug: Log user data structure (development only)
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Loaded users data:', userData?.slice(0, 2).map((u: UserData) => ({ id: u.id, _id: u._id, name: u.name })));
+        }
         
         setUsers(userData || []);
         setPagination({
@@ -158,6 +194,10 @@ const AdminUsers: React.FC = () => {
           suspended: safeUserData.filter((u: UserData) => u.status === 'suspended').length
         };
         setStats(statsData);
+
+        // Cache the data
+        setCachedData(userData || [], paginationData, statsData);
+
       } else {
         // setError(response.error || 'Failed to load users'); // Removed as per new_code
         addToast({ type: 'error', title: 'Error', message: response.error || 'Failed to load users' });
@@ -170,14 +210,32 @@ const AdminUsers: React.FC = () => {
     }
   };
 
-  const handleUserAction = async (userId: string, action: 'activate' | 'deactivate' | 'delete') => {
-    const user = users.find(u => u.id === userId);
-    if (!user) return;
+  const handleUserAction = async (userId: string, action: 'activate' | 'deactivate' | 'delete', force = false) => {
+    const user = users.find(u => u.id === userId || u._id === userId);
+    if (!user) {
+      console.error('User not found in local data:', { userId, users: users.map(u => ({ id: u.id, _id: u._id })) });
+      return;
+    }
+
+    // Use the CouchDB _id for API calls
+    const actualUserId = user._id || user.id;
+    
+    // Debug: Log IDs being used (development only)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('User action:', { 
+        action, 
+        inputUserId: userId, 
+        foundUser: { id: user.id, _id: user._id, name: user.name }, 
+        actualUserId 
+      });
+    }
 
     const confirmMessages = {
       activate: `Are you sure you want to activate ${user.name}?`,
       deactivate: `Are you sure you want to deactivate ${user.name}?`,
-      delete: `Are you sure you want to delete ${user.name}? This action cannot be undone.`
+      delete: force 
+        ? `FORCE DELETE: Are you sure you want to permanently delete ${user.name} and ALL associated data? This action cannot be undone.`
+        : `Are you sure you want to delete ${user.name}? This action cannot be undone.`
     };
 
     if (!window.confirm(confirmMessages[action])) return;
@@ -187,10 +245,10 @@ const AdminUsers: React.FC = () => {
       let response;
 
       if (action === 'delete') {
-        response = await apiClient.deleteUser(userId);
+        response = await apiClient.deleteUser(actualUserId, force);
       } else {
         const isActive = action === 'activate';
-        response = await apiClient.updateUserStatus(userId, isActive);
+        response = await apiClient.updateUserStatus(actualUserId, isActive);
       }
 
       if (response.success) {
@@ -203,7 +261,7 @@ const AdminUsers: React.FC = () => {
         if (action === 'delete') {
           setShowDetailModal(false);
           setSelectedUser(null);
-        } else if (selectedUser && selectedUser.id === userId) {
+        } else if (selectedUser && (selectedUser.id === userId || selectedUser._id === userId)) {
           setSelectedUser({
             ...selectedUser,
             status: action === 'activate' ? 'active' : 'suspended'
@@ -212,6 +270,19 @@ const AdminUsers: React.FC = () => {
         
         loadUsers(pagination.page);
       } else {
+        // Check if deletion failed due to constraints
+        if (action === 'delete' && !force && response.error?.includes('associated data')) {
+          const forceDelete = window.confirm(
+            `${response.error}\n\nDo you want to FORCE DELETE this user and all associated data? This action cannot be undone.`
+          );
+          
+          if (forceDelete) {
+            // Retry with force=true using the original userId (which is what the component uses)
+            handleUserAction(userId, action, true);
+            return;
+          }
+        }
+        
         addToast({
           type: 'error',
           title: 'Error',
@@ -219,7 +290,19 @@ const AdminUsers: React.FC = () => {
         });
       }
     } catch (err: any) {
-      // setError(err.message || `Failed to ${action} user`); // Removed as per new_code
+      // Check if deletion failed due to constraints
+      if (action === 'delete' && !force && err.message?.includes('associated data')) {
+        const forceDelete = window.confirm(
+          `${err.message}\n\nDo you want to FORCE DELETE this user and all associated data? This action cannot be undone.`
+        );
+        
+        if (forceDelete) {
+          // Retry with force=true using the original userId (which is what the component uses)
+          handleUserAction(userId, action, true);
+          return;
+        }
+      }
+      
       addToast({ type: 'error', title: 'Error', message: err.message || `Failed to ${action} user` });
     } finally {
       setActionLoading('');
@@ -240,18 +323,8 @@ const AdminUsers: React.FC = () => {
   };
 
   const getRoleBadge = (role: string) => {
-    const configs = {
-      admin: { variant: 'error' as const, icon: Shield },
-      tutor: { variant: 'warning' as const, icon: GraduationCap },
-      learner: { variant: 'success' as const, icon: BookOpen }
-    };
-    
-    const config = configs[role as keyof typeof configs] || configs.learner;
-    const Icon = config.icon;
-    
     return (
-      <Badge variant={config.variant} className="flex items-center gap-1">
-        <Icon size={12} />
+      <Badge variant="default" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
         {role.charAt(0).toUpperCase() + role.slice(1)}
       </Badge>
     );
@@ -259,15 +332,15 @@ const AdminUsers: React.FC = () => {
 
   const getStatusBadge = (status: string) => {
     const configs = {
-      active: { variant: 'success' as const, label: 'Active' },
-      suspended: { variant: 'error' as const, label: 'Suspended' },
-      inactive: { variant: 'default' as const, label: 'Inactive' }
+      active: { label: 'Active' },
+      suspended: { label: 'Suspended' },
+      inactive: { label: 'Inactive' }
     };
     
     const config = configs[status as keyof typeof configs] || configs.inactive;
     
     return (
-      <Badge variant={config.variant}>
+      <Badge variant="default" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
         {config.label}
       </Badge>
     );
@@ -284,46 +357,23 @@ const AdminUsers: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Toast Notifications */}
-      <div className="fixed top-20 right-4 z-50 space-y-2">
+      <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 space-y-2">
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className="max-w-sm w-full bg-white dark:bg-gray-800 shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden transform transition-all duration-300 ease-in-out"
+            className="flex items-center px-4 py-3 rounded-lg shadow-lg border-l-4 transition-all duration-300 ease-in-out transform translate-y-0 opacity-100 max-w-md w-auto min-w-80 bg-blue-50 dark:bg-blue-900/20 border-blue-400 text-blue-800 dark:text-blue-200"
           >
-            <div className="p-4">
-              <div className="flex items-start">
-                <div className="flex-shrink-0">
-                  {toast.type === 'success' && (
-                    <CheckCircle className="h-6 w-6 text-green-400" />
-                  )}
-                  {toast.type === 'error' && (
-                    <XCircle className="h-6 w-6 text-red-400" />
-                  )}
-                  {toast.type === 'warning' && (
-                    <AlertTriangle className="h-6 w-6 text-yellow-400" />
-                  )}
-                  {toast.type === 'info' && (
-                    <AlertCircle className="h-6 w-6 text-blue-400" />
-                  )}
-                </div>
-                <div className="ml-3 w-0 flex-1 pt-0.5">
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    {toast.title}
-                  </p>
-                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    {toast.message}
-                  </p>
-                </div>
-                <div className="ml-4 flex-shrink-0 flex">
-                  <button
-                    className="bg-white dark:bg-gray-800 rounded-md inline-flex text-gray-400 hover:text-gray-500 focus:outline-none"
-                    onClick={() => removeToast(toast.id)}
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
-                </div>
-              </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">
+                {toast.message}
+              </p>
             </div>
+            <button
+              onClick={() => removeToast(toast.id)}
+              className="ml-3 flex-shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            >
+              ×
+            </button>
           </div>
         ))}
       </div>
@@ -339,20 +389,7 @@ const AdminUsers: React.FC = () => {
           </p>
         </div>
         
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => loadUsers(pagination.page)}
-          >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
-          </Button>
-          <Button>
-            <Plus className="w-4 h-4 mr-2" />
-            Add User
-          </Button>
-        </div>
+
       </div>
 
       {/* Stats Cards */}
@@ -367,7 +404,6 @@ const AdminUsers: React.FC = () => {
         >
           <Card className="p-4">
             <div className="text-center">
-              <Users className="w-6 h-6 mx-auto mb-2 text-gray-600" />
               <p className="text-sm text-gray-600 dark:text-gray-400">Total</p>
               <p className="text-xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
             </div>
@@ -380,9 +416,8 @@ const AdminUsers: React.FC = () => {
         >
           <Card className="p-4">
             <div className="text-center">
-              <Shield className="w-6 h-6 mx-auto mb-2 text-red-600" />
               <p className="text-sm text-gray-600 dark:text-gray-400">Admins</p>
-              <p className="text-xl font-bold text-red-600">{stats.admins}</p>
+              <p className="text-xl font-bold text-blue-600">{stats.admins}</p>
             </div>
           </Card>
         </div>
@@ -393,9 +428,8 @@ const AdminUsers: React.FC = () => {
         >
           <Card className="p-4">
             <div className="text-center">
-              <GraduationCap className="w-6 h-6 mx-auto mb-2 text-purple-600" />
               <p className="text-sm text-gray-600 dark:text-gray-400">Tutors</p>
-              <p className="text-xl font-bold text-purple-600">{stats.tutors}</p>
+              <p className="text-xl font-bold text-blue-500">{stats.tutors}</p>
             </div>
           </Card>
         </div>
@@ -406,9 +440,8 @@ const AdminUsers: React.FC = () => {
         >
           <Card className="p-4">
             <div className="text-center">
-              <BookOpen className="w-6 h-6 mx-auto mb-2 text-green-600" />
               <p className="text-sm text-gray-600 dark:text-gray-400">Learners</p>
-              <p className="text-xl font-bold text-green-600">{stats.learners}</p>
+              <p className="text-xl font-bold text-blue-400">{stats.learners}</p>
             </div>
           </Card>
         </div>
@@ -419,9 +452,8 @@ const AdminUsers: React.FC = () => {
         >
           <Card className="p-4">
             <div className="text-center">
-              <UserCheck className="w-6 h-6 mx-auto mb-2 text-blue-600" />
               <p className="text-sm text-gray-600 dark:text-gray-400">Active</p>
-              <p className="text-xl font-bold text-blue-600">{stats.active}</p>
+              <p className="text-xl font-bold text-blue-500">{stats.active}</p>
             </div>
           </Card>
         </div>
@@ -432,7 +464,6 @@ const AdminUsers: React.FC = () => {
         >
           <Card className="p-4">
             <div className="text-center">
-              <UserX className="w-6 h-6 mx-auto mb-2 text-gray-600" />
               <p className="text-sm text-gray-600 dark:text-gray-400">Inactive</p>
               <p className="text-xl font-bold text-gray-600">{stats.inactive}</p>
             </div>
@@ -445,44 +476,40 @@ const AdminUsers: React.FC = () => {
         >
           <Card className="p-4">
             <div className="text-center">
-              <UserX className="w-6 h-6 mx-auto mb-2 text-red-600" />
               <p className="text-sm text-gray-600 dark:text-gray-400">Suspended</p>
-              <p className="text-xl font-bold text-red-600">{stats.suspended}</p>
+              <p className="text-xl font-bold text-gray-500">{stats.suspended}</p>
             </div>
           </Card>
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="flex-1">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <Input
-              type="text"
-              placeholder="Search users by name or email..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
+          <Input
+            type="text"
+            placeholder="Search users by name or email..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full"
+          />
         </div>
         
         <select
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value)}
-          className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+          className="px-6 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
         >
           <option value="">All Roles</option>
           <option value="admin">Admin</option>
           <option value="tutor">Tutor</option>
           <option value="learner">Learner</option>
         </select>
-        
+
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+          className="px-6 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
         >
           <option value="">All Status</option>
           <option value="active">Active</option>
@@ -497,7 +524,7 @@ const AdminUsers: React.FC = () => {
           <Card key={user.id} className="p-4 hover:shadow-lg transition-shadow cursor-pointer">
             <div onClick={() => openUserDetails(user)}>
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
+                <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold">
                   {user.name.charAt(0).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -531,11 +558,11 @@ const AdminUsers: React.FC = () => {
                   onMouseEnter={() => setHoveredButton(`view-${user.id}`)}
                   onMouseLeave={() => setHoveredButton('')}
                 >
-                  <Eye className="w-5 h-5" />
+                  <Eye className="w-4 h-4" />
                 </button>
                 {hoveredButton === `view-${user.id}` && (
                   <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded whitespace-nowrap z-10">
-                    View
+                    View Details
                     <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-gray-900 dark:border-t-gray-100"></div>
                   </div>
                 )}
@@ -548,25 +575,21 @@ const AdminUsers: React.FC = () => {
                     handleUserAction(user.id, user.status === 'active' ? 'deactivate' : 'activate');
                   }}
                   disabled={actionLoading === `${user.status === 'active' ? 'deactivate' : 'activate'}-${user.id}`}
-                  className={`p-2 rounded-lg transition-colors disabled:opacity-50 ${
-                    user.status === 'active' 
-                      ? 'text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20' 
-                      : 'text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20'
-                  }`}
+                  className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors disabled:opacity-50"
                   onMouseEnter={() => setHoveredButton(`${user.status === 'active' ? 'deactivate' : 'activate'}-${user.id}`)}
                   onMouseLeave={() => setHoveredButton('')}
                 >
                   {actionLoading === `${user.status === 'active' ? 'deactivate' : 'activate'}-${user.id}` ? (
                     <LoadingSpinner size="sm" />
                   ) : user.status === 'active' ? (
-                    <UserX className="w-5 h-5" />
+                    <UserX className="w-4 h-4" />
                   ) : (
-                    <UserCheck className="w-5 h-5" />
+                    <UserCheck className="w-4 h-4" />
                   )}
                 </button>
                 {hoveredButton === `${user.status === 'active' ? 'deactivate' : 'activate'}-${user.id}` && (
                   <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded whitespace-nowrap z-10">
-                    {user.status === 'active' ? 'Deactivate' : 'Activate'}
+                    {user.status === 'active' ? 'Deactivate User' : 'Activate User'}
                     <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-gray-900 dark:border-t-gray-100"></div>
                   </div>
                 )}
@@ -586,12 +609,12 @@ const AdminUsers: React.FC = () => {
                   {actionLoading === `delete-${user.id}` ? (
                     <LoadingSpinner size="sm" />
                   ) : (
-                    <Trash2 className="w-5 h-5" />
+                    <Trash2 className="w-4 h-4" />
                   )}
                 </button>
                 {hoveredButton === `delete-${user.id}` && (
                   <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded whitespace-nowrap z-10">
-                    Delete
+                    Delete User
                     <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-gray-900 dark:border-t-gray-100"></div>
                   </div>
                 )}
@@ -649,7 +672,7 @@ const AdminUsers: React.FC = () => {
               <div className="space-y-6">
                 {/* User Info */}
                 <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-xl">
+                  <div className="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold text-xl">
                     {selectedUser.name.charAt(0).toUpperCase()}
                   </div>
                   <div>
@@ -711,37 +734,28 @@ const AdminUsers: React.FC = () => {
                     variant="outline"
                     onClick={() => handleUserAction(selectedUser.id, selectedUser.status === 'active' ? 'deactivate' : 'activate')}
                     disabled={actionLoading.includes(selectedUser.id)}
-                    className={selectedUser.status === 'active' ? 'text-red-600 hover:text-red-700' : 'text-green-600 hover:text-green-700'}
+                    className="text-blue-600 hover:text-blue-700"
                   >
                     {actionLoading.includes(selectedUser.id) ? (
                       <LoadingSpinner size="sm" />
-                    ) : selectedUser.status === 'active' ? (
-                      <>
-                        <UserX className="w-4 h-4 mr-2" />
-                        Deactivate
-                      </>
-                    ) : (
-                      <>
-                        <UserCheck className="w-4 h-4 mr-2" />
-                        Activate
-                      </>
-                    )}
+                                          ) : selectedUser.status === 'active' ? (
+                        'Deactivate'
+                      ) : (
+                        'Activate'
+                      )}
                   </Button>
                   
                   <Button
                     variant="outline"
                     onClick={() => handleUserAction(selectedUser.id, 'delete')}
                     disabled={actionLoading.includes(selectedUser.id)}
-                    className="text-red-600 hover:text-red-700"
+                    className="text-blue-500 hover:text-blue-600"
                   >
                     {actionLoading.includes(selectedUser.id) ? (
                       <LoadingSpinner size="sm" />
-                    ) : (
-                      <>
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Delete User
-                      </>
-                    )}
+                                          ) : (
+                        'Delete User'
+                      )}
                   </Button>
                 </div>
               </div>

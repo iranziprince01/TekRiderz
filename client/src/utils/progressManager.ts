@@ -1,65 +1,85 @@
-/**
- * Simplified Progress Manager for TekRiders
- * Lightweight replacement for complex progressManager.ts
- */
+// Comprehensive progress manager for offline-first progress tracking
 
-import { offlineStorage } from './offlineStorage';
+import { offlineStorage, OfflineProgress } from './offlineStorage';
+import { syncManager } from './syncManager';
 import { apiClient } from './api';
-
-// ================ INTERFACES ================
 
 export interface LessonProgress {
   startedAt: string;
   completedAt?: string;
   timeSpent: number;
-  lastPosition?: number;
-  interactions: Array<{
+  lastPosition?: number; // for videos
+  interactions: {
     type: string;
     timestamp: string;
     data: any;
-  }>;
-  notes: Array<{
+  }[];
+  notes: {
     id: string;
     timestamp: number;
     content: string;
-  }>;
-  bookmarks: Array<{
+    createdAt: string;
+  }[];
+  bookmarks: {
     id: string;
     timestamp: number;
     title: string;
-  }>;
+    createdAt: string;
+  }[];
+}
+
+export interface SectionProgress {
+  completedLessons: string[];
+  progress: number; // 0-100
+  timeSpent: number;
+  startedAt: string;
+  completedAt?: string;
+  quizScore?: number;
+  assignmentGrade?: number;
 }
 
 export interface CourseProgressData {
   userId: string;
   courseId: string;
-  enrollmentDate: string;
-  lastAccessedAt: string;
-  overallProgress: number;
-  lessons: Record<string, LessonProgress>;
-  quizzes: Record<string, {
-    bestScore: number;
-    attempts: Array<{
-      score: number;
-      maxScore: number;
-      percentage: number;
-      passed: boolean;
-      completedAt: string;
-      timeSpent: number;
-    }>;
-  }>;
-  certificates: string[];
+  completedLessons: string[];
+  completedSections: string[];
+  currentLesson?: string;
+  currentSection?: string;
   timeSpent: number;
-  isCompleted: boolean;
-  completedAt?: string;
+  lastWatched?: string;
+  overallProgress: number;
+  sectionProgress: Record<string, SectionProgress>;
+  lessonProgress: Record<string, LessonProgress>;
+  quizScores: Record<string, any>;
+  assignments: Record<string, any>;
+  engagement: {
+    sessionCount: number;
+    averageSessionLength: number;
+    longestSession: number;
+    totalActiveTime: number;
+    lastActiveAt: string;
+    streakDays: number;
+    completionVelocity: number;
+    interactionRate: number;
+  };
+  achievements: {
+    earnedAchievements: string[];
+    progressTowardsAchievements: Record<string, number>;
+  };
+  lastSyncedAt: number;
   lastModifiedAt: number;
   pendingChanges: boolean;
 }
 
-// ================ SIMPLE PROGRESS MANAGER ================
-
-class SimpleProgressManager {
-  private progressCache = new Map<string, CourseProgressData>();
+class ProgressManager {
+  private progressCache: Map<string, CourseProgressData> = new Map();
+  private sessionStartTime: number = Date.now();
+  private currentSession: {
+    courseId?: string;
+    lessonId?: string;
+    startTime: number;
+    interactions: number;
+  } = { startTime: Date.now(), interactions: 0 };
 
   // Initialize progress for a user and course
   async initializeProgress(userId: string, courseId: string): Promise<CourseProgressData> {
@@ -70,49 +90,68 @@ class SimpleProgressManager {
       return this.progressCache.get(progressId)!;
     }
 
-    // Try to load from storage
-    const stored = localStorage.getItem(`progress_${progressId}`);
-    if (stored) {
-      try {
-        const progress = JSON.parse(stored);
-        this.progressCache.set(progressId, progress);
-        return progress;
-      } catch (error) {
-        console.warn('Failed to parse stored progress:', error);
-      }
+    // Try to get from local storage
+    let progress = await offlineStorage.getProgress(userId, courseId);
+    
+    if (!progress) {
+      // Create new progress
+      progress = {
+        id: progressId,
+        userId,
+        courseId,
+        completedLessons: [],
+        completedSections: [],
+        timeSpent: 0,
+        overallProgress: 0,
+        sectionProgress: {},
+        lessonProgress: {},
+        quizScores: {},
+        assignments: {},
+        engagement: {
+          sessionCount: 0,
+          averageSessionLength: 0,
+          longestSession: 0,
+          totalActiveTime: 0,
+          lastActiveAt: new Date().toISOString(),
+          streakDays: 0,
+          completionVelocity: 0,
+          interactionRate: 0
+        },
+        achievements: {
+          earnedAchievements: [],
+          progressTowardsAchievements: {}
+        },
+        lastSyncedAt: 0,
+        lastModifiedAt: Date.now(),
+        pendingChanges: false
+      };
+
+      await offlineStorage.storeProgress(progress);
     }
 
-    // Create new progress
-    const progress: CourseProgressData = {
-      userId,
-      courseId,
-      enrollmentDate: new Date().toISOString(),
-      lastAccessedAt: new Date().toISOString(),
-      overallProgress: 0,
-      lessons: {},
-      quizzes: {},
-      certificates: [],
-      timeSpent: 0,
-      isCompleted: false,
-      lastModifiedAt: Date.now(),
-      pendingChanges: false
-    };
+    // Cache it
+    this.progressCache.set(progressId, progress);
 
-    await this.saveProgress(progress);
     return progress;
   }
 
-  // Get progress for user and course
-  async getProgress(userId: string, courseId: string): Promise<CourseProgressData> {
-    return this.initializeProgress(userId, courseId);
-  }
-
   // Start a lesson
-  async startLesson(userId: string, courseId: string, lessonId: string, sectionId: string): Promise<void> {
-    const progress = await this.getProgress(userId, courseId);
+  async startLesson(
+    userId: string, 
+    courseId: string, 
+    lessonId: string, 
+    sectionId: string
+  ): Promise<void> {
+    const progress = await this.initializeProgress(userId, courseId);
     
-    if (!progress.lessons[lessonId]) {
-      progress.lessons[lessonId] = {
+    // Update current lesson/section
+    progress.currentLesson = lessonId;
+    progress.currentSection = sectionId;
+    progress.lastWatched = new Date().toISOString();
+
+    // Initialize lesson progress if not exists
+    if (!progress.lessonProgress[lessonId]) {
+      progress.lessonProgress[lessonId] = {
         startedAt: new Date().toISOString(),
         timeSpent: 0,
         interactions: [],
@@ -121,51 +160,108 @@ class SimpleProgressManager {
       };
     }
 
-    progress.lastAccessedAt = new Date().toISOString();
+    // Update session info
+    this.currentSession = {
+      courseId,
+      lessonId,
+      startTime: Date.now(),
+      interactions: 0
+    };
+
     progress.lastModifiedAt = Date.now();
     progress.pendingChanges = true;
 
-    await this.saveProgress(progress);
-    await this.queueSyncAction('lesson_start', { userId, courseId, lessonId, sectionId });
+    // Save to cache and storage
+    this.progressCache.set(`${userId}-${courseId}`, progress);
+    await offlineStorage.storeProgress(progress);
   }
 
   // Complete a lesson
-  async completeLesson(userId: string, courseId: string, lessonId: string, sectionId: string, timeSpent: number = 0): Promise<void> {
-    const progress = await this.getProgress(userId, courseId);
-    
-    if (!progress.lessons[lessonId]) {
-      progress.lessons[lessonId] = {
-        startedAt: new Date().toISOString(),
+  async completeLesson(
+    userId: string,
+    courseId: string,
+    lessonId: string,
+    sectionId: string,
+    timeSpent: number = 0
+  ): Promise<void> {
+    const progress = await this.initializeProgress(userId, courseId);
+
+    // Add to completed lessons if not already there
+    if (!progress.completedLessons.includes(lessonId)) {
+      progress.completedLessons.push(lessonId);
+    }
+
+    // Update lesson progress
+    const lessonProgress = progress.lessonProgress[lessonId] || {
+      startedAt: new Date().toISOString(),
+      timeSpent: 0,
+      interactions: [],
+      notes: [],
+      bookmarks: []
+    };
+
+    lessonProgress.completedAt = new Date().toISOString();
+    lessonProgress.timeSpent += timeSpent;
+    progress.lessonProgress[lessonId] = lessonProgress;
+
+    // Update total time spent
+    progress.timeSpent += timeSpent;
+
+    // Update section progress
+    if (!progress.sectionProgress[sectionId]) {
+      progress.sectionProgress[sectionId] = {
+        completedLessons: [],
+        progress: 0,
         timeSpent: 0,
-        interactions: [],
-        notes: [],
-        bookmarks: []
+        startedAt: new Date().toISOString()
       };
     }
 
-    progress.lessons[lessonId].completedAt = new Date().toISOString();
-    progress.lessons[lessonId].timeSpent += timeSpent;
-    progress.timeSpent += timeSpent;
-    progress.lastAccessedAt = new Date().toISOString();
+    const sectionProgress = progress.sectionProgress[sectionId];
+    if (!sectionProgress.completedLessons.includes(lessonId)) {
+      sectionProgress.completedLessons.push(lessonId);
+    }
+    sectionProgress.timeSpent += timeSpent;
+
+    // Update engagement metrics
+    const sessionTime = Date.now() - this.currentSession.startTime;
+    progress.engagement.sessionCount += 1;
+    progress.engagement.totalActiveTime += sessionTime;
+    progress.engagement.averageSessionLength = progress.engagement.totalActiveTime / progress.engagement.sessionCount;
+    progress.engagement.longestSession = Math.max(progress.engagement.longestSession, sessionTime);
+    progress.engagement.lastActiveAt = new Date().toISOString();
+    progress.engagement.interactionRate = this.currentSession.interactions / (sessionTime / 1000 / 60); // interactions per minute
+
     progress.lastModifiedAt = Date.now();
     progress.pendingChanges = true;
 
-    // Recalculate overall progress
-    progress.overallProgress = this.calculateOverallProgress(progress);
+    // Save to cache and storage
+    this.progressCache.set(`${userId}-${courseId}`, progress);
+    await offlineStorage.storeProgress(progress);
 
-    await this.saveProgress(progress);
-    await this.queueSyncAction('lesson_complete', { 
-      userId, courseId, lessonId, sectionId, timeSpent, 
-      overallProgress: progress.overallProgress 
-    });
+    // Queue for sync if online or when back online
+    await syncManager.queueModuleCompletion(
+      userId,
+      courseId,
+      lessonId,
+      sectionId,
+      timeSpent,
+      this.calculateOverallProgress(progress)
+    );
   }
 
   // Update lesson position (for videos)
-  async updateLessonPosition(userId: string, courseId: string, lessonId: string, position: number): Promise<void> {
-    const progress = await this.getProgress(userId, courseId);
-    
-    if (!progress.lessons[lessonId]) {
-      progress.lessons[lessonId] = {
+  async updateLessonPosition(
+    userId: string,
+    courseId: string,
+    lessonId: string,
+    position: number
+  ): Promise<void> {
+    const progress = await this.initializeProgress(userId, courseId);
+
+    // Initialize lesson progress if not exists
+    if (!progress.lessonProgress[lessonId]) {
+      progress.lessonProgress[lessonId] = {
         startedAt: new Date().toISOString(),
         timeSpent: 0,
         interactions: [],
@@ -174,20 +270,31 @@ class SimpleProgressManager {
       };
     }
 
-    progress.lessons[lessonId].lastPosition = position;
-    progress.lastAccessedAt = new Date().toISOString();
+    progress.lessonProgress[lessonId].lastPosition = position;
+    progress.lastWatched = new Date().toISOString();
     progress.lastModifiedAt = Date.now();
     progress.pendingChanges = true;
 
-    await this.saveProgress(progress);
+    // Save to cache and storage
+    this.progressCache.set(`${userId}-${courseId}`, progress);
+    await offlineStorage.storeProgress(progress);
   }
 
-  // Add interaction
-  async addInteraction(userId: string, courseId: string, lessonId: string, interaction: { type: string; data: any }): Promise<void> {
-    const progress = await this.getProgress(userId, courseId);
-    
-    if (!progress.lessons[lessonId]) {
-      progress.lessons[lessonId] = {
+  // Add interaction (video play, pause, seek, etc.)
+  async addInteraction(
+    userId: string,
+    courseId: string,
+    lessonId: string,
+    interaction: {
+      type: string;
+      data: any;
+    }
+  ): Promise<void> {
+    const progress = await this.initializeProgress(userId, courseId);
+
+    // Initialize lesson progress if not exists
+    if (!progress.lessonProgress[lessonId]) {
+      progress.lessonProgress[lessonId] = {
         startedAt: new Date().toISOString(),
         timeSpent: 0,
         interactions: [],
@@ -196,24 +303,37 @@ class SimpleProgressManager {
       };
     }
 
-    progress.lessons[lessonId].interactions.push({
+    progress.lessonProgress[lessonId].interactions.push({
       ...interaction,
       timestamp: new Date().toISOString()
     });
 
-    progress.lastAccessedAt = new Date().toISOString();
+    // Update session interaction count
+    this.currentSession.interactions += 1;
+
     progress.lastModifiedAt = Date.now();
     progress.pendingChanges = true;
 
-    await this.saveProgress(progress);
+    // Save to cache and storage
+    this.progressCache.set(`${userId}-${courseId}`, progress);
+    await offlineStorage.storeProgress(progress);
   }
 
   // Add note
-  async addNote(userId: string, courseId: string, lessonId: string, note: { timestamp: number; content: string }): Promise<void> {
-    const progress = await this.getProgress(userId, courseId);
-    
-    if (!progress.lessons[lessonId]) {
-      progress.lessons[lessonId] = {
+  async addNote(
+    userId: string,
+    courseId: string,
+    lessonId: string,
+    note: {
+      timestamp: number;
+      content: string;
+    }
+  ): Promise<void> {
+    const progress = await this.initializeProgress(userId, courseId);
+
+    // Initialize lesson progress if not exists
+    if (!progress.lessonProgress[lessonId]) {
+      progress.lessonProgress[lessonId] = {
         startedAt: new Date().toISOString(),
         timeSpent: 0,
         interactions: [],
@@ -222,24 +342,37 @@ class SimpleProgressManager {
       };
     }
 
-    progress.lessons[lessonId].notes.push({
-      id: `note-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      ...note
+    const noteId = `note_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    progress.lessonProgress[lessonId].notes.push({
+      id: noteId,
+      timestamp: note.timestamp,
+      content: note.content,
+      createdAt: new Date().toISOString()
     });
 
-    progress.lastAccessedAt = new Date().toISOString();
     progress.lastModifiedAt = Date.now();
     progress.pendingChanges = true;
 
-    await this.saveProgress(progress);
+    // Save to cache and storage
+    this.progressCache.set(`${userId}-${courseId}`, progress);
+    await offlineStorage.storeProgress(progress);
   }
 
   // Add bookmark
-  async addBookmark(userId: string, courseId: string, lessonId: string, bookmark: { timestamp: number; title: string }): Promise<void> {
-    const progress = await this.getProgress(userId, courseId);
-    
-    if (!progress.lessons[lessonId]) {
-      progress.lessons[lessonId] = {
+  async addBookmark(
+    userId: string,
+    courseId: string,
+    lessonId: string,
+    bookmark: {
+      timestamp: number;
+      title: string;
+    }
+  ): Promise<void> {
+    const progress = await this.initializeProgress(userId, courseId);
+
+    // Initialize lesson progress if not exists
+    if (!progress.lessonProgress[lessonId]) {
+      progress.lessonProgress[lessonId] = {
         startedAt: new Date().toISOString(),
         timeSpent: 0,
         interactions: [],
@@ -248,145 +381,251 @@ class SimpleProgressManager {
       };
     }
 
-    progress.lessons[lessonId].bookmarks.push({
-      id: `bookmark-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      ...bookmark
+    const bookmarkId = `bookmark_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    progress.lessonProgress[lessonId].bookmarks.push({
+      id: bookmarkId,
+      timestamp: bookmark.timestamp,
+      title: bookmark.title,
+      createdAt: new Date().toISOString()
     });
 
-    progress.lastAccessedAt = new Date().toISOString();
     progress.lastModifiedAt = Date.now();
     progress.pendingChanges = true;
 
-    await this.saveProgress(progress);
+    // Save to cache and storage
+    this.progressCache.set(`${userId}-${courseId}`, progress);
+    await offlineStorage.storeProgress(progress);
   }
 
   // Update quiz score
-  async updateQuizScore(userId: string, courseId: string, quizId: string, score: {
-    score: number;
-    maxScore: number;
-    percentage: number;
-    passed: boolean;
-    answers: any[];
-    timeSpent: number;
-  }): Promise<void> {
-    const progress = await this.getProgress(userId, courseId);
+  async updateQuizScore(
+    userId: string,
+    courseId: string,
+    quizId: string,
+    score: {
+      score: number;
+      maxScore: number;
+      percentage: number;
+      passed: boolean;
+      answers: any[];
+      timeSpent: number;
+    }
+  ): Promise<void> {
+    const progress = await this.initializeProgress(userId, courseId);
+
+    // Get existing quiz data
+    const existingQuizData = progress.quizScores[quizId];
     
-    if (!progress.quizzes[quizId]) {
-      progress.quizzes[quizId] = {
-        bestScore: 0,
-        attempts: []
+    if (existingQuizData) {
+      // Update with best score
+      if (score.percentage > existingQuizData.bestPercentage) {
+        existingQuizData.bestScore = score.score;
+        existingQuizData.bestPercentage = score.percentage;
+      }
+      existingQuizData.totalAttempts += 1;
+      existingQuizData.passed = existingQuizData.passed || score.passed;
+      existingQuizData.attempts.push({
+        score: score.score,
+        percentage: score.percentage,
+        passed: score.passed,
+        timeSpent: score.timeSpent,
+        completedAt: new Date().toISOString()
+      });
+    } else {
+      // First attempt
+      progress.quizScores[quizId] = {
+        bestScore: score.score,
+        bestPercentage: score.percentage,
+        totalAttempts: 1,
+        passed: score.passed,
+        certificationEligible: score.passed && score.percentage >= 80,
+        attempts: [{
+          score: score.score,
+          percentage: score.percentage,
+          passed: score.passed,
+          timeSpent: score.timeSpent,
+          completedAt: new Date().toISOString()
+        }]
       };
     }
 
-    const attempt = {
-      score: score.score,
-      maxScore: score.maxScore,
-      percentage: score.percentage,
-      passed: score.passed,
-      completedAt: new Date().toISOString(),
-      timeSpent: score.timeSpent
-    };
-
-    progress.quizzes[quizId].attempts.push(attempt);
-    progress.quizzes[quizId].bestScore = Math.max(progress.quizzes[quizId].bestScore, score.percentage);
-    progress.timeSpent += score.timeSpent;
-    progress.lastAccessedAt = new Date().toISOString();
     progress.lastModifiedAt = Date.now();
     progress.pendingChanges = true;
 
-    await this.saveProgress(progress);
-    await this.queueSyncAction('quiz_complete', { userId, courseId, quizId, score: attempt });
+    // Save to cache and storage
+    this.progressCache.set(`${userId}-${courseId}`, progress);
+    await offlineStorage.storeProgress(progress);
+  }
+
+  // Calculate overall progress
+  private calculateOverallProgress(progress: CourseProgressData): number {
+    if (progress.completedLessons.length === 0) return 0;
+    
+    // This would need to be calculated based on total lessons in the course
+    // For now, return a basic calculation
+    return Math.min(progress.completedLessons.length * 10, 100); // Assume 10 lessons max
+  }
+
+  // Get progress for a course
+  async getProgress(userId: string, courseId: string): Promise<CourseProgressData | null> {
+    const progressId = `${userId}-${courseId}`;
+    
+    // Check cache first
+    if (this.progressCache.has(progressId)) {
+      return this.progressCache.get(progressId)!;
+    }
+
+    // Get from storage
+    const progress = await offlineStorage.getProgress(userId, courseId);
+    if (progress) {
+      this.progressCache.set(progressId, progress);
+    }
+
+    return progress;
+  }
+
+  // Get all progress for a user
+  async getAllProgress(userId: string): Promise<CourseProgressData[]> {
+    try {
+      return await offlineStorage.getAllPendingProgress(userId);
+    } catch (error) {
+      console.error('Failed to get all progress:', error);
+      return [];
+    }
   }
 
   // Sync progress with server
   async syncProgress(userId: string, courseId: string): Promise<boolean> {
     try {
       const progress = await this.getProgress(userId, courseId);
-      
-      if (!navigator.onLine) {
-        return false;
+      if (!progress || !progress.pendingChanges) {
+        return true; // Nothing to sync
       }
 
-      // Simple sync - just send the progress data
-      await apiClient.post(`/api/progress/${courseId}`, progress);
-      
-      progress.pendingChanges = false;
-      progress.lastModifiedAt = Date.now();
-      await this.saveProgress(progress);
-      
-      return true;
+      // Try to sync with server
+      const response = await apiClient.updateCourseProgress(courseId, {
+        progress: progress.overallProgress,
+        completedLessons: progress.completedLessons,
+        timeSpent: progress.timeSpent,
+        lastWatched: progress.lastWatched,
+        sectionProgress: progress.sectionProgress,
+        lessonProgress: progress.lessonProgress,
+        quizScores: progress.quizScores
+      });
+
+      if (response.success) {
+        // Mark as synced
+        progress.lastSyncedAt = Date.now();
+        progress.pendingChanges = false;
+        
+        this.progressCache.set(`${userId}-${courseId}`, progress);
+        await offlineStorage.storeProgress(progress);
+        
+        return true;
+      }
+
+      return false;
     } catch (error) {
-      console.warn('Sync failed:', error);
+      console.error('Failed to sync progress:', error);
       return false;
     }
   }
 
-  // Get learning analytics
-  async getLearningAnalytics(userId: string): Promise<any> {
-    // Simple analytics from localStorage data
-    const keys = Object.keys(localStorage);
-    const progressKeys = keys.filter(key => key.startsWith(`progress_${userId}-`));
-    
-    const analytics = {
-      totalCourses: progressKeys.length,
-      completedCourses: 0,
-      totalTimeSpent: 0,
-      averageProgress: 0
-    };
+  // Hydrate app state from local storage
+  async hydrateAppState(userId: string): Promise<{
+    courses: CourseProgressData[];
+    totalTimeSpent: number;
+    completedCourses: number;
+    activeCourses: number;
+    achievements: string[];
+  }> {
+    try {
+      const allProgress = await this.getAllProgress(userId);
+      
+      const totalTimeSpent = allProgress.reduce((sum, progress) => sum + progress.timeSpent, 0);
+      const completedCourses = allProgress.filter(progress => progress.overallProgress >= 100).length;
+      const activeCourses = allProgress.filter(progress => progress.overallProgress > 0 && progress.overallProgress < 100).length;
+      const achievements = allProgress.reduce((all, progress) => {
+        return [...all, ...progress.achievements.earnedAchievements];
+      }, [] as string[]);
 
-    let totalProgress = 0;
-
-    for (const key of progressKeys) {
-      try {
-        const data = JSON.parse(localStorage.getItem(key) || '{}');
-        if (data.isCompleted) analytics.completedCourses++;
-        analytics.totalTimeSpent += data.timeSpent || 0;
-        totalProgress += data.overallProgress || 0;
-      } catch (error) {
-        console.warn('Failed to parse progress data:', error);
-      }
+      return {
+        courses: allProgress,
+        totalTimeSpent,
+        completedCourses,
+        activeCourses,
+        achievements: [...new Set(achievements)] // Remove duplicates
+      };
+    } catch (error) {
+      console.error('Failed to hydrate app state:', error);
+      return {
+        courses: [],
+        totalTimeSpent: 0,
+        completedCourses: 0,
+        activeCourses: 0,
+        achievements: []
+      };
     }
-
-    analytics.averageProgress = progressKeys.length > 0 ? totalProgress / progressKeys.length : 0;
-
-    return analytics;
   }
 
-  // Hydrate app state
-  async hydrateAppState(userId: string): Promise<any> {
-    return {
-      isHydrated: true,
-      timestamp: Date.now()
-    };
+  // Get learning analytics
+  async getLearningAnalytics(userId: string): Promise<{
+    weeklyProgress: number[];
+    dailyActiveTime: number[];
+    completionRate: number;
+    averageQuizScore: number;
+    streakDays: number;
+    totalInteractions: number;
+  }> {
+    try {
+      const allProgress = await this.getAllProgress(userId);
+      
+      // Calculate analytics
+      const totalLessons = allProgress.reduce((sum, progress) => sum + progress.completedLessons.length, 0);
+      const totalQuizzes = allProgress.reduce((sum, progress) => sum + Object.keys(progress.quizScores).length, 0);
+      const totalQuizScore = allProgress.reduce((sum, progress) => {
+        return sum + Object.values(progress.quizScores).reduce((quizSum: number, quiz: any) => {
+          return quizSum + quiz.bestPercentage;
+        }, 0);
+      }, 0);
+
+      const totalInteractions = allProgress.reduce((sum, progress) => {
+        return sum + Object.values(progress.lessonProgress).reduce((lessonSum: number, lesson: any) => {
+          return lessonSum + lesson.interactions.length;
+        }, 0);
+      }, 0);
+
+      return {
+        weeklyProgress: [0, 0, 0, 0, 0, 0, 0], // This would need real calculation
+        dailyActiveTime: [0, 0, 0, 0, 0, 0, 0], // This would need real calculation
+        completionRate: totalLessons > 0 ? (totalLessons / (totalLessons + 10)) * 100 : 0, // Rough calculation
+        averageQuizScore: totalQuizzes > 0 ? totalQuizScore / totalQuizzes : 0,
+        streakDays: allProgress[0]?.engagement.streakDays || 0,
+        totalInteractions
+      };
+    } catch (error) {
+      console.error('Failed to get learning analytics:', error);
+      return {
+        weeklyProgress: [0, 0, 0, 0, 0, 0, 0],
+        dailyActiveTime: [0, 0, 0, 0, 0, 0, 0],
+        completionRate: 0,
+        averageQuizScore: 0,
+        streakDays: 0,
+        totalInteractions: 0
+      };
+    }
   }
 
-  // ================ PRIVATE METHODS ================
-
-  private async saveProgress(progress: CourseProgressData): Promise<void> {
-    const progressId = `${progress.userId}-${progress.courseId}`;
-    this.progressCache.set(progressId, progress);
-    localStorage.setItem(`progress_${progressId}`, JSON.stringify(progress));
+  // Clear cache
+  clearCache(): void {
+    this.progressCache.clear();
   }
 
-  private calculateOverallProgress(progress: CourseProgressData): number {
-    const lessons = Object.values(progress.lessons);
-    if (lessons.length === 0) return 0;
-    
-    const completedLessons = lessons.filter(lesson => lesson.completedAt).length;
-    return Math.round((completedLessons / lessons.length) * 100);
-  }
-
-  private async queueSyncAction(type: string, data: any): Promise<void> {
-    await offlineStorage.queueAction({
-      id: `${type}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      type,
-      data,
-      timestamp: Date.now(),
-      userId: data.userId
-    });
+  // Get cache size
+  getCacheSize(): number {
+    return this.progressCache.size;
   }
 }
 
-// Create and export singleton instance
-export const progressManager = new SimpleProgressManager();
-export default progressManager; 
+// Create singleton instance
+export const progressManager = new ProgressManager(); 

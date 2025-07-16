@@ -6,28 +6,11 @@ import { Input } from '../../components/ui/Input';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { Badge } from '../../components/ui/Badge';
 import { 
-  BookOpen,
-  Search,
   Eye, 
   CheckCircle, 
   XCircle, 
-  Trash2,
-  Clock, 
-  Edit,
-  Users,
-  Star,
-  Calendar,
-  TrendingUp,
-  Filter,
-  RefreshCw,
-  Play,
-  Pause,
-  Archive,
-  FileText,
-  X,
-  AlertTriangle,
-  Check,
-  AlertCircle
+  Trash2, 
+  X
 } from 'lucide-react';
 import { apiClient } from '../../utils/api';
 
@@ -89,7 +72,7 @@ interface ToastNotification {
 const AdminCourses: React.FC = () => {
   const navigate = useNavigate();
   const [courses, setCourses] = useState<CourseData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Changed from true to false
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [categoryFilter, setCategoryFilter] = useState<string>('');
@@ -119,8 +102,53 @@ const AdminCourses: React.FC = () => {
     pendingApproval: 0
   });
 
+  // Cache management
+  const CACHE_KEY = 'admin-courses-data';
+  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+  const getCachedData = () => {
+    try {
+      const cached = sessionStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const { data, timestamp } = JSON.parse(cached);
+        const isExpired = Date.now() - timestamp > CACHE_DURATION;
+        if (!isExpired) {
+          return data;
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to parse cached courses data:', error);
+    }
+    return null;
+  };
+
+  const setCachedData = (courseData: CourseData[], paginationData: any, statsData: CourseStats) => {
+    try {
+      sessionStorage.setItem(CACHE_KEY, JSON.stringify({
+        data: { courses: courseData, pagination: paginationData, stats: statsData },
+        timestamp: Date.now()
+      }));
+    } catch (error) {
+      console.warn('Failed to cache courses data:', error);
+    }
+  };
+
   useEffect(() => {
-    loadCourses();
+    // Try to load from cache first
+    const cachedData = getCachedData();
+    if (cachedData) {
+      setCourses(cachedData.courses || []);
+      setPagination(cachedData.pagination || { page: 1, limit: 12, total: 0, pages: 0 });
+      setStats(cachedData.stats || {
+        total: 0, draft: 0, submitted: 0, approved: 0,
+        published: 0, rejected: 0, archived: 0, pendingApproval: 0
+      });
+      // Refresh in background without showing loader
+      loadCourses(1, false);
+    } else {
+      // Only show loading if no cached data
+      loadCourses();
+    }
   }, []);
 
   useEffect(() => {
@@ -146,9 +174,11 @@ const AdminCourses: React.FC = () => {
     setToasts(prev => prev.filter(t => t.id !== id));
   };
 
-  const loadCourses = async (page = 1) => {
+  const loadCourses = async (page = 1, showLoader = true) => {
     try {
-      setLoading(true);
+      if (showLoader && courses.length === 0) { // Only show loader if no existing data
+        setLoading(true);
+      }
 
       const params: any = { page, limit: pagination.limit };
       if (searchTerm.trim()) params.search = searchTerm.trim();
@@ -182,6 +212,9 @@ const AdminCourses: React.FC = () => {
                       pendingApproval: safeCourseData.filter((c: CourseData) => c.status === 'submitted' || c.status === 'pending').length
         };
         setStats(statsData);
+
+        // Cache the data
+        setCachedData(courseData || [], paginationData, statsData);
       }
     } catch (err: any) {
       addToast({
@@ -259,6 +292,20 @@ const AdminCourses: React.FC = () => {
             return;
           }
           response = await apiClient.deleteAdminCourse(actualCourseId);
+          
+          // If deletion failed due to enrollments, offer force delete
+          if (!response.success && response.error?.includes('enrollments')) {
+            const forceDelete = window.confirm(
+              `${response.error}\n\nDo you want to FORCE DELETE this course and all associated data? This action cannot be undone.`
+            );
+            
+            if (forceDelete) {
+              response = await apiClient.deleteAdminCourse(actualCourseId, true);
+            } else {
+              setActionLoading('');
+              return;
+            }
+          }
           break;
       }
 
@@ -316,20 +363,18 @@ const AdminCourses: React.FC = () => {
 
   const getStatusBadge = (status: string) => {
     const configs = {
-      draft: { variant: 'default' as const, icon: Edit, label: 'Draft' },
-      submitted: { variant: 'warning' as const, icon: Clock, label: 'Pending' },
-      approved: { variant: 'success' as const, icon: CheckCircle, label: 'Approved' },
-      published: { variant: 'success' as const, icon: Play, label: 'Published' },
-      rejected: { variant: 'error' as const, icon: XCircle, label: 'Rejected' },
-      archived: { variant: 'default' as const, icon: Archive, label: 'Archived' }
+      draft: { variant: 'default' as const, label: 'Draft' },
+      submitted: { variant: 'default' as const, label: 'Pending' },
+      approved: { variant: 'default' as const, label: 'Approved' },
+      published: { variant: 'default' as const, label: 'Published' },
+      rejected: { variant: 'default' as const, label: 'Rejected' },
+      archived: { variant: 'default' as const, label: 'Archived' }
     };
 
     const config = configs[status as keyof typeof configs] || configs.draft;
-    const Icon = config.icon;
 
     return (
-      <Badge variant={config.variant} className="flex items-center gap-1">
-        <Icon size={12} />
+      <Badge variant={config.variant} className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
         {config.label}
       </Badge>
     );
@@ -350,115 +395,63 @@ const AdminCourses: React.FC = () => {
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`
-              flex items-center px-4 py-3 rounded-lg shadow-lg border-l-4 transition-all duration-300 ease-in-out
-              transform translate-y-0 opacity-100 max-w-md w-auto min-w-80
-              ${toast.type === 'success' 
-                ? 'bg-green-50 dark:bg-green-900/20 border-green-400 text-green-800 dark:text-green-200' 
-                : toast.type === 'error'
-                ? 'bg-red-50 dark:bg-red-900/20 border-red-400 text-red-800 dark:text-red-200'
-                : toast.type === 'warning'
-                ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-400 text-yellow-800 dark:text-yellow-200'
-                : 'bg-blue-50 dark:bg-blue-900/20 border-blue-400 text-blue-800 dark:text-blue-200'
-              }
-            `}
+            className="flex items-center px-4 py-3 rounded-lg shadow-lg border-l-4 transition-all duration-300 ease-in-out transform translate-y-0 opacity-100 max-w-md w-auto min-w-80 bg-blue-50 dark:bg-blue-900/20 border-blue-400 text-blue-800 dark:text-blue-200"
           >
-            <div className="flex-shrink-0 mr-3">
-              {toast.type === 'success' && (
-                <CheckCircle className="h-5 w-5 text-green-500" />
-              )}
-              {toast.type === 'error' && (
-                <XCircle className="h-5 w-5 text-red-500" />
-              )}
-              {toast.type === 'warning' && (
-                <AlertTriangle className="h-5 w-5 text-yellow-500" />
-              )}
-              {toast.type === 'info' && (
-                <AlertCircle className="h-5 w-5 text-blue-500" />
-          )}
-        </div>
-
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">
                 {toast.message}
-            </p>
-          </div>
+              </p>
+            </div>
 
             <button
               onClick={() => removeToast(toast.id)}
               className="ml-3 flex-shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
             >
-              <X className="h-4 w-4" />
+              ×
             </button>
-            </div>
-        ))}
           </div>
+        ))}
+      </div>
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Course Management
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Review and manage all platform courses
-          </p>
-          </div>
-
-        <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-            onClick={() => loadCourses(pagination.page)}
-          >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
-            </Button>
-        </div>
-          </div>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+          Course Management
+        </h1>
+        <p className="text-gray-600 dark:text-gray-400 mt-1">
+          Review and manage all platform courses
+        </p>
+      </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <div 
           className="cursor-pointer hover:shadow-md transition-shadow"
-                  onClick={() => {
+          onClick={() => {
             setStatusFilter('');
             setCategoryFilter('');
             setLevelFilter('');
             setSearchTerm('');
           }}
         >
-          <Card className="p-4">
-            <div className="text-center">
-              <BookOpen className="w-6 h-6 mx-auto mb-2 text-gray-600" />
-              <p className="text-sm text-gray-600 dark:text-gray-400">Total</p>
+          <Card className="p-4 h-24 flex items-center justify-center">
+            <div className="text-center w-full">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1 h-4">Total</p>
               <p className="text-xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
             </div>
           </Card>
         </div>
         
-        <div 
-          className="cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => { setStatusFilter('draft'); setCategoryFilter(''); setLevelFilter(''); setSearchTerm(''); }}
-        >
-          <Card className="p-4">
-            <div className="text-center">
-              <Edit className="w-6 h-6 mx-auto mb-2 text-gray-600" />
-              <p className="text-sm text-gray-600 dark:text-gray-400">Draft</p>
-              <p className="text-xl font-bold text-gray-600">{stats.draft}</p>
-            </div>
-          </Card>
-        </div>
+
         
         <div 
           className="cursor-pointer hover:shadow-md transition-shadow"
           onClick={() => { setStatusFilter('pending'); setCategoryFilter(''); setLevelFilter(''); setSearchTerm(''); }}
         >
-          <Card className="p-4">
-            <div className="text-center">
-              <Clock className="w-6 h-6 mx-auto mb-2 text-yellow-600" />
-              <p className="text-sm text-gray-600 dark:text-gray-400">Pending</p>
-              <p className="text-xl font-bold text-yellow-600">{stats.submitted}</p>
+          <Card className="p-4 h-24 flex items-center justify-center">
+            <div className="text-center w-full">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1 h-4">Pending</p>
+              <p className="text-xl font-bold text-blue-500">{stats.submitted}</p>
             </div>
           </Card>
         </div>
@@ -467,11 +460,10 @@ const AdminCourses: React.FC = () => {
           className="cursor-pointer hover:shadow-md transition-shadow"
           onClick={() => { setStatusFilter('approved'); setCategoryFilter(''); setLevelFilter(''); setSearchTerm(''); }}
         >
-          <Card className="p-4">
-            <div className="text-center">
-              <CheckCircle className="w-6 h-6 mx-auto mb-2 text-green-600" />
-              <p className="text-sm text-gray-600 dark:text-gray-400">Approved</p>
-              <p className="text-xl font-bold text-green-600">{stats.approved}</p>
+          <Card className="p-4 h-24 flex items-center justify-center">
+            <div className="text-center w-full">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1 h-4">Approved</p>
+              <p className="text-xl font-bold text-blue-400">{stats.approved}</p>
             </div>
           </Card>
         </div>
@@ -480,25 +472,23 @@ const AdminCourses: React.FC = () => {
           className="cursor-pointer hover:shadow-md transition-shadow"
           onClick={() => { setStatusFilter('published'); setCategoryFilter(''); setLevelFilter(''); setSearchTerm(''); }}
         >
-          <Card className="p-4">
-            <div className="text-center">
-              <Play className="w-6 h-6 mx-auto mb-2 text-blue-600" />
-              <p className="text-sm text-gray-600 dark:text-gray-400">Published</p>
+          <Card className="p-4 h-24 flex items-center justify-center">
+            <div className="text-center w-full">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1 h-4">Published</p>
               <p className="text-xl font-bold text-blue-600">{stats.published}</p>
+            </div>
+          </Card>
         </div>
-        </Card>
-      </div>
         
         <div 
           className="cursor-pointer hover:shadow-md transition-shadow"
           onClick={() => { setStatusFilter('rejected'); setCategoryFilter(''); setLevelFilter(''); setSearchTerm(''); }}
         >
-          <Card className="p-4">
-            <div className="text-center">
-              <XCircle className="w-6 h-6 mx-auto mb-2 text-red-600" />
-              <p className="text-sm text-gray-600 dark:text-gray-400">Rejected</p>
-              <p className="text-xl font-bold text-red-600">{stats.rejected}</p>
-      </div>
+          <Card className="p-4 h-24 flex items-center justify-center">
+            <div className="text-center w-full">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1 h-4">Rejected</p>
+              <p className="text-xl font-bold text-blue-300">{stats.rejected}</p>
+            </div>
           </Card>
         </div>
         
@@ -506,83 +496,70 @@ const AdminCourses: React.FC = () => {
           className="cursor-pointer hover:shadow-md transition-shadow"
           onClick={() => { setStatusFilter('archived'); setCategoryFilter(''); setLevelFilter(''); setSearchTerm(''); }}
         >
-          <Card className="p-4">
-            <div className="text-center">
-              <Archive className="w-6 h-6 mx-auto mb-2 text-gray-600" />
-              <p className="text-sm text-gray-600 dark:text-gray-400">Archived</p>
+          <Card className="p-4 h-24 flex items-center justify-center">
+            <div className="text-center w-full">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1 h-4">Archived</p>
               <p className="text-xl font-bold text-gray-600">{stats.archived}</p>
-        </div>
+            </div>
           </Card>
-      </div>
-
-        <div 
-          className="cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => { setStatusFilter('pending'); setCategoryFilter(''); setLevelFilter(''); setSearchTerm(''); }}
-        >
-          <Card className="p-4">
-            <div className="text-center">
-              <AlertTriangle className="w-6 h-6 mx-auto mb-2 text-orange-600" />
-              <p className="text-sm text-gray-600 dark:text-gray-400">Needs Review</p>
-              <p className="text-xl font-bold text-orange-600">{stats.pendingApproval}</p>
-              </div>
-            </Card>
         </div>
+
+
       </div>
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="flex-1">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <Input
-                type="text"
-              placeholder="Search courses by title or instructor..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-              />
-            </div>
-          </div>
+          <Input
+            type="text"
+            placeholder="Search courses by title or tutor..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full"
+          />
+        </div>
+        
+        <div className="flex gap-4">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-6 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white min-w-32"
+          >
+            <option value="">All Status</option>
+            <option value="draft">Draft</option>
+            <option value="pending">Pending</option>
+            <option value="submitted">Submitted</option>
+            <option value="approved">Approved</option>
+            <option value="published">Published</option>
+            <option value="rejected">Rejected</option>
+            <option value="archived">Archived</option>
+          </select>
 
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-              >
-                <option value="">All Status</option>
-                <option value="draft">Draft</option>
-          <option value="pending">Pending</option>
-                <option value="submitted">Submitted</option>
-                <option value="approved">Approved</option>
-                <option value="published">Published</option>
-                <option value="rejected">Rejected</option>
-                <option value="archived">Archived</option>
-              </select>
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="px-6 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white min-w-36"
+          >
+            <option value="">All Categories</option>
+            <option value="programming">Programming</option>
+            <option value="design">Design</option>
+            <option value="marketing">Marketing</option>
+            <option value="business">Business</option>
+            <option value="photography">Photography</option>
+            <option value="music">Music</option>
+          </select>
 
-              <select
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-          className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-              >
-                <option value="">All Categories</option>
-                <option value="programming">Programming</option>
-                <option value="design">Design</option>
-          <option value="marketing">Marketing</option>
-          <option value="business">Business</option>
-          <option value="photography">Photography</option>
-          <option value="music">Music</option>
-              </select>
-
-              <select
-                value={levelFilter}
-                onChange={(e) => setLevelFilter(e.target.value)}
-          className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-              >
-                <option value="">All Levels</option>
-                <option value="beginner">Beginner</option>
-                <option value="intermediate">Intermediate</option>
-                <option value="advanced">Advanced</option>
-              </select>
+          <select
+            value={levelFilter}
+            onChange={(e) => setLevelFilter(e.target.value)}
+            className="px-6 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white min-w-28"
+          >
+            <option value="">All Levels</option>
+            <option value="beginner">Beginner</option>
+            <option value="intermediate">Intermediate</option>
+            <option value="advanced">Advanced</option>
+          </select>
+        </div>
       </div>
 
       {/* Simple Course Cards */}
@@ -603,7 +580,7 @@ const AdminCourses: React.FC = () => {
               {/* Tutor/Owner */}
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Instructor</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Tutor</p>
                   <p className="font-medium text-gray-900 dark:text-white">{course.instructorName}</p>
                 </div>
                 <div>
@@ -622,23 +599,23 @@ const AdminCourses: React.FC = () => {
                           setShowApprovalModal(true);
                         }}
                         disabled={actionLoading.includes(course.id)}
-                        className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors disabled:opacity-50"
+                        className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors disabled:opacity-50"
                         onMouseEnter={() => setHoveredButton(`approve-${course.id}`)}
                         onMouseLeave={() => setHoveredButton('')}
                       >
                         {actionLoading === `approve-${course.id}` ? (
                           <LoadingSpinner size="sm" />
                         ) : (
-                          <CheckCircle className="w-5 h-5" />
+                          <CheckCircle className="w-4 h-4" />
                         )}
                       </button>
                       {hoveredButton === `approve-${course.id}` && (
                         <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded whitespace-nowrap z-10">
-                          Approve
+                          Approve Course
                           <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-gray-900 dark:border-t-gray-100"></div>
-            </div>
-          )}
-        </div>
+                        </div>
+                      )}
+                    </div>
                     
                     <div className="relative">
                       <button
@@ -647,23 +624,23 @@ const AdminCourses: React.FC = () => {
                           setShowRejectModal(true);
                         }}
                         disabled={actionLoading.includes(course.id)}
-                        className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
+                        className="p-2 text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors disabled:opacity-50"
                         onMouseEnter={() => setHoveredButton(`reject-${course.id}`)}
                         onMouseLeave={() => setHoveredButton('')}
                       >
                         {actionLoading === `reject-${course.id}` ? (
                           <LoadingSpinner size="sm" />
                         ) : (
-                          <XCircle className="w-5 h-5" />
+                          <XCircle className="w-4 h-4" />
                         )}
                       </button>
                       {hoveredButton === `reject-${course.id}` && (
                         <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded whitespace-nowrap z-10">
-                          Reject
+                          Reject Course
                           <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-gray-900 dark:border-t-gray-100"></div>
-                </div>
+                        </div>
                       )}
-              </div>
+                    </div>
                   </>
                 )}
                 
@@ -675,13 +652,13 @@ const AdminCourses: React.FC = () => {
                       onMouseEnter={() => setHoveredButton(`view-${course.id}`)}
                       onMouseLeave={() => setHoveredButton('')}
                     >
-                      <Eye className="w-5 h-5" />
+                      <Eye className="w-4 h-4" />
                     </button>
                     {hoveredButton === `view-${course.id}` && (
                       <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded whitespace-nowrap z-10">
-                        View
+                        View Course
                         <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-gray-900 dark:border-t-gray-100"></div>
-            </div>
+                      </div>
                     )}
                   </div>
                 )}
@@ -695,21 +672,21 @@ const AdminCourses: React.FC = () => {
                     onMouseLeave={() => setHoveredButton('')}
                   >
                     {actionLoading === `delete-${course.id}` ? (
-                    <LoadingSpinner size="sm" />
+                      <LoadingSpinner size="sm" />
                     ) : (
-                      <Trash2 className="w-5 h-5" />
+                      <Trash2 className="w-4 h-4" />
                     )}
                   </button>
                   {hoveredButton === `delete-${course.id}` && (
                     <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded whitespace-nowrap z-10">
-                      Delete
+                      Delete Course
                       <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-gray-900 dark:border-t-gray-100"></div>
-                  </div>
-                )}
+                    </div>
+                  )}
                 </div>
+              </div>
             </div>
-          </div>
-        </Card>
+          </Card>
         ))}
       </div>
 
@@ -755,7 +732,7 @@ const AdminCourses: React.FC = () => {
                   onClick={() => setShowApprovalModal(false)}
                 >
                   <X className="w-4 h-4" />
-              </Button>
+                </Button>
             </div>
             
               <p className="text-gray-600 dark:text-gray-400 mb-4">
@@ -814,7 +791,7 @@ const AdminCourses: React.FC = () => {
                   onClick={() => setShowRejectModal(false)}
                 >
                   <X className="w-4 h-4" />
-              </Button>
+                </Button>
             </div>
             
               <p className="text-gray-600 dark:text-gray-400 mb-4">

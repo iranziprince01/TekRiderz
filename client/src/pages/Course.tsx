@@ -2,8 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { useNetworkStatus } from '../hooks/useNetworkStatus';
-import { essentialDataCache } from '../utils/offlineDataCache';
 import { getCourse, getCourses, enrollInCourse, getCourseContent, getUserProgress, getUserCourseProgress, getFileUrl, getCourseQuizzes, submitQuiz, getQuizResults, markLessonComplete, updateLessonProgress, getCourseProgress, getInstructorAnalytics, getCourseStats, updateCourseProgress, apiClient } from '../utils/api';
 import { getCoursePermissions, CoursePermissions } from '../utils/coursePermissions';
 import CourseLayout from '../components/layout/CourseLayout';
@@ -36,11 +34,7 @@ import {
   Info,
   ArrowLeft,
   ArrowRight,
-  Send,
-  Wifi,
-  WifiOff,
-  Download,
-  Eye
+  Send
 } from 'lucide-react';
 import { AutoGradedQuiz } from '../components/quiz/AutoGradedQuiz';
 import { ToastContainer } from '../components/ui/Toast';
@@ -232,11 +226,10 @@ const CourseHome = ({ courseData, onEnrollmentUpdate }: {
           onEnrollmentUpdate(true, response.data?.enrollmentId);
         }
         
-        // Clear success message and refresh
+        // Trigger a page reload to refresh all data
         setTimeout(() => {
-          setSuccess('');
-        window.location.reload();
-        }, 2000);
+          window.location.reload();
+        }, 1000);
         
       } else {
         const errorMessage = response.error || 'Failed to enroll in course';
@@ -305,7 +298,7 @@ const CourseHome = ({ courseData, onEnrollmentUpdate }: {
               <div>
                 <p className={`font-medium ${courseData.isCompleted ? 'text-yellow-800 dark:text-yellow-200' : 'text-green-800 dark:text-green-200'}`}>
                   {courseData.isCompleted ? 
-                    (language === 'rw' ? '🏆 Urangije gukurikira iri somo' : '🏆 Course Completed') :
+                    (language === 'rw' ? 'Urangije gukurikira iri somo' : 'Course Completed') :
                     (language === 'rw' ? 'Urasanzwe wanditse muri iki gisomo' : 'You are enrolled in this course')
                   }
                 </p>
@@ -409,14 +402,7 @@ const CourseHome = ({ courseData, onEnrollmentUpdate }: {
                 </div>
               </div>
               
-              <div className="text-right">
-                <div className="text-3xl font-bold text-green-600 mb-2">
-                  {language === 'rw' ? 'Ubuntu!' : 'Free'}
-                </div>
-                <div className="text-sm text-gray-500">
-                  {language === 'rw' ? 'Isomo ry\'ubuntu' : 'Free course'}
-                </div>
-              </div>
+              {/* All courses are free - no pricing section needed */}
             </div>
             
             {/* Course Description */}
@@ -1806,7 +1792,7 @@ const CourseModules = ({ courseData }: { courseData: CourseData }) => {
                                             disabled={moduleProgress[lessonKey]?.videoProgress?.markedAsDone || !canMarkAsDone(lessonKey)}
                                           >
                                             {moduleProgress[lessonKey]?.videoProgress?.markedAsDone 
-                                              ? '✓ Completed' 
+                                              ? 'Completed' 
                                               : canMarkAsDone(lessonKey) 
                                                 ? 'Mark as Done' 
                                                 : 'Watch 90% to unlock'}
@@ -1846,7 +1832,7 @@ const CourseModules = ({ courseData }: { courseData: CourseData }) => {
                                             disabled={moduleProgress[lessonKey]?.videoProgress?.markedAsDone}
                                           >
                                             {moduleProgress[lessonKey]?.videoProgress?.markedAsDone 
-                                              ? '✓ Completed' 
+                                              ? 'Completed' 
                                               : 'Mark as Complete'}
                                         </button>
                                         </div>
@@ -3986,20 +3972,15 @@ const InlineQuiz = ({ quiz, lessonKey, onComplete, courseId }: {
 // Main Course Component
 const Course = () => {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { language } = useLanguage();
-  const { isOnline } = useNetworkStatus();
-
-  // Add offline course availability state
-  const [isOfflineCourseAvailable, setIsOfflineCourseAvailable] = useState(false);
-
-  const location = useLocation();
   const [courseData, setCourseData] = useState<CourseData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<string>('home');
   const [availableCourses, setAvailableCourses] = useState<any[]>([]);
+  const { language } = useLanguage();
 
   // Handle enrollment state updates
   const handleEnrollmentUpdate = (isEnrolled: boolean, enrollmentId?: string) => {
@@ -4300,31 +4281,6 @@ const Course = () => {
     }
   };
 
-  useEffect(() => {
-    // Check if course is available offline
-    const checkOfflineAvailability = async () => {
-      if (id && user?.id) {
-        try {
-          const offlineSettings = localStorage.getItem(`course_preloaded_${id}`);
-          const hasOfflineData = !!offlineSettings;
-          setIsOfflineCourseAvailable(hasOfflineData);
-        } catch (error) {
-          console.warn('Failed to check offline course availability:', error);
-        }
-      }
-    };
-
-    checkOfflineAvailability();
-  }, [id, user?.id]);
-
-  // Auto-redirect to offline course if online course fails and offline is available
-  useEffect(() => {
-    if (!isOnline && isOfflineCourseAvailable && id) {
-      console.log('🔌 Device offline, redirecting to offline course...');
-      navigate(`/offline-course/${id}`, { replace: true });
-    }
-  }, [isOnline, isOfflineCourseAvailable, id, navigate]);
-
   // Render the appropriate component based on current view
   const renderCurrentView = () => {
     if (!courseData) return null;
@@ -4428,35 +4384,6 @@ const Course = () => {
   return (
     <>
       <ToastContainer />
-      
-      {/* Offline Mode Indicator and Navigation */}
-      {(!isOnline || isOfflineCourseAvailable) && (
-        <div className="fixed top-4 right-4 z-50">
-          <div className="flex gap-2">
-            {/* Offline Status Indicator */}
-            {!isOnline && (
-              <div className="bg-orange-100 border border-orange-200 rounded-lg px-3 py-2 flex items-center gap-2 text-orange-800 text-sm shadow-lg">
-                <WifiOff className="w-4 h-4" />
-                <span>{language === 'rw' ? 'Muri offline' : 'You\'re offline'}</span>
-              </div>
-            )}
-            
-            {/* Switch to Offline Course Button */}
-            {isOnline && isOfflineCourseAvailable && (
-              <Button
-                onClick={() => navigate(`/offline-course/${id}`)}
-                variant="outline"
-                size="sm"
-                className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
-              >
-                <Eye className="w-4 h-4 mr-1" />
-                {language === 'rw' ? 'Reba offline' : 'View Offline'}
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
-      
       <CourseLayout 
         courseTitle={courseData.course.title || 'Untitled Course'}
         courseProgress={0} // Will be calculated based on user progress

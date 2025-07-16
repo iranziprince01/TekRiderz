@@ -10,10 +10,7 @@ import NetworkStatusIndicator from '../common/NetworkStatusIndicator';
 import { 
   Moon, 
   Sun, 
-  Bell, 
-  User, 
   LogOut, 
-  Settings,
   Globe,
   ChevronDown,
   Menu,
@@ -138,19 +135,6 @@ const Header: React.FC<HeaderProps> = ({
 
             {user ? (
               <>
-                {/* Notifications - hidden on mobile */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="hidden sm:flex relative"
-                  aria-label="Notifications"
-                >
-                  <Bell className="h-4 w-4" />
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                    3
-                  </span>
-                </Button>
-
                 {/* Profile Menu */}
                 <div className="relative ml-3">
                   <Button
@@ -161,11 +145,7 @@ const Header: React.FC<HeaderProps> = ({
                     aria-label="Profile menu"
                   >
                     <div className="relative">
-                      {avatar.isLoading ? (
-                        <div className="h-8 w-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                          <LoadingSpinner size="sm" />
-                        </div>
-                      ) : (
+                      {avatar.src && !avatar.hasError ? (
                         <img
                           src={avatar.src}
                           alt={user.name}
@@ -173,6 +153,14 @@ const Header: React.FC<HeaderProps> = ({
                           onLoad={avatar.onLoad}
                           onError={avatar.onError}
                         />
+                      ) : (
+                        <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold ring-2 ring-gray-200 dark:ring-gray-700">
+                          {user.name && user.name.trim() && user.name.trim() !== 'User' 
+                            ? user.name.trim().charAt(0).toUpperCase() 
+                            : user.email 
+                              ? user.email.charAt(0).toUpperCase() 
+                              : 'U'}
+                        </div>
                       )}
                       <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-900" />
                     </div>
@@ -184,11 +172,7 @@ const Header: React.FC<HeaderProps> = ({
                       {/* Profile Info */}
                       <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                         <div className="flex items-center space-x-3">
-                          {avatar.isLoading ? (
-                            <div className="h-10 w-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                              <LoadingSpinner size="sm" />
-                            </div>
-                          ) : (
+                          {avatar.src && !avatar.hasError ? (
                             <img
                               src={avatar.src}
                               alt={user.name}
@@ -196,6 +180,14 @@ const Header: React.FC<HeaderProps> = ({
                               onLoad={avatar.onLoad}
                               onError={avatar.onError}
                             />
+                          ) : (
+                            <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold ring-2 ring-gray-200 dark:ring-gray-700">
+                              {user.name && user.name.trim() && user.name.trim() !== 'User' 
+                                ? user.name.trim().charAt(0).toUpperCase() 
+                                : user.email 
+                                  ? user.email.charAt(0).toUpperCase() 
+                                  : 'U'}
+                            </div>
                           )}
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{user.name}</p>
@@ -206,25 +198,6 @@ const Header: React.FC<HeaderProps> = ({
                             </div>
                           </div>
                         </div>
-                      </div>
-
-                      {/* Menu Items */}
-                      <div className="py-2">
-                        <Link
-                          to="/profile"
-                          className="flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                          onClick={() => setShowProfileMenu(false)}
-                        >
-                          <User className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                          <span>{t('nav.profile')}</span>
-                        </Link>
-                        <button 
-                          className="flex items-center space-x-3 w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                          onClick={() => setShowProfileMenu(false)}
-                        >
-                          <Settings className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                          <span>{t('nav.settings')}</span>
-                        </button>
                       </div>
 
                       {/* Logout */}

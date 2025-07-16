@@ -163,14 +163,14 @@ const LearnerCertificates: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
+        <div>
         <h1 className="text-3xl font-bold text-gray-900">
           {t('My Certificates')}
         </h1>
         <p className="text-gray-600 mt-1">
           {t('View and manage your earned course certificates')}
-        </p>
-      </div>
+          </p>
+        </div>
 
       {/* Certificate Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -178,7 +178,7 @@ const LearnerCertificates: React.FC = () => {
           <div className="flex items-center gap-3">
             <div className="bg-yellow-100 p-2 rounded-lg">
               <Award className="w-5 h-5 text-yellow-600" />
-            </div>
+      </div>
             <div>
               <div className="text-xl font-bold">{certificateStats.total}</div>
               <div className="text-gray-600 text-sm">{t('Total Certificates')}</div>
@@ -235,9 +235,9 @@ const LearnerCertificates: React.FC = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
             />
-          </div>
-        </div>
-        
+                      </div>
+                    </div>
+                    
         <div className="sm:w-48">
           <select
             value={sortBy}
@@ -249,8 +249,8 @@ const LearnerCertificates: React.FC = () => {
             <option value="status">{t('Sort by Status')}</option>
           </select>
         </div>
-      </div>
-
+                    </div>
+                    
       {/* Certificates List */}
       <div>
         <div className="flex justify-between items-center mb-4">
@@ -258,7 +258,7 @@ const LearnerCertificates: React.FC = () => {
           <Badge variant="default">
             {filteredCertificates.length} {t('certificates')}
           </Badge>
-        </div>
+                      </div>
 
         {filteredCertificates.length > 0 ? (
           <div className="space-y-4">
@@ -283,11 +283,11 @@ const LearnerCertificates: React.FC = () => {
                               {certificate.grade}%
                             </Badge>
                           )}
-                        </div>
-                        
+              </div>
+
                         <h3 className="font-semibold text-gray-900 text-lg mb-2">
-                          {certificate.courseName}
-                        </h3>
+                      {certificate.courseName}
+                    </h3>
                         
                         <div className="space-y-1 text-sm text-gray-600">
                           <p className="flex items-center gap-2">
@@ -303,31 +303,31 @@ const LearnerCertificates: React.FC = () => {
                             <p className="font-mono text-xs">
                               {t('Certificate')}: {certificate.certificateNumber}
                             </p>
-                          )}
-                        </div>
-                      </div>
+                      )}
+                    </div>
+                  </div>
 
                       <div className="flex flex-col sm:items-end gap-3">
                         <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
+                  <Button
+                    size="sm"
+                    variant="outline"
                             onClick={() => handleView(certificate)}
                             className="flex items-center gap-2"
                           >
                             <Eye className="w-4 h-4" />
                             {t('View')}
-                          </Button>
+                  </Button>
                           
-                          <Button
-                            size="sm"
+                  <Button
+                    size="sm"
                             onClick={() => handleDownload(certificate)}
                             className="flex items-center gap-2"
-                          >
+                  >
                             <Download className="w-4 h-4" />
                             {t('Download')}
-                          </Button>
-                        </div>
+                  </Button>
+                </div>
 
                         {certificate.course && (
                           <Link 
@@ -351,10 +351,10 @@ const LearnerCertificates: React.FC = () => {
                       </div>
                     )}
                   </div>
-                </div>
-              </Card>
-            ))}
-          </div>
+              </div>
+            </Card>
+          ))}
+        </div>
         ) : (
           <Card className="p-8 text-center">
             <Award className="w-12 h-12 text-gray-300 mx-auto mb-4" />
@@ -363,7 +363,7 @@ const LearnerCertificates: React.FC = () => {
                 ? t('No certificates earned')
                 : t('No certificates match your search')
               }
-            </h3>
+              </h3>
             <p className="text-gray-600 mb-4">
               {processedCertificates.length === 0 
                 ? t('Complete courses to earn certificates and showcase your achievements')
@@ -377,16 +377,16 @@ const LearnerCertificates: React.FC = () => {
                 </Button>
               </Link>
             ) : (
-              <Button
-                variant="outline"
+                <Button
+                  variant="outline"
                 onClick={() => setSearchTerm('')}
-              >
+                >
                 {t('Clear Search')}
-              </Button>
+                </Button>
             )}
           </Card>
         )}
-      </div>
+              </div>
 
       {/* Achievement Summary */}
       {processedCertificates.length > 0 && (

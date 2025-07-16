@@ -86,7 +86,7 @@ class SimpleOfflineStorage {
   async clearQueuedActions(): Promise<void> {
     try {
       localStorage.removeItem('offline_actions');
-    } catch (error) {
+      } catch (error) {
       console.warn('Failed to clear queued actions:', error);
     }
   }

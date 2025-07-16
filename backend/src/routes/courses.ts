@@ -339,14 +339,20 @@ router.post('/:id/enroll', authenticate, authorize('learner', 'tutor', 'admin'),
       });
     }
 
-    // Check if already enrolled
+        // Check if already enrolled
     const existingEnrollment = await enrollmentModel.findByUserAndCourse(req.user.id, courseId);
     if (existingEnrollment) {
-    return res.json({
-      success: true,
+      return res.json({
+        success: true,
         data: {
           enrollment: existingEnrollment,
-          message: 'Already enrolled in this course'
+          message: 'Already enrolled in this course',
+          course: {
+            id: course._id || course.id,
+            title: course.title,
+            thumbnail: course.thumbnail,
+            instructorName: course.instructorName
+          }
         }
       });
     }
@@ -384,7 +390,13 @@ router.post('/:id/enroll', authenticate, authorize('learner', 'tutor', 'admin'),
       success: true,
       data: {
         enrollment,
-        message: 'Successfully enrolled in course'
+        message: 'Successfully enrolled in course',
+        course: {
+          id: course._id || course.id,
+          title: course.title,
+          thumbnail: course.thumbnail,
+          instructorName: course.instructorName
+        }
       }
     });
   } catch (error) {
@@ -1918,96 +1930,6 @@ router.post('/:id/lessons/:lessonId/complete', authenticate, async (req: Request
   }
 });
 
-// Enroll in course
-router.post('/:id/enroll', authenticate, async (req: Request, res: Response) => {
-  try {
-    const courseId = req.params.id;
-    
-    if (!courseId) {
-      return res.status(400).json({
-        success: false,
-        error: 'Course ID is required'
-      });
-    }
 
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: 'Authentication required'
-      });
-    }
-
-    // Check if course exists
-    const course = await courseModel.findById(courseId);
-    if (!course) {
-      return res.status(404).json({
-        success: false,
-        error: 'Course not found'
-      });
-    }
-
-    // Check if course is published
-    if (course.status !== 'published') {
-      return res.status(400).json({
-        success: false,
-        error: 'Course is not available for enrollment'
-      });
-    }
-
-    // Check if user is already enrolled
-    const existingEnrollment = await enrollmentModel.findByUserAndCourse(req.user.id, courseId);
-    if (existingEnrollment) {
-      return res.status(409).json({
-        success: false,
-        error: 'Already enrolled in this course',
-        data: {
-          enrollmentId: existingEnrollment._id,
-          enrolledAt: existingEnrollment.enrolledAt,
-          progress: existingEnrollment.progress
-        }
-      });
-    }
-
-    // Create enrollment
-    const enrollment = await enrollmentModel.create({
-      id: `enrollment_${Date.now()}_${req.user.id}`,
-      type: 'enrollment',
-      userId: req.user.id,
-      courseId: courseId,
-      status: 'active',
-      progress: 0,
-      enrolledAt: new Date().toISOString()
-    });
-
-    // Create progress record
-    await progressModel.getOrCreateProgress(req.user.id, courseId);
-
-    logger.info('User enrolled in course:', {
-      userId: req.user.id,
-      courseId,
-      enrollmentId: enrollment._id
-    });
-
-    return res.json({
-      success: true,
-      message: 'Successfully enrolled in course',
-      data: {
-        enrollment,
-        course: {
-          id: course._id || course.id,
-          title: course.title,
-          thumbnail: course.thumbnail,
-          instructorName: course.instructorName
-        }
-      }
-    });
-  } catch (error) {
-    logger.error('Failed to enroll in course:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to enroll in course'
-    });
-  }
-});
 
 export default router; 

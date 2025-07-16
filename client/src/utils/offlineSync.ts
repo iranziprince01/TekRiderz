@@ -4,6 +4,7 @@
  */
 
 import { offlineStorage } from './offlineStorage';
+import { offlineOperations } from './offlineOperations';
 import { apiClient } from './api';
 
 interface SyncResult {
@@ -20,7 +21,7 @@ interface SyncStats {
 
 class SimpleOfflineSyncManager {
   private isSyncing = false;
-  private syncInterval: ReturnType<typeof setInterval> | null = null;
+  private syncInterval: number | null = null;
 
   constructor() {
     // Start periodic sync when online

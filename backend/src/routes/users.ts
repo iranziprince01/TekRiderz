@@ -141,16 +141,32 @@ router.get('/profile', authenticate, async (req: Request, res: Response) => {
     const userResponse = {
       id: user.id || user._id,
       _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      status: user.status,
-      verified: user.verified,
-      avatar: user.avatar,
-      createdAt: user.createdAt,
-      lastLogin: user.lastLogin,
-      profile: user.profile,
-      preferences: user.preferences,
+      name: user.name || '',
+      email: user.email || '',
+      role: user.role || 'learner',
+      status: user.status || 'active',
+      verified: user.verified || false,
+      avatar: user.avatar || null,
+      createdAt: user.createdAt || new Date().toISOString(),
+      lastLogin: user.lastLogin || new Date().toISOString(),
+      profile: {
+        bio: user.profile?.bio || '',
+        location: user.profile?.location || '',
+        phone: (user.profile as any)?.phone || '',
+        website: user.profile?.website || '',
+        expertise: user.profile?.expertise || [],
+        education: (user.profile as any)?.education || '',
+        experience: (user.profile as any)?.experience || '',
+        socialMedia: user.profile?.socialMedia || {}
+      },
+      preferences: user.preferences || {
+        language: 'en',
+        notifications: {
+          email: true,
+          push: true,
+          marketing: false
+        }
+      },
       stats: {
         totalEnrollments,
         completedCourses,
@@ -159,11 +175,15 @@ router.get('/profile', authenticate, async (req: Request, res: Response) => {
       }
     };
 
-    logger.info('Profile data successfully retrieved:', { 
+    logger.info('Profile data successfully retrieved and formatted:', { 
       userId: userResponse.id,
       userEmail: userResponse.email,
+      userName: userResponse.name,
       hasProfile: !!userResponse.profile,
-      hasStats: !!userResponse.stats 
+      profileFields: Object.keys(userResponse.profile),
+      hasStats: !!userResponse.stats,
+      documentId: user._id,
+      documentRev: user._rev
     });
 
     return res.json({
@@ -303,31 +323,52 @@ router.put('/profile', authenticate, async (req: Request, res: Response) => {
     const userIdToUpdate = existingUser.id || existingUser._id || req.user.id;
     const updatedUser = await userModel.update(userIdToUpdate, updateData);
 
-    logger.info('User profile updated successfully', { 
+    // Verify the update was persisted to CouchDB by fetching the updated document
+    const verificationUser = await userModel.findById(userIdToUpdate);
+    if (!verificationUser) {
+      logger.error('Failed to verify profile update in CouchDB', { userIdToUpdate });
+      return res.status(500).json({
+        success: false,
+        error: 'Profile update verification failed',
+      });
+    }
+
+    logger.info('User profile updated and verified in CouchDB', { 
       originalUserId: req.user.id,
       actualUserId: userIdToUpdate,
-      updatedFields: Object.keys(updateData)
+      updatedFields: Object.keys(updateData),
+      verificationId: verificationUser._id,
+      verificationRev: verificationUser._rev,
+      profileData: verificationUser.profile
     });
 
     const responseUser = {
-      id: updatedUser.id || updatedUser._id,
-      _id: updatedUser._id,
-      name: updatedUser.name,
-      email: updatedUser.email,
-      role: updatedUser.role,
-      status: updatedUser.status,
-      verified: updatedUser.verified,
-      avatar: updatedUser.avatar,
-      profile: updatedUser.profile,
-      preferences: updatedUser.preferences,
+      id: verificationUser.id || verificationUser._id,
+      _id: verificationUser._id,
+      _rev: verificationUser._rev,
+      name: verificationUser.name,
+      email: verificationUser.email,
+      role: verificationUser.role,
+      status: verificationUser.status,
+      verified: verificationUser.verified,
+      avatar: verificationUser.avatar,
+      profile: verificationUser.profile,
+      preferences: verificationUser.preferences,
+      createdAt: verificationUser.createdAt,
+      updatedAt: verificationUser.updatedAt,
     };
 
     return res.json({
       success: true,
-      message: 'Profile updated successfully',
+      message: 'Profile updated and synchronized to CouchDB successfully',
       data: {
         user: responseUser,
       },
+      meta: {
+        persistenceVerified: true,
+        lastUpdated: verificationUser.updatedAt,
+        documentRevision: verificationUser._rev
+      }
     });
   } catch (error) {
     logger.error('Failed to update user profile:', error);

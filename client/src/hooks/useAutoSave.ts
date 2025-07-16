@@ -231,8 +231,7 @@ export const useCourseAutoSave = (courseData: any, options: AutoSaveOptions = {}
       formData.append('category', data.category || '');
       formData.append('level', data.level || 'beginner');
       formData.append('language', 'en');
-      formData.append('price', '0');
-      formData.append('currency', 'USD');
+              // All courses are free - no pricing data needed
       formData.append('status', 'draft');
       formData.append('targetAudience', 'General learners');
       

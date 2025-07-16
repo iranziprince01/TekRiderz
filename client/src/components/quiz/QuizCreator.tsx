@@ -79,7 +79,7 @@ interface QuizCreatorProps {
 
 const QUESTION_TYPES = [
   { value: 'multiple-choice', label: 'Multiple Choice', icon: '●' },
-  { value: 'true-false', label: 'True/False', icon: '✓' },
+      { value: 'true-false', label: 'True/False', icon: 'TF' },
   { value: 'multiple-select', label: 'Multiple Select', icon: '☑' },
   { value: 'fill-blank', label: 'Fill in the Blank', icon: '___' },
   { value: 'essay', label: 'Essay', icon: '✍' }

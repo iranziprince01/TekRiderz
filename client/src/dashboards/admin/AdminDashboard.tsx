@@ -5,24 +5,20 @@ import { Button } from '../../components/ui/Button';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
+import { apiClient } from '../../utils/api';
+import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 import { 
   Users, 
   BookOpen, 
-  TrendingUp, 
+  CheckCircle, 
+  GraduationCap, 
+  RefreshCw, 
+  X, 
+  Clock, 
+  Circle, 
   Activity,
-  UserCheck,
-  GraduationCap,
-  Eye,
-  Calendar,
-  Clock,
-  Star,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  RefreshCw
+  CheckCircle2
 } from 'lucide-react';
-import { apiClient } from '../../utils/api';
-import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 
 interface DashboardStats {
   overview: {
@@ -57,6 +53,9 @@ interface DashboardStats {
       user: string;
       timestamp: string;
       status: string;
+      courseName?: string;
+      userName?: string;
+      adminAction?: boolean;
     }>;
     pendingCourses: Array<{
       id: string;
@@ -71,9 +70,42 @@ interface DashboardStats {
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Changed from true to false
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+
+  // Cache key for admin dashboard data
+  const CACHE_KEY = 'admin-dashboard-stats';
+  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+  // Check for cached data
+  const getCachedData = () => {
+    try {
+      const cached = sessionStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const { data, timestamp } = JSON.parse(cached);
+        const isExpired = Date.now() - timestamp > CACHE_DURATION;
+        if (!isExpired) {
+          return data;
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to parse cached dashboard data:', error);
+    }
+    return null;
+  };
+
+  // Store data in cache
+  const setCachedData = (data: DashboardStats) => {
+    try {
+      sessionStorage.setItem(CACHE_KEY, JSON.stringify({
+        data,
+        timestamp: Date.now()
+      }));
+    } catch (error) {
+      console.warn('Failed to cache dashboard data:', error);
+    }
+  };
 
   // Auto-refresh dashboard data every 5 minutes
   const autoRefresh = useAutoRefresh({
@@ -85,12 +117,21 @@ const AdminDashboard: React.FC = () => {
   });
 
   useEffect(() => {
-    loadDashboardStats();
+    // Try to load from cache first
+    const cachedStats = getCachedData();
+    if (cachedStats) {
+      setStats(cachedStats);
+      // Optionally refresh in background without showing loader
+      loadDashboardStats(false);
+    } else {
+      // Only show loading if no cached data
+      loadDashboardStats();
+    }
   }, []);
 
   const loadDashboardStats = async (showLoader = true) => {
     try {
-      if (showLoader) {
+      if (showLoader && !stats) { // Only show loader if no existing data
         setLoading(true);
       } else {
         setRefreshing(true);
@@ -101,6 +142,7 @@ const AdminDashboard: React.FC = () => {
       
       if (response.success && response.data) {
         setStats(response.data);
+        setCachedData(response.data); // Cache the new data
       } else {
         setError(response.error || 'Failed to load dashboard statistics');
       }
@@ -123,18 +165,20 @@ const AdminDashboard: React.FC = () => {
   };
 
   const getStatusIcon = (status: string) => {
+    const iconProps = { size: 16, className: "flex-shrink-0" };
+    
     switch (status) {
       case 'completed':
       case 'approved':
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
+        return <CheckCircle {...iconProps} className="text-green-500" />;
       case 'pending':
       case 'submitted':
-        return <Clock className="w-4 h-4 text-yellow-500" />;
+        return <Clock {...iconProps} className="text-yellow-500" />;
       case 'rejected':
       case 'failed':
-        return <XCircle className="w-4 h-4 text-red-500" />;
+        return <X {...iconProps} className="text-red-500" />;
       default:
-        return <AlertTriangle className="w-4 h-4 text-gray-500" />;
+        return <Circle {...iconProps} className="text-gray-400" />;
     }
   };
 
@@ -153,7 +197,7 @@ const AdminDashboard: React.FC = () => {
           {error}
         </Alert>
         <Button onClick={() => loadDashboardStats()} className="flex items-center gap-2">
-          <RefreshCw className="w-4 h-4" />
+          <RefreshCw size={16} />
           Retry
         </Button>
       </div>
@@ -185,7 +229,7 @@ const AdminDashboard: React.FC = () => {
         <div className="flex items-center gap-4">
           {refreshing && (
             <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-              <RefreshCw className="w-4 h-4 animate-spin" />
+              <RefreshCw size={14} className="animate-spin" />
               Refreshing...
             </div>
           )}
@@ -195,7 +239,7 @@ const AdminDashboard: React.FC = () => {
             onClick={() => loadDashboardStats(false)}
             disabled={refreshing}
           >
-            <RefreshCw className="w-4 h-4 mr-2" />
+            <RefreshCw size={14} />
             Refresh
           </Button>
         </div>
@@ -203,69 +247,89 @@ const AdminDashboard: React.FC = () => {
 
       {/* Quick Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                Total Users
-              </p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {stats.overview.totalUsers}
-              </p>
+        <div 
+          className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105"
+          onClick={() => navigate('/dashboard/users')}
+        >
+          <Card className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                  Total Users
+                </p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {stats.overview.totalUsers}
+                </p>
+              </div>
+              <div className="bg-blue-100 dark:bg-blue-900/20 p-3 rounded-full">
+                <Users className="text-blue-600 dark:text-blue-400" size={24} />
+              </div>
             </div>
-            <div className="bg-blue-100 dark:bg-blue-900/20 p-3 rounded-full">
-              <Users className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-            </div>
-          </div>
-        </Card>
+          </Card>
+        </div>
 
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                Total Courses
-              </p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {stats.overview.totalCourses}
-              </p>
+        <div 
+          className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105"
+          onClick={() => navigate('/dashboard/courses')}
+        >
+          <Card className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                  Total Courses
+                </p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {stats.overview.totalCourses}
+                </p>
+              </div>
+              <div className="bg-blue-200 dark:bg-blue-800/30 p-3 rounded-full">
+                <BookOpen className="text-blue-500 dark:text-blue-300" size={24} />
+              </div>
             </div>
-            <div className="bg-green-100 dark:bg-green-900/20 p-3 rounded-full">
-              <BookOpen className="h-6 w-6 text-green-600 dark:text-green-400" />
-            </div>
-          </div>
-        </Card>
+          </Card>
+        </div>
 
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                Active Users
-              </p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {stats.overview.activeUsers}
-              </p>
+        <div 
+          className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105"
+          onClick={() => navigate('/dashboard/users')}
+        >
+          <Card className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                  Active Users
+                </p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {stats.overview.activeUsers}
+                </p>
+              </div>
+              <div className="bg-blue-300 dark:bg-blue-700/40 p-3 rounded-full">
+                <CheckCircle className="text-blue-400 dark:text-blue-200" size={24} />
+              </div>
             </div>
-            <div className="bg-purple-100 dark:bg-purple-900/20 p-3 rounded-full">
-              <UserCheck className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-            </div>
-          </div>
-        </Card>
+          </Card>
+        </div>
 
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                Total Enrollments
-              </p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {stats.overview.totalEnrollments}
-              </p>
+        <div 
+          className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105"
+          onClick={() => navigate('/dashboard/courses')}
+        >
+          <Card className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                  Total Enrollments
+                </p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {stats.overview.totalEnrollments}
+                </p>
+              </div>
+              <div className="bg-blue-400 dark:bg-blue-600/50 p-3 rounded-full">
+                <GraduationCap className="text-blue-300 dark:text-blue-100" size={24} />
+              </div>
             </div>
-            <div className="bg-orange-100 dark:bg-orange-900/20 p-3 rounded-full">
-              <GraduationCap className="h-6 w-6 text-orange-600 dark:text-orange-400" />
-            </div>
-          </div>
-        </Card>
+          </Card>
+        </div>
       </div>
 
       {/* Management Cards */}
@@ -276,10 +340,10 @@ const AdminDashboard: React.FC = () => {
           onClick={() => navigate('/dashboard/users')}
         >
           <Card className="p-6 hover:border-blue-300 dark:hover:border-blue-600">
-          <div className="flex items-center justify-between mb-4">
+          <div className="mb-4">
             <div className="flex items-center gap-3">
               <div className="bg-blue-100 dark:bg-blue-900/20 p-3 rounded-full">
-                <Users className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                <Users className="text-blue-600 dark:text-blue-400" size={24} />
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -290,10 +354,6 @@ const AdminDashboard: React.FC = () => {
                 </p>
               </div>
             </div>
-            <Button variant="ghost" size="sm">
-              <Eye className="w-4 h-4 mr-2" />
-              View All
-            </Button>
           </div>
           
           <div className="grid grid-cols-2 gap-4 text-sm">
@@ -331,10 +391,10 @@ const AdminDashboard: React.FC = () => {
            onClick={() => navigate('/dashboard/courses')}
          >
            <Card className="p-6 hover:border-green-300 dark:hover:border-green-600">
-          <div className="flex items-center justify-between mb-4">
+          <div className="mb-4">
             <div className="flex items-center gap-3">
               <div className="bg-green-100 dark:bg-green-900/20 p-3 rounded-full">
-                <BookOpen className="h-6 w-6 text-green-600 dark:text-green-400" />
+                <BookOpen className="text-green-600 dark:text-green-400" size={24} />
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -345,10 +405,6 @@ const AdminDashboard: React.FC = () => {
                 </p>
               </div>
             </div>
-            <Button variant="ghost" size="sm">
-              <Eye className="w-4 h-4 mr-2" />
-              View All
-            </Button>
           </div>
           
           <div className="grid grid-cols-2 gap-4 text-sm">
@@ -385,14 +441,13 @@ const AdminDashboard: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Activities */}
         <Card className="p-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="mb-4">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
               Recent Activities
             </h3>
-            <Button variant="ghost" size="sm">
-              <Eye className="w-4 h-4 mr-2" />
-              View All
-            </Button>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              Latest platform updates and user activities
+            </p>
           </div>
           
           <div className="space-y-4">
@@ -406,18 +461,50 @@ const AdminDashboard: React.FC = () => {
                     <p className="text-sm font-medium text-gray-900 dark:text-white">
                       {activity.description}
                     </p>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">
-                      {formatDate(activity.timestamp)}
-                    </p>
+                    <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                      <span>{activity.userName || activity.user}</span>
+                      {activity.adminAction && (
+                        <span className="px-1.5 py-0.5 bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 rounded text-xs font-medium">
+                          Admin
+                        </span>
+                      )}
+                      {activity.courseName && (
+                        <>
+                          <span>•</span>
+                          <span className="truncate">{activity.courseName}</span>
+                        </>
+                      )}
+                      <span>•</span>
+                      <span>{formatDate(activity.timestamp)}</span>
+                    </div>
                   </div>
-                  <Badge variant="default" className="flex-shrink-0">
+                  <Badge 
+                    variant={
+                      activity.type === 'registration' ? 'info' :
+                      activity.type === 'submission' ? 'warning' :
+                      activity.type === 'approval' ? 'success' :
+                      activity.type === 'enrollment' ? 'info' :
+                      activity.type === 'completion' ? 'success' :
+                      activity.type === 'user_management' ? 'warning' :
+                      'default'
+                    } 
+                    className={
+                      activity.type === 'registration' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' :
+                      activity.type === 'submission' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300' :
+                      activity.type === 'approval' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' :
+                      activity.type === 'enrollment' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300' :
+                      activity.type === 'completion' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300' :
+                      activity.type === 'user_management' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300' :
+                      ''
+                    }
+                  >
                     {activity.type}
                   </Badge>
                 </div>
               ))
             ) : (
               <div className="text-center py-8">
-                <Activity className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <Activity className="mx-auto text-gray-400 mb-2" size={48} />
                 <p className="text-gray-600 dark:text-gray-400">
                   No recent activities
                 </p>
@@ -433,7 +520,6 @@ const AdminDashboard: React.FC = () => {
               Pending Course Approvals
             </h3>
             <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard/courses?status=submitted')}>
-              <Eye className="w-4 h-4 mr-2" />
               View All
             </Button>
           </div>
@@ -443,7 +529,7 @@ const AdminDashboard: React.FC = () => {
               stats.recent.pendingCourses.map((course) => (
                 <div key={course.id} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                   <div className="flex-shrink-0">
-                    <Clock className="w-4 h-4 text-yellow-500" />
+                    <Clock className="text-yellow-500" size={16} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
@@ -464,7 +550,7 @@ const AdminDashboard: React.FC = () => {
               ))
             ) : (
               <div className="text-center py-8">
-                <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-4" />
+                <CheckCircle2 className="mx-auto text-green-400 mb-2" size={48} />
                 <p className="text-gray-600 dark:text-gray-400">
                   No pending course approvals
                 </p>

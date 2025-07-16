@@ -28,7 +28,6 @@ const Landing: React.FC = () => {
       instructor: 'John Smith',
       students: 1250,
       rating: 4.8,
-      price: t('common.free') || 'Free',
       category: 'Programming'
     },
     {
@@ -38,7 +37,6 @@ const Landing: React.FC = () => {
       instructor: 'Sarah Johnson',
       students: 890,
       rating: 4.9,
-      price: t('common.free') || 'Free',
       category: 'Web Development'
     },
     {
@@ -48,7 +46,6 @@ const Landing: React.FC = () => {
       instructor: 'Mike Davis',
       students: 650,
       rating: 4.7,
-      price: t('common.free') || 'Free',
       category: 'Marketing'
     }
   ];
@@ -283,7 +280,7 @@ const Landing: React.FC = () => {
                       {course.category}
                     </span>
                     <span className="text-xs text-green-600 dark:text-green-400 font-medium bg-green-50 dark:bg-green-900/30 px-2 py-1 rounded-full">
-                      {course.price}
+                      Free
                     </span>
                   </div>
                   

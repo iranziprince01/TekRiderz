@@ -3,12 +3,10 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { LanguageProvider } from './contexts/LanguageContext';
+import { NetworkStatusProvider } from './contexts/NetworkStatusContext';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { NotificationManager } from './components/ui/NotificationManager';
 import ProtectedRoute from './components/ProtectedRoute';
-
-// Offline sync system
-import { offlineSync } from './utils/offlineSync';
 
 // Pages
 import Landing from './pages/Landing';
@@ -33,7 +31,7 @@ function App() {
         
         // Initialize service worker in production only
         if (import.meta.env.PROD && 'serviceWorker' in navigator) {
-          try {
+      try {
             const registration = await navigator.serviceWorker.register('/sw.js', {
               scope: '/'
             });
@@ -41,15 +39,6 @@ function App() {
           } catch (swError: any) {
             console.warn('⚠️ Service Worker registration failed:', swError?.message || 'Unknown error');
           }
-        }
-
-        // Initialize offline sync system
-        try {
-          // The sync system is already initialized via import, 
-          // it will automatically start monitoring and syncing
-          console.log('✅ Offline sync system initialized');
-        } catch (syncError: any) {
-          console.warn('⚠️ Offline sync initialization failed:', syncError?.message || 'Unknown error');
         }
 
         console.log('✅ App initialization completed successfully');
@@ -99,9 +88,10 @@ function App() {
     };
   }, []);
 
-  return (
+    return (
     <ErrorBoundary>
-      <ThemeProvider>
+      <NetworkStatusProvider>
+        <ThemeProvider>
         <LanguageProvider>
           <Router>
             <AuthProvider>
@@ -116,18 +106,18 @@ function App() {
                   <Route path="/verify-otp" element={<OTPVerify />} />
                   <Route path="/forgot-password" element={<ForgotPassword />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
-                  
+
                   {/* Protected routes */}
                   <Route path="/dashboard/*" element={
-                    <ProtectedRoute>
-                      <Dashboard />
-                    </ProtectedRoute>
+                      <ProtectedRoute>
+                        <Dashboard />
+                      </ProtectedRoute>
                   } />
                   
-                  <Route path="/course/:id" element={
-                    <ProtectedRoute>
-                      <Course />
-                    </ProtectedRoute>
+                  <Route path="/course/:id/*" element={
+                      <ProtectedRoute>
+                        <Course />
+                      </ProtectedRoute>
                   } />
                   
                   <Route path="/offline-course/:id" element={
@@ -143,11 +133,11 @@ function App() {
                   } />
                   
                   <Route path="/profile" element={
-                    <ProtectedRoute>
-                      <Profile />
-                    </ProtectedRoute>
+                      <ProtectedRoute>
+                        <Profile />
+                      </ProtectedRoute>
                   } />
-                  
+
                   {/* 404 */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>
@@ -155,7 +145,8 @@ function App() {
             </AuthProvider>
           </Router>
         </LanguageProvider>
-      </ThemeProvider>
+        </ThemeProvider>
+      </NetworkStatusProvider>
     </ErrorBoundary>
   );
 }

@@ -699,8 +699,9 @@ class ApiClient {
     });
   }
 
-  async deleteUser(userId: string): Promise<ApiResponse> {
-    return this.makeRequest(`/admin/users/${userId}`, {
+  async deleteUser(userId: string, force = false): Promise<ApiResponse> {
+    const url = `/admin/users/${userId}${force ? '?force=true' : ''}`;
+    return this.makeRequest(url, {
       method: 'DELETE',
     });
   }
@@ -738,8 +739,9 @@ class ApiClient {
     });
   }
 
-  async deleteAdminCourse(courseId: string): Promise<ApiResponse> {
-    return this.makeRequest(`/admin/courses/${courseId}`, {
+  async deleteAdminCourse(courseId: string, force = false): Promise<ApiResponse> {
+    const url = `/admin/courses/${courseId}${force ? '?force=true' : ''}`;
+    return this.makeRequest(url, {
       method: 'DELETE',
     });
   }

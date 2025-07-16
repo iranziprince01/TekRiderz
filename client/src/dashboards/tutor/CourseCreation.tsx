@@ -375,8 +375,7 @@ const CourseCreation: React.FC = () => {
       formData.append('category', courseData.category);
       formData.append('level', courseData.level);
       formData.append('language', 'en');
-      formData.append('price', '0');
-      formData.append('currency', 'USD');
+                      // All courses are free - no pricing data needed
       formData.append('status', 'draft');
       
       // Arrays as JSON strings

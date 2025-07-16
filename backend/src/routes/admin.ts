@@ -99,6 +99,164 @@ router.get('/stats', async (req: Request, res: Response) => {
       progressCount: progress.length
     });
 
+    // Generate diverse recent activities from multiple sources
+    const activities: Array<{
+      id: string;
+      type: string;
+      description: string;
+      user: string;
+      timestamp: string;
+      status: string;
+      courseName?: string;
+      userName?: string;
+      adminAction?: boolean;
+    }> = [];
+
+    // Add recent user registrations (only tutors and learners - admins are rare)
+    const recentUsers = users
+      .filter(u => u.createdAt && (u.role === 'tutor' || u.role === 'learner'))
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 3);
+
+    recentUsers.forEach((user, index) => {
+      activities.push({
+        id: `user-${user._id || index}`,
+        type: 'registration',
+        description: `New ${user.role} joined the platform`,
+        user: user.name || user.email?.split('@')[0] || 'Unknown User',
+        userName: user.name || user.email?.split('@')[0] || 'Unknown User',
+        timestamp: user.createdAt,
+        status: 'completed'
+      });
+    });
+
+    // Add recent user status changes (admin actions)
+    const recentStatusChanges = users
+      .filter(u => u.updatedAt && u.updatedAt !== u.createdAt)
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      .slice(0, 2);
+
+    recentStatusChanges.forEach((user, index) => {
+      const statusAction = user.status === 'active' ? 'activated' : 
+                          user.status === 'inactive' ? 'deactivated' : 
+                          user.status === 'suspended' ? 'suspended' : 'updated';
+      
+      activities.push({
+        id: `user-status-${user._id || index}`,
+        type: 'user_management',
+        description: `User account ${statusAction}`,
+        user: user.name || user.email?.split('@')[0] || 'Unknown User',
+        userName: user.name || user.email?.split('@')[0] || 'Unknown User',
+        timestamp: user.updatedAt,
+        status: user.status === 'active' ? 'completed' : 'pending',
+        adminAction: true
+      });
+    });
+
+    // Add recent course submissions (important tutor activity)
+    const recentCourseSubmissions = courses
+      .filter(c => c.status === 'submitted' && c.submittedAt)
+      .sort((a, b) => new Date(b.submittedAt!).getTime() - new Date(a.submittedAt!).getTime())
+      .slice(0, 2); // Limit to avoid spam
+
+    for (const course of recentCourseSubmissions) {
+      try {
+        const instructor = users.find(u => u._id === course.instructorId);
+        activities.push({
+          id: `course-submit-${course._id}`,
+          type: 'submission',
+          description: `Course submitted for approval`,
+          user: instructor?.name || instructor?.email?.split('@')[0] || 'Unknown Instructor',
+          userName: instructor?.name || instructor?.email?.split('@')[0] || 'Unknown Instructor',
+          courseName: course.title,
+          timestamp: course.submittedAt!,
+          status: 'pending'
+        });
+      } catch (err) {
+        // Skip if instructor not found
+      }
+    }
+
+    // Add recent course approvals (important admin activity)
+    const recentApprovals = courses
+      .filter(c => c.status === 'published' && c.approvedAt)
+      .sort((a, b) => new Date(b.approvedAt!).getTime() - new Date(a.approvedAt!).getTime())
+      .slice(0, 2); // Limit to key events
+
+    for (const course of recentApprovals) {
+      try {
+        const instructor = users.find(u => u._id === course.instructorId);
+        activities.push({
+          id: `course-approve-${course._id}`,
+          type: 'approval',
+          description: `Course approved and published`,
+          user: instructor?.name || instructor?.email?.split('@')[0] || 'Unknown Instructor',
+          userName: instructor?.name || instructor?.email?.split('@')[0] || 'Unknown Instructor',
+          courseName: course.title,
+          timestamp: course.approvedAt!,
+          status: 'completed',
+          adminAction: true
+        });
+      } catch (err) {
+        // Skip if instructor not found
+      }
+    }
+
+    // Add recent enrollments (important learner activity) - but limit to avoid spam
+    const recentEnrollments = enrollments
+      .filter(e => e.createdAt)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 3); // Reduced from 4 to 3
+
+    for (const enrollment of recentEnrollments) {
+      try {
+        const user = users.find(u => u._id === enrollment.userId);
+        const course = courses.find(c => c._id === enrollment.courseId);
+        activities.push({
+          id: `enrollment-${enrollment._id}`,
+          type: 'enrollment',
+          description: `Learner enrolled in course`,
+          user: user?.name || user?.email?.split('@')[0] || 'Unknown Student',
+          userName: user?.name || user?.email?.split('@')[0] || 'Unknown Student',
+          courseName: course?.title || 'Unknown Course',
+          timestamp: enrollment.createdAt,
+          status: 'completed'
+        });
+      } catch (err) {
+        // Skip if user or course not found
+      }
+    }
+
+    // Add recent course completions (achievement milestones only)
+    const completedEnrollments = enrollments
+      .filter(e => e.status === 'completed' && e.completedAt)
+      .sort((a, b) => new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime())
+      .slice(0, 2); // Reduced from 3 to 2 - only major achievements
+
+    for (const enrollment of completedEnrollments) {
+      try {
+        const user = users.find(u => u._id === enrollment.userId);
+        const course = courses.find(c => c._id === enrollment.courseId);
+        activities.push({
+          id: `completion-${enrollment._id}`,
+          type: 'completion',
+          description: `Learner completed course`,
+          user: user?.name || user?.email?.split('@')[0] || 'Unknown Student',
+          userName: user?.name || user?.email?.split('@')[0] || 'Unknown Student',
+          courseName: course?.title || 'Unknown Course',
+          timestamp: enrollment.completedAt!,
+          status: 'completed'
+        });
+      } catch (err) {
+        // Skip if user or course not found
+      }
+    }
+
+    // Sort all activities by timestamp (most recent first) and take top 8 to avoid overwhelming
+    const sortedActivities = activities
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, 8); // Reduced from 10 to 8 for better performance
+
     const stats = {
       overview: {
         totalUsers: users.length,
@@ -136,15 +294,14 @@ router.get('/stats', async (req: Request, res: Response) => {
         activeUsers: progress.filter((p: Progress) => p.timeSpent > 0).length,
       },
       recent: {
-        activities: enrollments.slice(0, 5).map((enrollment: Enrollment, index: number) => ({
-          id: enrollment._id || `activity-${index}`,
-          type: 'enrollment' as const,
-          description: 'User enrolled in course',
-          user: enrollment.userId || 'Unknown',
-          timestamp: enrollment.createdAt || new Date().toISOString(),
-          status: 'completed' as const,
+        activities: sortedActivities,
+        pendingCourses: courses.filter((c: Course) => c.status === 'submitted').slice(0, 5).map(course => ({
+          id: course._id,
+          title: course.title,
+          instructorName: users.find(u => u._id === course.instructorId)?.name || 'Unknown Instructor',
+          submittedAt: course.submittedAt || course.createdAt,
+          status: course.status
         })),
-        pendingCourses: courses.filter((c: Course) => c.status === 'submitted').slice(0, 5),
       }
     };
 
@@ -1526,6 +1683,9 @@ router.get('/analytics', async (req: Request, res: Response) => {
 router.delete('/users/:userId', async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId } = req.params;
+    const { force = false } = req.query; // Allow force deletion
+
+    logger.info('Admin delete user request:', { userId, force });
 
     if (!userId) {
       res.status(400).json({
@@ -1535,8 +1695,24 @@ router.delete('/users/:userId', async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    const user = await userModel.findById(userId);
+    let user = await userModel.findById(userId);
+    
+    // If not found by direct ID, try to find in all users (as a fallback)
     if (!user) {
+      logger.warn('User not found by direct ID, trying fallback search:', { userId });
+      try {
+        const allUsers = await userModel.getAllUsers();
+        user = allUsers.find(u => u._id === userId || u.id === userId) || null;
+        if (user) {
+          logger.info('Found user via fallback search:', { userId, foundId: user._id });
+        }
+      } catch (fallbackError) {
+        logger.error('Fallback user search failed:', fallbackError);
+      }
+    }
+    
+    if (!user) {
+      logger.warn('User not found for deletion after all attempts:', { userId });
       res.status(404).json({
         success: false,
         message: 'User not found',
@@ -1544,32 +1720,90 @@ router.delete('/users/:userId', async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    // Don't allow deletion of admin users
-    if (user.role === 'admin') {
+    // Don't allow deletion of admin users unless forced
+    if (user.role === 'admin' && !force) {
       res.status(403).json({
         success: false,
-        message: 'Cannot delete admin users',
+        message: 'Cannot delete admin users. Use force=true to delete anyway.',
       });
       return;
     }
 
-    // Soft delete by setting status to inactive
-    await userModel.update(userId, { status: 'inactive' });
+    // Check if user has enrollments or courses
+    let hasConstraints = false;
+    const constraintDetails = [];
 
-    logger.info('User deactivated', {
+    try {
+      // Check if user is a tutor with courses
+      if (user.role === 'tutor') {
+        const coursesResult = await courseModel.findAll({ limit: 1000 });
+        const tutorCourses = coursesResult.docs.filter((course: any) => course.instructorId === userId);
+        
+        if (tutorCourses.length > 0) {
+          hasConstraints = true;
+          constraintDetails.push(`${tutorCourses.length} courses as instructor`);
+        }
+      }
+
+      // Check if user has enrollments
+      if (user.role === 'learner') {
+        const enrollmentsResult = await enrollmentModel.findAll({ limit: 1000 });
+        const userEnrollments = enrollmentsResult.docs.filter((enrollment: any) => enrollment.userId === userId);
+        
+        if (userEnrollments.length > 0) {
+          hasConstraints = true;
+          constraintDetails.push(`${userEnrollments.length} course enrollments`);
+        }
+      }
+    } catch (checkError) {
+      logger.warn('Failed to check user constraints during deletion:', checkError);
+    }
+
+    // If user has constraints and not forced, return error
+    if (hasConstraints && !force) {
+      res.status(400).json({
+        success: false,
+        message: `User has associated data and cannot be deleted. Use force=true to delete anyway.`,
+        data: {
+          constraints: constraintDetails,
+          suggestion: 'Consider deactivating the user instead of deleting'
+        }
+      });
+      return;
+    }
+
+    // Proceed with actual deletion from CouchDB using the user's _id
+    const actualUserId = user._id || userId;
+    logger.info('Attempting to delete user:', { userId, actualUserId, userName: user.name });
+    
+    const deleted = await userModel.delete(actualUserId);
+    
+    if (!deleted) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to delete user from database',
+      });
+      return;
+    }
+
+    logger.info('User deleted by admin', {
       userId,
+      userName: user.name,
+      userRole: user.role,
+      force,
+      constraints: constraintDetails,
       adminId: (req as any).user.id,
     });
 
     res.json({
       success: true,
-      message: 'User deactivated successfully',
+      message: force ? 'User force deleted successfully' : 'User deleted successfully',
     });
   } catch (error) {
-    logger.error('Failed to deactivate user', { error });
+    logger.error('Failed to delete user', { error });
     res.status(500).json({
       success: false,
-      message: 'Failed to deactivate user',
+      message: 'Failed to delete user',
     });
   }
 });
