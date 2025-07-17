@@ -125,7 +125,7 @@ const AdminDashboard: React.FC = () => {
       loadDashboardStats(false);
     } else {
       // Only show loading if no cached data
-      loadDashboardStats();
+    loadDashboardStats();
     }
   }, []);
 
@@ -251,85 +251,85 @@ const AdminDashboard: React.FC = () => {
           className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105"
           onClick={() => navigate('/dashboard/users')}
         >
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Total Users
-                </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {stats.overview.totalUsers}
-                </p>
-              </div>
-              <div className="bg-blue-100 dark:bg-blue-900/20 p-3 rounded-full">
+        <Card className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                Total Users
+              </p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                {stats.overview.totalUsers}
+              </p>
+            </div>
+            <div className="bg-blue-100 dark:bg-blue-900/20 p-3 rounded-full">
                 <Users className="text-blue-600 dark:text-blue-400" size={24} />
               </div>
             </div>
           </Card>
-        </div>
+          </div>
 
         <div 
           className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105"
           onClick={() => navigate('/dashboard/courses')}
         >
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Total Courses
-                </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {stats.overview.totalCourses}
-                </p>
-              </div>
+        <Card className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                Total Courses
+              </p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                {stats.overview.totalCourses}
+              </p>
+            </div>
               <div className="bg-blue-200 dark:bg-blue-800/30 p-3 rounded-full">
                 <BookOpen className="text-blue-500 dark:text-blue-300" size={24} />
               </div>
             </div>
           </Card>
-        </div>
+          </div>
 
         <div 
           className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105"
           onClick={() => navigate('/dashboard/users')}
         >
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Active Users
-                </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {stats.overview.activeUsers}
-                </p>
-              </div>
+        <Card className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                Active Users
+              </p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                {stats.overview.activeUsers}
+              </p>
+            </div>
               <div className="bg-blue-300 dark:bg-blue-700/40 p-3 rounded-full">
                 <CheckCircle className="text-blue-400 dark:text-blue-200" size={24} />
               </div>
             </div>
           </Card>
-        </div>
+          </div>
 
         <div 
           className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105"
           onClick={() => navigate('/dashboard/courses')}
         >
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Total Enrollments
-                </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {stats.overview.totalEnrollments}
-                </p>
-              </div>
+        <Card className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                Total Enrollments
+              </p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                {stats.overview.totalEnrollments}
+              </p>
+            </div>
               <div className="bg-blue-400 dark:bg-blue-600/50 p-3 rounded-full">
                 <GraduationCap className="text-blue-300 dark:text-blue-100" size={24} />
               </div>
             </div>
           </Card>
-        </div>
+          </div>
       </div>
 
       {/* Management Cards */}
@@ -542,7 +542,7 @@ const AdminDashboard: React.FC = () => {
                   <Button 
                     variant="ghost" 
                     size="sm"
-                    onClick={() => navigate(`/course/${course.id}`)}
+                    onClick={() => navigate(`/course/${course._id || course.id}`)}
                   >
                     Review
                   </Button>

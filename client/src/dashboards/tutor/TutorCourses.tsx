@@ -38,7 +38,7 @@ interface Course {
   description: string;
   category: string;
   level: 'beginner' | 'intermediate' | 'advanced';
-  status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'published';
+  status: 'draft' | 'submitted' | 'pending' | 'approved' | 'rejected' | 'published';
   students: number;
   enrollmentCount?: number;
   rating: {
@@ -152,7 +152,7 @@ const TutorCourses: React.FC = () => {
         const calculatedStats: CourseStats = {
           total: safeProcessedCourses.length,
           approved: safeProcessedCourses.filter((c: Course) => c.status === 'approved' || c.status === 'published').length,
-          pending: safeProcessedCourses.filter((c: Course) => c.status === 'submitted').length,
+          pending: safeProcessedCourses.filter((c: Course) => c.status === 'pending' || c.status === 'submitted').length,
           draft: safeProcessedCourses.filter((c: Course) => c.status === 'draft').length,
           rejected: safeProcessedCourses.filter((c: Course) => c.status === 'rejected').length,
           enrollments: safeProcessedCourses.reduce((sum: number, course: Course) => sum + course.students, 0),
@@ -319,7 +319,7 @@ const TutorCourses: React.FC = () => {
     setSelectedCourse(course);
 
     if (action === 'edit') {
-      navigate(`/tutor/courses/${courseId}/edit`);
+      navigate(`/dashboard/courses/edit/${courseId}`);
     } else if (action === 'view') {
       navigate(`/course/${courseId}`);
     } else if (action === 'details') {
@@ -403,6 +403,7 @@ const TutorCourses: React.FC = () => {
     const variants = {
       draft: 'info',
       submitted: 'warning',
+      pending: 'warning',
       approved: 'success',
       published: 'success',
       rejected: 'error',
@@ -411,6 +412,7 @@ const TutorCourses: React.FC = () => {
     const labels = {
       draft: language === 'rw' ? 'Igishushanyo' : 'Draft',
       submitted: language === 'rw' ? 'Bitegereye' : 'Under Review',
+      pending: language === 'rw' ? 'Bitegereje' : 'Pending',
       approved: language === 'rw' ? 'Byemejwe' : 'Published',
       published: language === 'rw' ? 'Byatangajwe' : 'Published',
       rejected: language === 'rw' ? 'Byanze' : 'Rejected',
@@ -478,8 +480,8 @@ const TutorCourses: React.FC = () => {
         </p>
         <div className="mt-6">
           <Button 
-            onClick={() => navigate('/tutor/create-course')}
-            className="bg-purple-600 hover:bg-purple-700"
+            onClick={() => navigate('/dashboard/courses/new')}
+            className="bg-blue-600 hover:bg-blue-700"
           >
             <Plus className="w-4 h-4 mr-2" />
             {language === 'rw' ? 'Kora Isomo' : 'Create Course'}
@@ -530,112 +532,68 @@ const TutorCourses: React.FC = () => {
             )}
           </div>
           </div>
-        <div className="flex items-center space-x-3">
-          <Button
-            variant="outline"
-            onClick={() => loadCourses(true)}
-            disabled={refreshing}
-          >
-            {refreshing ? (
-              <LoadingSpinner size="sm" />
-            ) : (
-              <RefreshCw className="w-4 h-4 mr-2" />
-            )}
-            {language === 'rw' ? 'Koresha' : 'Refresh'}
-          </Button>
-          <Button 
-            onClick={() => navigate('/tutor/create-course')}
-            className="bg-purple-600 hover:bg-purple-700"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            {language === 'rw' ? 'Kora Isomo' : 'Create Course'}
-          </Button>
-        </div>
+        <Button 
+          onClick={() => navigate('/dashboard/courses/new')}
+          className="bg-blue-600 hover:bg-blue-700"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          {language === 'rw' ? 'Kora Isomo' : 'Create Course'}
+        </Button>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                {language === 'rw' ? 'Amasomo yose' : 'Total Courses'}
-              </p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
-            </div>
-            <div className="bg-blue-100 dark:bg-blue-900 p-3 rounded-full">
-              <BookOpen className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-            </div>
+        <Card className="p-5 hover:shadow-lg transition-shadow border-2 hover:border-blue-300 dark:hover:border-blue-600">
+          <div className="text-center">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+              {language === 'rw' ? 'Amasomo yose' : 'Total Courses'}
+            </p>
+            <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.total}</p>
           </div>
         </Card>
         
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                {language === 'rw' ? 'Byemejwe' : 'Approved'}
-              </p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.approved}</p>
-            </div>
-            <div className="bg-green-100 dark:bg-green-900 p-3 rounded-full">
-              <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
-            </div>
+        <Card className="p-5 hover:shadow-lg transition-shadow border-2 hover:border-blue-300 dark:hover:border-blue-600">
+          <div className="text-center">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+              {language === 'rw' ? 'Byemejwe' : 'Approved'}
+            </p>
+            <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.approved}</p>
           </div>
         </Card>
         
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                {language === 'rw' ? 'Bitegereje' : 'Pending'}
-              </p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.pending}</p>
-            </div>
-            <div className="bg-yellow-100 dark:bg-yellow-900 p-3 rounded-full">
-              <Clock className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
-            </div>
+        <Card className="p-5 hover:shadow-lg transition-shadow border-2 hover:border-blue-300 dark:hover:border-blue-600">
+          <div className="text-center">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+              {language === 'rw' ? 'Bitegereje' : 'Pending'}
+            </p>
+            <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.pending}</p>
           </div>
         </Card>
         
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                {language === 'rw' ? 'Igishushanyo' : 'Draft'}
-              </p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.draft}</p>
-            </div>
-            <div className="bg-gray-100 dark:bg-gray-900 p-3 rounded-full">
-              <Edit className="h-6 w-6 text-gray-600 dark:text-gray-400" />
-            </div>
+        <Card className="p-5 hover:shadow-lg transition-shadow border-2 hover:border-blue-300 dark:hover:border-blue-600">
+          <div className="text-center">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+              {language === 'rw' ? 'Igishushanyo' : 'Draft'}
+            </p>
+            <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.draft}</p>
           </div>
         </Card>
         
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                {language === 'rw' ? 'Byanze' : 'Rejected'}
-              </p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.rejected}</p>
-            </div>
-            <div className="bg-red-100 dark:bg-red-900 p-3 rounded-full">
-              <XCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
-            </div>
+        <Card className="p-5 hover:shadow-lg transition-shadow border-2 hover:border-blue-300 dark:hover:border-blue-600">
+          <div className="text-center">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+              {language === 'rw' ? 'Byanze' : 'Rejected'}
+            </p>
+            <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.rejected}</p>
           </div>
         </Card>
         
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                {language === 'rw' ? 'Abanyeshuri' : 'Enrollments'}
-              </p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.enrollments}</p>
-            </div>
-            <div className="bg-purple-100 dark:bg-purple-900 p-3 rounded-full">
-              <Users className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-            </div>
+        <Card className="p-5 hover:shadow-lg transition-shadow border-2 hover:border-blue-300 dark:hover:border-blue-600">
+          <div className="text-center">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+              {language === 'rw' ? 'Abanyeshuri' : 'Enrollments'}
+            </p>
+            <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.enrollments}</p>
           </div>
         </Card>
       </div>
@@ -653,14 +611,15 @@ const TutorCourses: React.FC = () => {
               className="pl-10"
             />
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-6">
             <select 
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+              className="px-6 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white min-w-[140px]"
             >
               <option value="all">{language === 'rw' ? 'Imiterere yose' : 'All Status'}</option>
               <option value="draft">{language === 'rw' ? 'Igishushanyo' : 'Draft'}</option>
+              <option value="pending">{language === 'rw' ? 'Bitegereje' : 'Pending'}</option>
               <option value="submitted">{language === 'rw' ? 'Bitegereye' : 'Under Review'}</option>
               <option value="published">{language === 'rw' ? 'Byatangajwe' : 'Published'}</option>
               <option value="rejected">{language === 'rw' ? 'Byanze' : 'Rejected'}</option>
@@ -668,7 +627,7 @@ const TutorCourses: React.FC = () => {
             <select 
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+              className="px-6 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white min-w-[140px]"
             >
               <option value="all">{language === 'rw' ? 'Ibyiciro byose' : 'All Categories'}</option>
               <option value="programming">Programming</option>
@@ -683,8 +642,8 @@ const TutorCourses: React.FC = () => {
       {/* Courses Grid */}
       {filteredCourses.length === 0 ? (
         <Card className="p-12 text-center">
-          <div className="mx-auto h-24 w-24 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center mb-6">
-            <BookOpen className="h-12 w-12 text-purple-600 dark:text-purple-400" />
+          <div className="mx-auto h-24 w-24 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center mb-6">
+            <BookOpen className="h-12 w-12 text-blue-600 dark:text-blue-400" />
           </div>
           <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
             {searchTerm || statusFilter !== 'all' || categoryFilter !== 'all' 
@@ -702,8 +661,8 @@ const TutorCourses: React.FC = () => {
           {!searchTerm && statusFilter === 'all' && categoryFilter === 'all' && (
             <div className="space-y-4">
               <Button 
-                onClick={() => navigate('/tutor/create-course')}
-                className="bg-purple-600 hover:bg-purple-700"
+                onClick={() => navigate('/dashboard/courses/new')}
+                className="bg-blue-600 hover:bg-blue-700"
                 size="lg"
               >
                 <Plus className="w-5 h-5 mr-2" />
@@ -741,7 +700,7 @@ const TutorCourses: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredCourses.map((course) => (
-            <div key={course.id} onClick={() => openCoursePage(course.id)} className="cursor-pointer">
+            <div key={course.id} onClick={() => openCoursePage(course._id || course.id)} className="cursor-pointer">
               <Card className="bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden border border-gray-200 dark:border-gray-700 flex flex-col h-full">
                 {/* Course Thumbnail */}
                 <div className="relative h-32 bg-gray-100 dark:bg-gray-700 flex-shrink-0">
@@ -800,7 +759,7 @@ const TutorCourses: React.FC = () => {
                                 key={star}
                                 className={`h-3 w-3 ${
                                   star <= Math.floor(ratingValue)
-                                    ? 'text-yellow-400 fill-current'
+                                    ? 'text-blue-400 fill-current'
                                     : 'text-gray-300 dark:text-gray-600'
                                 }`}
                               />
@@ -824,7 +783,7 @@ const TutorCourses: React.FC = () => {
                   <div className="flex items-center justify-between mt-auto">
                     {/* Price */}
                     <div>
-                      <span className="text-sm font-bold text-green-600 dark:text-green-400">
+                      <span className="text-sm font-bold text-blue-600 dark:text-blue-400">
                         {language === 'rw' ? 'Ubuntu!' : 'Free'}
                       </span>
                       <div className="text-xs text-gray-500 dark:text-gray-400">
@@ -847,7 +806,7 @@ const TutorCourses: React.FC = () => {
                         variant="outline"
                         size="sm"
                         onClick={() => handleCourseAction(course.id, 'edit')}
-                        className="text-xs px-3 py-1.5 hover:bg-purple-50 hover:border-purple-300 hover:text-purple-600 dark:hover:bg-purple-900/20"
+                        className="text-xs px-3 py-1.5 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 dark:hover:bg-blue-900/20"
                       >
                         <Edit className="h-3 w-3 mr-1" />
                         {language === 'rw' ? 'Hindura' : 'Edit'}
@@ -861,70 +820,7 @@ const TutorCourses: React.FC = () => {
         </div>
       )}
 
-      {/* Quick Actions */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-          {language === 'rw' ? 'Ibikorwa byihuse' : 'Quick Actions'}
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <button 
-            onClick={() => navigate('/tutor/create-course')}
-            className="p-4 text-left border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-          >
-            <div className="flex items-center">
-              <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center mr-3">
-                <Plus className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-              </div>
-              <div>
-                <div className="text-sm font-medium text-gray-900 dark:text-white">
-                  {language === 'rw' ? 'Kora isomo rishya' : 'Create New Course'}
-                </div>
-                <div className="text-sm text-gray-500 dark:text-gray-400">
-                  {language === 'rw' ? 'Tangira ukore isomo rishya' : 'Start building your next course'}
-                </div>
-              </div>
-            </div>
-          </button>
-          
-          <button 
-            onClick={() => navigate('/tutor/students')}
-            className="p-4 text-left border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-          >
-            <div className="flex items-center">
-              <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center mr-3">
-                <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              </div>
-              <div>
-                <div className="text-sm font-medium text-gray-900 dark:text-white">
-                  {language === 'rw' ? 'Reba abanyeshuri' : 'View Students'}
-                </div>
-                <div className="text-sm text-gray-500 dark:text-gray-400">
-                  {language === 'rw' ? 'Kugenzura iterambere ry\'abanyeshuri' : 'Check student progress'}
-                </div>
-              </div>
-            </div>
-          </button>
-          
-          <button 
-            onClick={() => navigate('/tutor/analytics')}
-            className="p-4 text-left border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-          >
-            <div className="flex items-center">
-              <div className="w-10 h-10 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center mr-3">
-                <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
-              </div>
-              <div>
-                <div className="text-sm font-medium text-gray-900 dark:text-white">
-                  {language === 'rw' ? 'Ipiganwa n\'ibaruwa' : 'Course Analytics'}
-                </div>
-                <div className="text-sm text-gray-500 dark:text-gray-400">
-                  {language === 'rw' ? 'Reba imikorere y\'amasomo yawe' : 'View performance metrics'}
-                </div>
-              </div>
-            </div>
-          </button>
-        </div>
-      </Card>
+
       {/* Enhanced Course Details Modal */}
       {showDetailsModal && selectedCourse && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">

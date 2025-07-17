@@ -125,7 +125,7 @@ const AdminUsers: React.FC = () => {
       loadUsers(1, false);
     } else {
       // Only show loading if no cached data
-      loadUsers();
+    loadUsers();
     }
   }, []);
 
@@ -155,7 +155,7 @@ const AdminUsers: React.FC = () => {
   const loadUsers = async (page = 1, showLoader = true) => {
     try {
       if (showLoader && users.length === 0) { // Only show loader if no existing data
-        setLoading(true);
+      setLoading(true);
       }
       // setError(''); // Removed as per new_code
 
@@ -365,15 +365,15 @@ const AdminUsers: React.FC = () => {
           >
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">
-                {toast.message}
-              </p>
-            </div>
-            <button
-              onClick={() => removeToast(toast.id)}
+                    {toast.message}
+                  </p>
+                </div>
+                  <button
+                    onClick={() => removeToast(toast.id)}
               className="ml-3 flex-shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-            >
+                  >
               ×
-            </button>
+                  </button>
           </div>
         ))}
       </div>
@@ -486,13 +486,13 @@ const AdminUsers: React.FC = () => {
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="flex-1">
-          <Input
-            type="text"
-            placeholder="Search users by name or email..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            <Input
+              type="text"
+              placeholder="Search users by name or email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full"
-          />
+            />
         </div>
         
         <select
@@ -505,7 +505,7 @@ const AdminUsers: React.FC = () => {
           <option value="tutor">Tutor</option>
           <option value="learner">Learner</option>
         </select>
-
+        
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
@@ -738,11 +738,11 @@ const AdminUsers: React.FC = () => {
                   >
                     {actionLoading.includes(selectedUser.id) ? (
                       <LoadingSpinner size="sm" />
-                                          ) : selectedUser.status === 'active' ? (
+                    ) : selectedUser.status === 'active' ? (
                         'Deactivate'
-                      ) : (
+                    ) : (
                         'Activate'
-                      )}
+                    )}
                   </Button>
                   
                   <Button
@@ -753,9 +753,9 @@ const AdminUsers: React.FC = () => {
                   >
                     {actionLoading.includes(selectedUser.id) ? (
                       <LoadingSpinner size="sm" />
-                                          ) : (
+                    ) : (
                         'Delete User'
-                      )}
+                    )}
                   </Button>
                 </div>
               </div>

@@ -21,16 +21,20 @@ export class UserModel extends BaseModel<User> {
   }
 
   // Create user with proper type validation
-  async create(userData: Omit<User, '_id' | '_rev' | 'createdAt' | 'updatedAt'>): Promise<User> {
+  async create(userData: Omit<User, '_id' | '_rev' | 'createdAt' | 'updatedAt' | 'id'>): Promise<User> {
     try {
       logger.info('Creating user', { email: userData.email, role: userData.role });
 
       // Hash the password before saving
       const hashedPassword = await this.hashPassword(userData.password);
       
+      // Generate ID that will be used for both _id and id fields
+      const userId = this.generateId();
+      
       // Set default values
       const userWithDefaults = {
         ...userData,
+        id: userId, // Set id field to match what will be the _id
         password: hashedPassword, // Use hashed password
         type: 'user' as const,
         status: userData.status || 'active', // Default to active for verified users
@@ -61,10 +65,22 @@ export class UserModel extends BaseModel<User> {
         ...(userData.lastLogin && { lastLogin: userData.lastLogin }),
       };
 
-      const createdUser = await super.create(userWithDefaults);
+      // Override the BaseModel create to use our specific ID
+      const now = new Date().toISOString();
+      const doc = {
+        ...userWithDefaults,
+        _id: userId, // Use the same ID for both _id and id
+        createdAt: now,
+        updatedAt: now,
+      } as User;
+
+      const result = await this.db.insert(doc);
       
-      // Ensure id field matches _id field
-      createdUser.id = createdUser._id!;
+      const createdUser = {
+        ...doc,
+        _id: result.id,
+        _rev: result.rev,
+      } as User;
       
       logger.info('User created successfully', { 
         userId: createdUser.id, 

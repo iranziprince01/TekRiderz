@@ -37,19 +37,19 @@ const MinimizedSidebar: React.FC<MinimizedSidebarProps> = ({ isOpen = false, onC
         },
         { 
           name: language === 'rw' ? 'Abakoresha' : 'Users', 
-          href: '/admin/users', 
+          href: '/dashboard/users', 
           icon: Users,
           gradient: 'from-green-500 to-emerald-500'
         },
         { 
           name: language === 'rw' ? 'Amasomo' : 'Courses', 
-          href: '/admin/courses', 
+          href: '/dashboard/courses', 
           icon: BookOpen,
           gradient: 'from-orange-500 to-red-500'
         },
         { 
           name: language === 'rw' ? 'Umwirondoro' : 'Profile', 
-          href: '/profile', 
+          href: '/dashboard/profile', 
           icon: User,
           gradient: 'from-purple-500 to-pink-500'
         }
@@ -66,19 +66,19 @@ const MinimizedSidebar: React.FC<MinimizedSidebarProps> = ({ isOpen = false, onC
         },
         { 
           name: language === 'rw' ? 'Amasomo Yanjye' : 'My Courses', 
-          href: '/tutor/courses', 
+          href: '/dashboard/courses', 
           icon: BookOpen,
           gradient: 'from-orange-500 to-red-500'
         },
         { 
           name: language === 'rw' ? 'Kora Isomo' : 'Create Course', 
-          href: '/tutor/create-course', 
+          href: '/dashboard/courses/new', 
           icon: Upload,
           gradient: 'from-green-500 to-emerald-500'
         },
         { 
           name: language === 'rw' ? 'Umwirondoro' : 'Profile', 
-          href: '/profile', 
+          href: '/dashboard/profile', 
           icon: User,
           gradient: 'from-purple-500 to-pink-500'
         }
@@ -95,13 +95,13 @@ const MinimizedSidebar: React.FC<MinimizedSidebarProps> = ({ isOpen = false, onC
       },
       { 
         name: language === 'rw' ? 'Amasomo Yanjye' : 'My Courses', 
-        href: '/learner/courses', 
+        href: '/dashboard/courses', 
         icon: BookOpen,
         gradient: 'from-orange-500 to-red-500'
       },
       { 
         name: language === 'rw' ? 'Umwirondoro' : 'Profile', 
-        href: '/profile', 
+        href: '/dashboard/profile', 
         icon: User,
         gradient: 'from-purple-500 to-pink-500'
       }

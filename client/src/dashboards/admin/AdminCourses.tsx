@@ -243,7 +243,7 @@ const AdminCourses: React.FC = () => {
       addToast({
         type: 'error',
         title: 'Error',
-        message: 'Course must be in pending or submitted status to approve'
+        message: 'Course must be in pending status to approve'
       });
       return;
     }
@@ -365,6 +365,7 @@ const AdminCourses: React.FC = () => {
     const configs = {
       draft: { variant: 'default' as const, label: 'Draft' },
       submitted: { variant: 'default' as const, label: 'Pending' },
+      pending: { variant: 'default' as const, label: 'Pending' },
       approved: { variant: 'default' as const, label: 'Approved' },
       published: { variant: 'default' as const, label: 'Published' },
       rejected: { variant: 'default' as const, label: 'Rejected' },
@@ -543,10 +544,8 @@ const AdminCourses: React.FC = () => {
             <option value="">All Categories</option>
             <option value="programming">Programming</option>
             <option value="design">Design</option>
-            <option value="marketing">Marketing</option>
-            <option value="business">Business</option>
-            <option value="photography">Photography</option>
-            <option value="music">Music</option>
+            <option value="business_tech">Business Tech</option>
+            <option value="general_it">General IT</option>
           </select>
 
           <select
@@ -571,7 +570,7 @@ const AdminCourses: React.FC = () => {
               <div>
                 <h3 
                   className="font-semibold text-lg text-gray-900 dark:text-white line-clamp-2 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                  onClick={() => openCoursePage(course.id)}
+                  onClick={() => openCoursePage(course._id || course.id)}
                 >
                   {course.title}
                 </h3>
@@ -590,7 +589,7 @@ const AdminCourses: React.FC = () => {
 
               {/* Action Buttons */}
               <div className="flex justify-end gap-2">
-                {(course.status === 'submitted' || course.status === 'pending') && (
+                {(course.status === 'pending' || course.status === 'submitted') && (
                   <>
                     <div className="relative">
                       <button
@@ -644,10 +643,10 @@ const AdminCourses: React.FC = () => {
                   </>
                 )}
                 
-                {course.status !== 'submitted' && course.status !== 'pending' && (
+                {(course.status !== 'pending' && course.status !== 'submitted') && (
                   <div className="relative">
                     <button
-                      onClick={() => openCoursePage(course.id)}
+                      onClick={() => openCoursePage(course._id || course.id)}
                       className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
                       onMouseEnter={() => setHoveredButton(`view-${course.id}`)}
                       onMouseLeave={() => setHoveredButton('')}

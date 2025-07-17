@@ -507,10 +507,10 @@ class ApiClient {
     });
   }
 
-  async resetPassword(token: string, password: string): Promise<ApiResponse> {
+  async resetPassword(email: string, otp: string, newPassword: string): Promise<ApiResponse> {
     return this.makeRequest('/auth/reset-password', {
       method: 'POST',
-      body: JSON.stringify({ token, password }),
+      body: JSON.stringify({ email, otp, newPassword }),
     });
   }
 
@@ -1024,7 +1024,7 @@ export const logout = () => apiClient.logout();
 export const verifyOTP = (email: string, otp: string) => apiClient.verifyOTP(email, otp);
 export const resendOTP = (email: string) => apiClient.resendOTP(email);
 export const forgotPassword = (email: string) => apiClient.forgotPassword(email);
-export const resetPassword = (token: string, password: string) => apiClient.resetPassword(token, password);
+export const resetPassword = (email: string, otp: string, newPassword: string) => apiClient.resetPassword(email, otp, newPassword);
 
 export const getCurrentUser = () => apiClient.getCurrentUser();
 export const updateProfile = (userData: any) => apiClient.updateProfile(userData);

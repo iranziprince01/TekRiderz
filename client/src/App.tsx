@@ -14,7 +14,6 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import OTPVerify from './pages/OTPVerify';
 import ForgotPassword from './pages/ForgotPassword';
-import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import Course from './pages/Course';
 import OfflineCourse from './pages/OfflineCourse';
@@ -88,11 +87,11 @@ function App() {
     };
   }, []);
 
-    return (
+  return (
     <ErrorBoundary>
       <NetworkStatusProvider>
-        <ThemeProvider>
-        <LanguageProvider>
+      <ThemeProvider>
+      <LanguageProvider>
           <Router>
             <AuthProvider>
               <div className="App">
@@ -105,7 +104,6 @@ function App() {
                   <Route path="/signup" element={<Signup />} />
                   <Route path="/verify-otp" element={<OTPVerify />} />
                   <Route path="/forgot-password" element={<ForgotPassword />} />
-                  <Route path="/reset-password" element={<ResetPassword />} />
 
                   {/* Protected routes */}
                   <Route path="/dashboard/*" element={

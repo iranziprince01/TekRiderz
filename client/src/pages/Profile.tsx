@@ -7,12 +7,12 @@ import { Badge } from '../components/ui/Badge';
 import { useAuth } from '../contexts/AuthContext';
 import { apiClient } from '../utils/api';
 import { 
-  User, 
-  Mail, 
+  User,
+  Mail,
   Phone, 
   MapPin, 
-  Edit3, 
-  Save, 
+  Edit3,
+  Save,
   X,
   Calendar,
   RefreshCw
@@ -156,8 +156,8 @@ const Profile: React.FC = () => {
 
       if (!formData.name.trim()) {
         setMessage({ type: 'error', text: 'Name is required' });
-        return;
-      }
+      return;
+    }
 
       // Prepare data in the format expected by backend
       const updateData = {
@@ -172,7 +172,7 @@ const Profile: React.FC = () => {
       console.log('Updating profile with data:', updateData);
 
       const response = await apiClient.updateProfile(updateData);
-
+      
       if (response.success) {
         setMessage({ type: 'success', text: 'Profile updated and synced to database successfully!' });
         setEditing(false);
@@ -267,10 +267,10 @@ const Profile: React.FC = () => {
         <LoadingSpinner size="lg" />
       </div>
     );
-  }
+    }
 
   if (!profile) {
-    return (
+      return (
       <div className="p-6">
         <div className="text-center">
           <p className="text-gray-600 dark:text-gray-400 mb-4">Failed to load profile</p>
@@ -278,11 +278,11 @@ const Profile: React.FC = () => {
             Try Again
           </Button>
         </div>
-      </div>
-    );
-  }
+        </div>
+      );
+    }
 
-  return (
+      return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
       {/* Message */}
       {message && (
@@ -299,23 +299,23 @@ const Profile: React.FC = () => {
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-        <div>
+      <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
             Profile
-          </h1>
+        </h1>
           <p className="text-gray-600 dark:text-gray-400">
             Manage your personal information
-          </p>
-        </div>
+        </p>
+      </div>
 
         <div className="flex items-center gap-2">
           {!editing ? (
             <>
-              <Button 
-                variant="outline"
+                <Button
+                  variant="outline"
                 onClick={() => loadProfile(true)}
                 disabled={loading}
-                className="flex items-center gap-2"
+                  className="flex items-center gap-2"
                 title="Refresh data from database"
               >
                 {loading ? <LoadingSpinner size="sm" /> : <RefreshCw size={16} />}
@@ -327,16 +327,16 @@ const Profile: React.FC = () => {
               >
                 <Edit3 size={16} />
                 Edit Profile
-              </Button>
+                </Button>
             </>
-          ) : (
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={handleCancel}
-                disabled={saving}
-                className="flex items-center gap-2"
-              >
+              ) : (
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleCancel}
+                    disabled={saving}
+                    className="flex items-center gap-2"
+                  >
                 <X size={16} />
                 Cancel
               </Button>
@@ -347,38 +347,38 @@ const Profile: React.FC = () => {
               >
                 {saving ? <LoadingSpinner size="sm" /> : <Save size={16} />}
                 {saving ? 'Saving...' : 'Save'}
-              </Button>
-            </div>
-          )}
+                  </Button>
+                </div>
+              )}
         </div>
-      </div>
-
+              </div>
+              
       {/* Profile Card */}
       <Card className="p-8">
         {/* Avatar and Basic Info */}
         <div className="flex items-center gap-6 mb-8">
                    <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-2xl">
            {profile.avatar ? (
-             <img 
+                      <img 
                src={profile.avatar} 
                alt="Profile" 
-               className="w-full h-full rounded-full object-cover" 
-             />
-           ) : (
+                        className="w-full h-full rounded-full object-cover"
+                      />
+                    ) : (
              getInitials(profile?.name)
-           )}
-         </div>
-                     <div>
+                  )}
+                </div>
+                <div>
              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
                {profile?.name || 'Enter your name'}
              </h2>
              <p className="text-gray-600 dark:text-gray-400 mb-2">{profile?.email || 'Enter your email'}</p>
              <Badge className={getRoleColor(profile?.role || 'learner')}>
                {profile?.role ? profile.role.charAt(0).toUpperCase() + profile.role.slice(1) : 'User'}
-             </Badge>
-           </div>
-        </div>
-
+                  </Badge>
+                </div>
+              </div>
+              
         {/* Profile Information */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Personal Details */}
@@ -389,60 +389,60 @@ const Profile: React.FC = () => {
 
             {editing ? (
               <div className="space-y-4">
-                <div>
+              <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Full Name *
                   </label>
-                                     <Input
+                  <Input
                      type="text"
-                     value={formData.name}
+                    value={formData.name}
                      onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                      placeholder="e.g., John Doe"
-                   />
-                 </div>
-
-                 <div>
+                  />
+              </div>
+              
+              <div>
                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                      Email Address
-                   </label>
-                   <Input
+                  </label>
+                    <Input
                      type="email"
                      value={formData.email}
                      onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                      placeholder="e.g., john@example.com"
                    />
-                 </div>
-
-                 <div>
+              </div>
+              
+              <div>
                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                      Phone Number
-                   </label>
-                   <Input
+                  </label>
+                  <Input
                      type="tel"
-                     value={formData.phone}
+                    value={formData.phone}
                      onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
                      placeholder="e.g., +1 (555) 123-4567"
                    />
-                 </div>
-
+              </div>
+              
                  <div>
                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                      Location
-                   </label>
-                   <Input
+                  </label>
+                  <Input
                      type="text"
                      value={formData.location}
                      onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
                      placeholder="e.g., New York, USA"
                    />
-                 </div>
-
+              </div>
+              
                  <div>
                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                      Bio
-                   </label>
-                   <textarea
-                     value={formData.bio}
+                  </label>
+                  <textarea
+                    value={formData.bio}
                      onChange={(e) => setFormData(prev => ({ ...prev, bio: e.target.value }))}
                      placeholder="Write a brief description about yourself, your interests, or professional background..."
                      rows={4}
@@ -451,32 +451,32 @@ const Profile: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <div className="space-y-4">
+            <div className="space-y-4">
                                  <div className="flex items-center gap-3">
                    <User className="text-blue-600" size={20} />
-                   <div>
+              <div>
                      <p className="text-sm text-gray-600 dark:text-gray-400">Full Name</p>
                      <p className="font-medium text-gray-900 dark:text-white">{profile?.name || 'Click edit to add your name'}</p>
                    </div>
-                 </div>
-
+              </div>
+              
                  <div className="flex items-center gap-3">
                    <Mail className="text-blue-600" size={20} />
-                   <div>
+              <div>
                      <p className="text-sm text-gray-600 dark:text-gray-400">Email</p>
                      <p className="font-medium text-gray-900 dark:text-white">{profile?.email || 'Click edit to add your email'}</p>
                    </div>
-                 </div>
-
+              </div>
+              
                  {profile?.phone && (
                    <div className="flex items-center gap-3">
                      <Phone className="text-blue-600" size={20} />
-                     <div>
+              <div>
                        <p className="text-sm text-gray-600 dark:text-gray-400">Phone</p>
                        <p className="font-medium text-gray-900 dark:text-white">{profile.phone}</p>
                      </div>
-                   </div>
-                 )}
+                  </div>
+                )}
 
                  {profile?.location && (
                    <div className="flex items-center gap-3">
@@ -484,52 +484,52 @@ const Profile: React.FC = () => {
                      <div>
                        <p className="text-sm text-gray-600 dark:text-gray-400">Location</p>
                        <p className="font-medium text-gray-900 dark:text-white">{profile.location}</p>
-                     </div>
-                   </div>
+              </div>
+            </div>
                  )}
 
                  {profile?.bio && (
                    <div className="mt-6">
                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">About</p>
                      <p className="text-gray-900 dark:text-white leading-relaxed">{profile.bio}</p>
-                   </div>
+                </div>
                  )}
               </div>
             )}
-          </div>
+              </div>
 
           {/* Account Information */}
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
               Account Information
             </h3>
-
+            
             <div className="space-y-4">
                              <div className="flex items-center gap-3">
                  <Calendar className="text-blue-600" size={20} />
-                 <div>
+              <div>
                    <p className="text-sm text-gray-600 dark:text-gray-400">Member Since</p>
                    <p className="font-medium text-gray-900 dark:text-white">
                      {profile?.createdAt ? formatDate(profile.createdAt) : 'Unknown'}
                    </p>
-                 </div>
-               </div>
+                </div>
+              </div>
 
                {profile?.lastLogin && (
                  <div className="flex items-center gap-3">
                    <Calendar className="text-blue-600" size={20} />
-                   <div>
+              <div>
                      <p className="text-sm text-gray-600 dark:text-gray-400">Last Login</p>
                      <p className="font-medium text-gray-900 dark:text-white">
                        {formatDate(profile.lastLogin)}
-                     </p>
-                   </div>
+                </p>
+              </div>
                  </div>
                )}
-             </div>
-          </div>
-        </div>
-      </Card>
+                </div>
+              </div>
+            </div>
+          </Card>
     </div>
   );
 };

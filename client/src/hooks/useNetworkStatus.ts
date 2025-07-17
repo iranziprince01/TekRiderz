@@ -21,11 +21,11 @@ export const useNetworkStatus = (handlers?: NetworkEventHandlers) => {
 
       if (wasOnline !== isOnline) {
         if (isOnline && handlers.onOnline) {
-          handlers.onOnline();
+        handlers.onOnline();
         } else if (!isOnline && handlers.onOffline) {
-          handlers.onOffline();
-        }
-        
+        handlers.onOffline();
+      }
+
         if (handlers.onConnectionChange) {
           handlers.onConnectionChange(networkStatus);
         }

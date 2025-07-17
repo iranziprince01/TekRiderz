@@ -248,7 +248,7 @@ const CourseHome = ({ courseData, onEnrollmentUpdate }: {
   // Function to navigate to course content
   const startLearning = () => {
     if (isEnrolled) {
-      navigate(`/course/${course.id}/modules`);
+      navigate(`/course/${course._id || course.id}/modules`);
     } else {
       handleEnrollment();
     }
@@ -4249,7 +4249,7 @@ const Course = () => {
               
               // Redirect after a short delay
               setTimeout(() => {
-                navigate(`/course/${targetCourse.id}`, { replace: true });
+                navigate(`/course/${targetCourse._id || targetCourse.id}`, { replace: true });
               }, 1500);
               
               return;
@@ -4357,7 +4357,7 @@ const Course = () => {
               <Button 
                 onClick={() => {
                   const targetCourse = availableCourses.find((c: any) => c.title.toLowerCase().includes('heading two')) || availableCourses[0];
-                  navigate(`/course/${targetCourse.id}`);
+                  navigate(`/course/${targetCourse._id || targetCourse.id}`);
                 }} 
                 variant="primary"
               >

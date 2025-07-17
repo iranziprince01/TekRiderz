@@ -1,8 +1,8 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { apiClient, isDevelopment } from '../../utils/api';
+import { apiClient } from '../../utils/api';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
@@ -10,14 +10,11 @@ import { Alert } from '../../components/ui/Alert';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { FileUploadComponent } from '../../components/course/FileUploadComponent';
 import { 
-  BookOpen, 
   Video, 
   Award, 
   CheckCircle,
-  ArrowLeft,
   Plus,
   Trash2,
-  Upload,
   Save,
   Send,
   X,
@@ -25,255 +22,143 @@ import {
   Info
 } from 'lucide-react';
 
-// Types
-interface ModuleQuizQuestion {
+// Simple types
+interface QuizQuestion {
   id: string;
   questionText: string;
-  type: 'multiple_choice';
   options: [string, string, string, string];
   correctAnswer: number;
   points: number;
 }
 
-interface ModuleQuiz {
-  id: string;
-  title: string;
-  description: string;
-  instructions: string;
-  questions: ModuleQuizQuestion[];
-  settings: {
-    timeLimit: number;
-    attempts: number;
-    passingScore: number;
-    shuffleQuestions: boolean;
-    shuffleOptions: boolean;
-    showResultsImmediately: boolean;
-    showCorrectAnswers: boolean;
-    allowReview: boolean;
-    requireSequential: boolean;
-  };
-  grading: {
-    autoGrade: boolean;
-    gradingMethod: 'highest' | 'average' | 'latest';
-    feedbackEnabled: boolean;
-    detailedFeedback: boolean;
-  };
-  availability: {
-    availableFrom?: string;
-    availableUntil?: string;
-    unlockConditions?: string[];
-  };
-}
-
-interface Module {
+interface ModuleData {
   id: string;
   title: string;
   description: string;
   videoFileId?: string;
   videoUrl?: string;
-  quiz: ModuleQuiz;
-  order: number;
-}
-
-interface FinalAssessmentQuestion {
-  id: string;
-  questionText: string;
-  type: 'multiple_choice';
-  options: [string, string, string, string];
-  correctAnswer: number;
-  points: number;
+  questions: QuizQuestion[];
 }
 
 interface FinalAssessment {
   id: string;
   title: string;
   description: string;
-  instructions: string;
-  questions: FinalAssessmentQuestion[];
+  questions: QuizQuestion[];
   settings: {
     timeLimit: number;
     attempts: number;
     passingScore: number;
     shuffleQuestions: boolean;
-    shuffleOptions: boolean;
     showResultsImmediately: boolean;
-    showCorrectAnswers: boolean;
-    allowReview: boolean;
-    requireSequential: boolean;
-  };
-  grading: {
-    autoGrade: boolean;
-    gradingMethod: 'highest' | 'average' | 'latest';
-    feedbackEnabled: boolean;
-    detailedFeedback: boolean;
   };
 }
 
 interface CourseData {
-  // Course Details
   title: string;
-  shortDescription: string;
   description: string;
-  thumbnail?: string;
-  thumbnailFileId?: string;
   category: string;
   level: 'beginner' | 'intermediate' | 'advanced';
-  tags: string[];
-  learningObjectives: string[];
-  
-  // Modules
-  modules: Module[];
-  
-  // Assessment (Optional)
+  thumbnail?: string;
+  thumbnailFileId?: string;
+  modules: ModuleData[];
   finalAssessment?: FinalAssessment;
-  
-  // Metadata
-  status: 'draft' | 'pending' | 'submitted';
 }
 
-const CATEGORIES = [
-  { value: 'programming', label: 'Programming' },
-  { value: 'design', label: 'Design' },
-  { value: 'business-tech', label: 'Business Tech' },
-  { value: 'general-it', label: 'General IT' }
-];
+// Simple session management - just refresh tokens periodically
+let sessionTimer: NodeJS.Timeout | null = null;
 
-const LEVELS = [
-  { value: 'beginner', label: 'Beginner' },
-  { value: 'intermediate', label: 'Intermediate' },
-  { value: 'advanced', label: 'Advanced' }
-];
+const startSessionMaintenance = (refreshTokenFn: () => Promise<void>) => {
+  if (sessionTimer) clearInterval(sessionTimer);
+  
+  sessionTimer = setInterval(async () => {
+    try {
+      await refreshTokenFn();
+      console.log('🔄 Session refreshed');
+    } catch (error) {
+      console.warn('Session refresh failed:', error);
+    }
+  }, 10 * 60 * 1000); // 10 minutes
+};
+
+const stopSessionMaintenance = () => {
+  if (sessionTimer) {
+    clearInterval(sessionTimer);
+    sessionTimer = null;
+  }
+};
 
 const CourseCreation: React.FC = () => {
-  const { user } = useAuth();
+  const { user, refreshToken } = useAuth();
   const { language } = useLanguage();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState(0);
+  // Simple state - no complex objects or effects
+  const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [courseId, setCourseId] = useState<string | null>(null);
-
   const [courseData, setCourseData] = useState<CourseData>({
     title: '',
-    shortDescription: '',
     description: '',
     category: '',
     level: 'beginner',
-    tags: [],
-    learningObjectives: [],
-    modules: [],
-    status: 'draft'
+    modules: []
   });
 
-  const [newTag, setNewTag] = useState('');
-  const [newObjective, setNewObjective] = useState('');
+  // Start session maintenance on mount (simple, no dependencies)
+  React.useEffect(() => {
+    startSessionMaintenance(refreshToken);
+    return () => stopSessionMaintenance();
+  }, []); // Empty dependency array - runs once
 
-  // Manual save only - no auto-save functionality
-  // Users must manually save drafts or submit course
-  const autoSave = {
-    saving: false,
-    lastSaved: null,
-    hasUnsavedChanges: false
-  };
-
-  const tabs = [
-    { id: 0, name: 'Course Details', icon: BookOpen },
-    { id: 1, name: 'Modules', icon: Video },
-    { id: 2, name: 'Assessment', icon: Award },
-    { id: 3, name: 'Submission', icon: CheckCircle }
+  const steps = [
+    'Course Details',
+    'Modules & Content',
+    'Assessment',
+    'Review & Submit'
   ];
 
-  // Helper functions
-  const addTag = () => {
-    if (newTag.trim() && !courseData.tags.includes(newTag.trim())) {
-      setCourseData(prev => ({
-        ...prev,
-        tags: [...prev.tags, newTag.trim()]
-      }));
-      setNewTag('');
-    }
-  };
+  const categories = [
+    { value: 'programming', label: 'Programming' },
+    { value: 'design', label: 'Design' },
+    { value: 'business_tech', label: 'Business Tech' },
+    { value: 'general_it', label: 'General IT' }
+  ];
 
-  const removeTag = (tagToRemove: string) => {
-    setCourseData(prev => ({
-      ...prev,
-      tags: prev.tags.filter(tag => tag !== tagToRemove)
-    }));
-  };
+  const levels = [
+    { value: 'beginner', label: 'Beginner' },
+    { value: 'intermediate', label: 'Intermediate' },
+    { value: 'advanced', label: 'Advanced' }
+  ];
 
-  const addObjective = () => {
-    if (newObjective.trim()) {
-      setCourseData(prev => ({
-        ...prev,
-        learningObjectives: [...prev.learningObjectives, newObjective.trim()]
-      }));
-      setNewObjective('');
-    }
-  };
-
-  const removeObjective = (objToRemove: string) => {
-    setCourseData(prev => ({
-      ...prev,
-      learningObjectives: prev.learningObjectives.filter(obj => obj !== objToRemove)
-    }));
+  // Simple handlers - no complex logic
+  const updateCourse = (field: keyof CourseData, value: any) => {
+    setCourseData(prev => ({ ...prev, [field]: value }));
   };
 
   const addModule = () => {
-    const newModule: Module = {
+    const newModule: ModuleData = {
       id: `module-${Date.now()}`,
       title: '',
       description: '',
-      quiz: {
-        id: `module-quiz-${Date.now()}`,
-        title: '',
-        description: '',
-        instructions: '',
-        questions: Array.from({ length: 3 }, (_, i) => ({
-          id: `q-${Date.now()}-${i}`,
-          questionText: '',
-          type: 'multiple_choice',
-          options: ['', '', '', ''],
-          correctAnswer: 0,
-          points: 1,
-        })),
-        settings: {
-          timeLimit: 0, // Untimed quiz
-          attempts: 3, // Exactly 3 attempts
-          passingScore: 70,
-          shuffleQuestions: true,
-          shuffleOptions: true,
-          showResultsImmediately: false,
-          showCorrectAnswers: true,
-          allowReview: true,
-          requireSequential: false,
-        },
-        grading: {
-          autoGrade: true,
-          gradingMethod: 'highest',
-          feedbackEnabled: true,
-          detailedFeedback: true,
-        },
-        availability: {},
-      },
-      order: courseData.modules.length
+      questions: []
     };
-
+    
     setCourseData(prev => ({
       ...prev,
       modules: [...prev.modules, newModule]
     }));
   };
 
-  const updateModule = (moduleId: string, updates: Partial<Module>) => {
-    setCourseData(prev => ({
-      ...prev,
-      modules: prev.modules.map(module =>
-        module.id === moduleId ? { ...module, ...updates } : module
+  const updateModule = (moduleId: string, field: keyof ModuleData, value: any) => {
+      setCourseData(prev => ({
+        ...prev,
+      modules: prev.modules.map(module => 
+        module.id === moduleId ? { ...module, [field]: value } : module
       )
-    }));
+      }));
   };
 
   const removeModule = (moduleId: string) => {
@@ -283,6 +168,145 @@ const CourseCreation: React.FC = () => {
     }));
   };
 
+  const addQuestion = (moduleId: string) => {
+    const newQuestion: QuizQuestion = {
+      id: `q-${Date.now()}`,
+          questionText: '',
+          options: ['', '', '', ''],
+          correctAnswer: 0,
+      points: 1
+    };
+
+    updateModule(moduleId, 'questions', [
+      ...courseData.modules.find(m => m.id === moduleId)?.questions || [],
+      newQuestion
+    ]);
+  };
+
+  const updateQuestion = (moduleId: string, questionId: string, field: keyof QuizQuestion, value: any) => {
+    const module = courseData.modules.find(m => m.id === moduleId);
+    if (!module) return;
+
+    const updatedQuestions = module.questions.map(q => 
+      q.id === questionId ? { ...q, [field]: value } : q
+    );
+
+    updateModule(moduleId, 'questions', updatedQuestions);
+  };
+
+  const updateQuestionOption = (moduleId: string, questionId: string, optionIndex: number, value: string) => {
+    const module = courseData.modules.find(m => m.id === moduleId);
+    if (!module) return;
+
+    const updatedQuestions = module.questions.map(q => {
+      if (q.id === questionId) {
+        const newOptions = [...q.options] as [string, string, string, string];
+        newOptions[optionIndex] = value;
+        return { ...q, options: newOptions };
+      }
+      return q;
+    });
+
+    updateModule(moduleId, 'questions', updatedQuestions);
+  };
+
+  const removeQuestion = (moduleId: string, questionId: string) => {
+    const module = courseData.modules.find(m => m.id === moduleId);
+    if (!module) return;
+
+    const updatedQuestions = module.questions.filter(q => q.id !== questionId);
+    updateModule(moduleId, 'questions', updatedQuestions);
+  };
+
+  // Assessment handlers
+  const enableAssessment = () => {
+    const newAssessment: FinalAssessment = {
+      id: `assessment-${Date.now()}`,
+      title: 'Final Assessment',
+      description: 'Complete this assessment to finish the course',
+      questions: [],
+        settings: {
+        timeLimit: 60,
+        attempts: 3,
+          passingScore: 70,
+          shuffleQuestions: true,
+        showResultsImmediately: false
+      }
+    };
+    updateCourse('finalAssessment', newAssessment);
+  };
+
+  const disableAssessment = () => {
+    updateCourse('finalAssessment', undefined);
+  };
+
+  const addAssessmentQuestion = () => {
+    if (!courseData.finalAssessment) return;
+    
+    const newQuestion: QuizQuestion = {
+      id: `aq-${Date.now()}`,
+      questionText: '',
+      options: ['', '', '', ''],
+      correctAnswer: 0,
+      points: 1
+    };
+
+    const updatedAssessment = {
+      ...courseData.finalAssessment,
+      questions: [...courseData.finalAssessment.questions, newQuestion]
+    };
+    
+    updateCourse('finalAssessment', updatedAssessment);
+  };
+
+  const updateAssessmentQuestion = (questionId: string, field: keyof QuizQuestion, value: any) => {
+    if (!courseData.finalAssessment) return;
+
+    const updatedQuestions = courseData.finalAssessment.questions.map(q => 
+      q.id === questionId ? { ...q, [field]: value } : q
+    );
+
+    const updatedAssessment = {
+      ...courseData.finalAssessment,
+      questions: updatedQuestions
+    };
+    
+    updateCourse('finalAssessment', updatedAssessment);
+  };
+
+  const updateAssessmentQuestionOption = (questionId: string, optionIndex: number, value: string) => {
+    if (!courseData.finalAssessment) return;
+
+    const updatedQuestions = courseData.finalAssessment.questions.map(q => {
+      if (q.id === questionId) {
+        const newOptions = [...q.options] as [string, string, string, string];
+        newOptions[optionIndex] = value;
+        return { ...q, options: newOptions };
+      }
+      return q;
+    });
+
+    const updatedAssessment = {
+      ...courseData.finalAssessment,
+      questions: updatedQuestions
+    };
+    
+    updateCourse('finalAssessment', updatedAssessment);
+  };
+
+  const removeAssessmentQuestion = (questionId: string) => {
+    if (!courseData.finalAssessment) return;
+
+    const updatedQuestions = courseData.finalAssessment.questions.filter(q => q.id !== questionId);
+    
+    const updatedAssessment = {
+      ...courseData.finalAssessment,
+      questions: updatedQuestions
+    };
+    
+    updateCourse('finalAssessment', updatedAssessment);
+  };
+
     const handleThumbnailUpload = (fileData: {
     fileId: string;
     filename: string;
@@ -290,11 +314,8 @@ const CourseCreation: React.FC = () => {
     size: number;
     type: string;
   }) => {
-    setCourseData(prev => ({
-      ...prev,
-      thumbnailFileId: fileData.fileId,
-      thumbnail: fileData.url
-    }));
+    updateCourse('thumbnailFileId', fileData.fileId);
+    updateCourse('thumbnail', fileData.url);
   };
 
   const handleVideoUpload = (moduleId: string, fileData: {
@@ -304,54 +325,8 @@ const CourseCreation: React.FC = () => {
     size: number;
     type: string;
   }) => {
-    updateModule(moduleId, {
-      videoFileId: fileData.fileId,
-      videoUrl: fileData.url
-    });
-  };
-
-  const enableAssessment = () => {
-    setCourseData(prev => ({
-      ...prev,
-      finalAssessment: {
-          id: `final-assessment-${Date.now()}`,
-          title: '',
-          description: '',
-          instructions: '',
-          questions: Array.from({ length: 10 }, (_, i) => ({
-            id: `final-q-${Date.now()}-${i}`,
-            questionText: '',
-            type: 'multiple_choice',
-            options: ['', '', '', ''],
-            correctAnswer: 0,
-            points: 1,
-          })),
-          settings: {
-            timeLimit: 0, // Untimed quiz
-            attempts: 3, // Exactly 3 attempts
-            passingScore: 70,
-            shuffleQuestions: true,
-            shuffleOptions: true,
-            showResultsImmediately: false,
-            showCorrectAnswers: true,
-            allowReview: true,
-            requireSequential: false,
-          },
-          grading: {
-            autoGrade: true,
-            gradingMethod: 'highest',
-            feedbackEnabled: true,
-            detailedFeedback: true,
-          },
-      }
-    }));
-  };
-
-  const disableAssessment = () => {
-    setCourseData(prev => ({
-      ...prev,
-      finalAssessment: undefined
-    }));
+    updateModule(moduleId, 'videoFileId', fileData.fileId);
+    updateModule(moduleId, 'videoUrl', fileData.url);
   };
 
   const saveDraft = async () => {
@@ -359,153 +334,86 @@ const CourseCreation: React.FC = () => {
     setError('');
     
     try {
-      // Validate required fields
-      if (!courseData.title || !courseData.shortDescription || !courseData.description) {
-        setError('Please fill in all required fields');
-        return;
-      }
-
-      // Prepare course data for backend
-      const formData = new FormData();
-      
-      // Basic course info
-      formData.append('title', courseData.title);
-      formData.append('shortDescription', courseData.shortDescription);
-      formData.append('description', courseData.description);
-      formData.append('category', courseData.category);
-      formData.append('level', courseData.level);
-      formData.append('language', 'en');
-                      // All courses are free - no pricing data needed
-      formData.append('status', 'draft');
-      
-      // Arrays as JSON strings
-      formData.append('tags', JSON.stringify(courseData.tags));
-      formData.append('requirements', JSON.stringify([]));
-      formData.append('learningObjectives', JSON.stringify(courseData.learningObjectives));
-      formData.append('targetAudience', 'General learners');
-      
-      // Convert modules to sections format expected by backend
-      const sections = courseData.modules.map((module, index) => ({
-        id: module.id,
-        title: module.title,
-        description: module.description,
-        order: index + 1,
-        isPublished: true, // Set to true so they appear in course
-        isRequired: true,
-        estimatedDuration: 1800, // 30 minutes default
-        learningObjectives: [],
-        lessons: module.videoUrl ? [{
-          id: `lesson_${module.id}`,
+      const payload = {
+        title: courseData.title,
+        description: courseData.description,
+        category: courseData.category,
+        level: courseData.level,
+        language: 'en',
+        status: 'draft',
+        thumbnailFileId: courseData.thumbnailFileId,
+        modules: courseData.modules.map((module, index) => ({
+          id: module.id,
           title: module.title,
+          order: index + 1,
           description: module.description,
-          type: 'video',
-          content: {
-            videoUrl: module.videoUrl,
-            videoFileId: module.videoFileId, // Include file ID for backend processing
-            duration: 1800
-          },
-          order: 1,
-          isPublished: true, // Set to true so they appear in course
-          isRequired: true,
-          estimatedDuration: 30,
-          // Store quiz in the lesson where the quiz submission handler expects it
-          quiz: module.quiz.questions.length > 0 ? {
-            id: module.quiz.id,
-            title: module.quiz.title || `${module.title} Quiz`,
-            description: module.quiz.description || `Quiz for ${module.title}`,
-            instructions: module.quiz.instructions || 'Answer all questions to complete this module.',
-            questions: module.quiz.questions.map(q => ({
+          videoFileId: module.videoFileId,
+          videoUrl: module.videoUrl,
+          quiz: module.questions.length > 0 ? {
+            id: `quiz-${module.id}`,
+            title: `${module.title} Quiz`,
+            questions: module.questions.map(q => ({
               id: q.id,
               questionText: q.questionText,
-              type: q.type,
+            type: 'multiple_choice',
               options: q.options,
               correctAnswer: q.correctAnswer,
               points: q.points
-            })),
-            settings: module.quiz.settings,
-            grading: module.quiz.grading,
-            availability: module.quiz.availability
-          } : undefined // Only include quiz if it has questions
-        }] : [],
-        // Remove moduleQuiz as it's now stored in lessons
-        // moduleQuiz: null
-      }));
-      
-      formData.append('sections', JSON.stringify(sections));
-      
-      // Add final assessment if exists
-      if (courseData.finalAssessment) {
-        formData.append('finalAssessment', JSON.stringify({
-          id: courseData.finalAssessment.id,
-          title: courseData.finalAssessment.title,
-          description: courseData.finalAssessment.description,
-          instructions: courseData.finalAssessment.instructions,
-          questions: courseData.finalAssessment.questions.map(q => ({
-            id: q.id,
-            questionText: q.questionText,
-            type: q.type,
-            options: q.options,
-            correctAnswer: q.correctAnswer,
-            points: q.points
           })),
-          settings: courseData.finalAssessment.settings,
-          grading: courseData.finalAssessment.grading
-        }));
-      }
-      
-      // Add thumbnail file if exists
-      if (courseData.thumbnailFileId) {
-        formData.append('thumbnailFileId', courseData.thumbnailFileId);
-      }
-      
-      // Calculate totals
-      const totalLessons = sections.reduce((total, section) => total + section.lessons.length, 0);
-      const totalDuration = sections.reduce((total, section) => total + section.estimatedDuration, 0);
-      
-      formData.append('totalLessons', totalLessons.toString());
-      formData.append('totalDuration', totalDuration.toString());
-      
-      // Set content flags based on course content
-      const contentFlags = {
-        hasVideo: courseData.modules.some(m => m.videoUrl),
-        hasQuizzes: courseData.modules.length > 0 || !!courseData.finalAssessment,
-        hasAssignments: false,
-        hasCertificate: false,
-        hasPrerequisites: false,
-        isAccessible: false
-      };
-      
-      formData.append('contentFlags', JSON.stringify(contentFlags));
+          settings: {
+              timeLimit: 0,
+              attempts: 3,
+            passingScore: 70,
+            shuffleQuestions: true,
+            shuffleOptions: true,
+            showResultsImmediately: false,
+            showCorrectAnswers: true,
+            allowReview: true,
+              requireSequential: false
+          },
+          grading: {
+            autoGrade: true,
+            gradingMethod: 'highest',
+            feedbackEnabled: true,
+              detailedFeedback: true
+            }
+          } : null
+                 })),
+         finalAssessment: courseData.finalAssessment ? {
+           id: courseData.finalAssessment.id,
+           title: courseData.finalAssessment.title,
+           description: courseData.finalAssessment.description,
+           questions: courseData.finalAssessment.questions.map(q => ({
+             id: q.id,
+             questionText: q.questionText,
+             type: 'multiple_choice',
+             options: q.options,
+             correctAnswer: q.correctAnswer,
+             points: q.points
+           })),
+           settings: courseData.finalAssessment.settings,
+           grading: {
+             autoGrade: true,
+             gradingMethod: 'highest',
+             feedbackEnabled: true,
+             detailedFeedback: true
+           }
+         } : null,
+         type: 'course',
+         createdAt: new Date().toISOString(),
+         updatedAt: new Date().toISOString(),
+         createdBy: user?.id,
+         instructorId: user?.id,
+         moduleCount: courseData.modules.length,
+         totalQuestions: courseData.modules.reduce((total, module) => total + module.questions.length, 0) + 
+                        (courseData.finalAssessment?.questions.length || 0)
+       };
 
-      console.log('Saving course draft...', { 
-        title: courseData.title,
-        sections: sections.length,
-        totalLessons,
-        totalDuration,
-        contentFlags
-      });
-
-      const result = await apiClient.createCourse(formData);
-      
-      if (result.success) {
-        setSuccess('Course saved as draft successfully!');
-        setTimeout(() => setSuccess(''), 3000);
-        
-        // Store the course ID for later submission
-        if (result.data && typeof result.data === 'object' && 'course' in result.data) {
-          const createdCourse = result.data.course as any;
-          const newCourseId = createdCourse._id || createdCourse.id;
-          setCourseId(newCourseId);
-          console.log('Course created with ID:', newCourseId);
-          return newCourseId;
-        }
-      } else {
-        throw new Error(result.error || 'Failed to save course');
-      }
-    } catch (error) {
-      console.error('Error saving course:', error);
-      setError(error instanceof Error ? error.message : 'Failed to save course');
-      throw error;
+      await apiClient.createCourse(payload);
+      setSuccess('Course draft saved successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (error: any) {
+      setError(error?.response?.data?.message || 'Failed to save course');
     } finally {
       setSaving(false);
     }
@@ -516,482 +424,426 @@ const CourseCreation: React.FC = () => {
     setError('');
     
     try {
-      // Validate required fields
-      if (!courseData.title || !courseData.shortDescription || !courseData.description) {
-        setError('Please fill in all required fields');
-        return;
+      // First save as draft to ensure all data is saved
+      const payload = {
+        title: courseData.title,
+        description: courseData.description,
+        category: courseData.category,
+        level: courseData.level,
+        language: 'en',
+        status: 'draft',
+        thumbnailFileId: courseData.thumbnailFileId,
+        modules: courseData.modules.map((module, index) => ({
+        id: module.id,
+        title: module.title,
+        order: index + 1,
+          description: module.description,
+          videoFileId: module.videoFileId,
+            videoUrl: module.videoUrl,
+          quiz: module.questions.length > 0 ? {
+            id: `quiz-${module.id}`,
+            title: `${module.title} Quiz`,
+            questions: module.questions.map(q => ({
+              id: q.id,
+              questionText: q.questionText,
+              type: 'multiple_choice',
+              options: q.options,
+              correctAnswer: q.correctAnswer,
+              points: q.points
+            })),
+            settings: {
+              timeLimit: 0,
+              attempts: 3,
+              passingScore: 70,
+              shuffleQuestions: true,
+              shuffleOptions: true,
+              showResultsImmediately: false,
+              showCorrectAnswers: true,
+              allowReview: true,
+              requireSequential: false
+            },
+            grading: {
+              autoGrade: true,
+              gradingMethod: 'highest',
+              feedbackEnabled: true,
+              detailedFeedback: true
+            }
+          } : null
+        })),
+        finalAssessment: courseData.finalAssessment ? {
+          id: courseData.finalAssessment.id,
+          title: courseData.finalAssessment.title,
+          description: courseData.finalAssessment.description,
+          questions: courseData.finalAssessment.questions.map(q => ({
+            id: q.id,
+            questionText: q.questionText,
+            type: 'multiple_choice',
+            options: q.options,
+            correctAnswer: q.correctAnswer,
+            points: q.points
+          })),
+          settings: courseData.finalAssessment.settings,
+          grading: {
+            autoGrade: true,
+            gradingMethod: 'highest',
+            feedbackEnabled: true,
+            detailedFeedback: true
+          }
+        } : null,
+        type: 'course',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        createdBy: user?.id,
+        instructorId: user?.id,
+        moduleCount: courseData.modules.length,
+        totalQuestions: courseData.modules.reduce((total, module) => total + module.questions.length, 0) + 
+                       (courseData.finalAssessment?.questions.length || 0)
+      };
+
+      // Create or update the course
+      const courseResponse = await apiClient.createCourse(payload);
+      const courseId = courseResponse.data?.course?._id || courseResponse.data?.course?.id;
+
+      if (!courseId) {
+        throw new Error('Failed to create course');
       }
 
-      if (courseData.modules.length === 0) {
-        setError('Please add at least one module');
-        return;
-      }
-
-      // Check if modules have required content
-      const incompleteModules = courseData.modules.filter(module => 
-        !module.title || !module.description || !module.videoUrl
-      );
+      // Then submit it for approval (changes status to 'submitted')
+      await apiClient.submitCourse(courseId);
       
-      if (incompleteModules.length > 0) {
-        setError('Please complete all modules (title, description, and video required)');
-        return;
-      }
-
-      // First save as draft and get course ID
-      const createdCourseId = await saveDraft();
-      
-      if (!createdCourseId) {
-        throw new Error('Failed to create course - no course ID returned');
-      }
-
-      // Then submit for approval using the actual course ID
-      console.log('Submitting course for approval...', createdCourseId);
-      const response = await apiClient.submitCourse(createdCourseId);
-
-      if (response.success) {
-        // All courses go through approval process regardless of environment
-        setSuccess('Course submitted successfully! It will be reviewed by an administrator before publication.');
+      setSuccess('Course submitted for review! It will now appear in admin pending approvals.');
         setTimeout(() => {
-          navigate('/tutor/courses');
-        }, 3000);
-      } else {
-        throw new Error(response.error || 'Failed to submit course');
-      }
-    } catch (error) {
-      console.error('Error submitting course:', error);
-      setError(error instanceof Error ? error.message : 'Failed to submit course');
+        navigate('/dashboard/courses');
+      }, 2000);
+    } catch (error: any) {
+      setError(error?.response?.data?.message || 'Failed to submit course');
     } finally {
       setLoading(false);
     }
   };
 
-  const canProceed = (tabIndex: number) => {
-    switch (tabIndex) {
+  const isStepValid = (step: number) => {
+    switch (step) {
       case 0:
-        return courseData.title && courseData.shortDescription && courseData.description && 
-               courseData.category && courseData.tags.length > 0 && courseData.learningObjectives.length > 0;
+        return courseData.title.length >= 10 && 
+               courseData.description.length >= 50 && 
+               courseData.category && 
+               courseData.level;
       case 1:
-        return courseData.modules.length > 0;
+        return courseData.modules.length > 0 && 
+               courseData.modules.every(m => m.title.length >= 5 && m.description.length >= 20);
       case 2:
         return true; // Assessment is optional
       case 3:
-        return courseData.title && courseData.modules.length > 0;
+        return true; // Review step is always valid if previous steps are valid
       default:
         return false;
     }
   };
 
+  const nextStep = () => {
+    if (currentStep < steps.length - 1 && isStepValid(currentStep)) {
+      setCurrentStep(currentStep + 1);
+    }
+  };
+
+  const prevStep = () => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-6xl mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-5xl mx-auto px-4">
+        <div className="bg-white rounded-xl shadow-lg border border-gray-200">
         {/* Header */}
-        <div className="mb-8">
+          <div className="px-8 py-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Button
-                variant="outline"
-                onClick={() => navigate('/dashboard')}
-                className="flex items-center space-x-2"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Back</span>
-              </Button>
               <div>
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                  Create New Course
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                  {language === 'rw' ? 'Kuramo Amasomo' : 'Create Course'}
                 </h1>
-                  <p className="text-gray-600 dark:text-gray-400">
+                <p className="text-gray-600">
                   Build and publish your course step by step
                 </p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-gray-500">Step {currentStep + 1} of {steps.length}</p>
+                <div className="w-32 bg-gray-200 rounded-full h-2 mt-1">
+                  <div 
+                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
+                  ></div>
+                </div>
                       </div>
                       </div>
             
-            {/* Manual save only - no auto-save status */}
-            <div className="flex items-center space-x-4">
-              <Button 
-                onClick={saveDraft}
-                disabled={saving}
-                variant="outline"
-                size="sm"
-                className="shadow-sm"
-              >
-                {saving ? (
-                  <LoadingSpinner size="sm" />
-                ) : (
-                  <Save className="w-4 h-4 mr-2" />
-                )}
-                {language === 'rw' ? 'Bika Igishushanyo' : 'Save Draft'}
-              </Button>
+            {/* Progress Steps */}
+            <div className="mt-6">
+              <div className="flex items-center justify-between">
+                {steps.map((step, index) => (
+                  <div key={index} className="flex items-center flex-1">
+                    <div className="flex items-center">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-200 ${
+                        index <= currentStep 
+                          ? 'bg-blue-600 text-white shadow-lg' 
+                          : 'bg-white border-2 border-gray-300 text-gray-400'
+                      }`}>
+                        {index < currentStep ? (
+                          <CheckCircle className="w-5 h-5" />
+                        ) : (
+                          index + 1
+                        )}
             </div>
+                      <span className={`ml-3 text-sm font-medium ${
+                        index <= currentStep ? 'text-blue-600' : 'text-gray-500'
+                      }`}>
+                        {step}
+                      </span>
+                    </div>
+                    {index < steps.length - 1 && (
+                      <div className={`flex-1 mx-4 h-0.5 transition-all duration-200 ${
+                        index < currentStep ? 'bg-blue-600' : 'bg-gray-300'
+                      }`} />
+                    )}
+                  </div>
+                ))}
+              </div>
           </div>
         </div>
 
-        {/* Error and Success Messages */}
+          {/* Content */}
+          <div className="p-8">
         {error && (
-          <Alert variant="error" className="mb-6">
-            <AlertCircle className="h-4 w-4" />
+              <Alert variant="error" className="mb-8">
             <span>{error}</span>
-            <Button variant="ghost" size="sm" onClick={() => setError('')} className="ml-auto">
-              <X className="h-4 w-4" />
-            </Button>
           </Alert>
         )}
 
         {success && (
-          <Alert variant="success" className="mb-6">
-            <CheckCircle className="h-4 w-4" />
+              <Alert variant="success" className="mb-8">
             <span>{success}</span>
-            <Button variant="ghost" size="sm" onClick={() => setSuccess('')} className="ml-auto">
-              <X className="h-4 w-4" />
-            </Button>
           </Alert>
         )}
 
-        {/* Tab Navigation */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-8">
-          <div className="flex">
-            {tabs.map((tab, index) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(index)}
-                className={`flex-1 flex items-center justify-center space-x-2 py-4 px-6 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === index
-                    ? 'border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-                }`}
-              >
-                <tab.icon className="w-5 h-5" />
-                <span>{tab.name}</span>
-                {canProceed(index) && <CheckCircle className="w-4 h-4 text-green-500" />}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Tab Content */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-          {/* Course Details Tab */}
-          {activeTab === 0 && (
-            <div className="p-6 space-y-6">
+            {/* Step 0: Course Details */}
+            {currentStep === 0 && (
+              <div className="space-y-6">
+                <h2 className="text-xl font-semibold text-gray-900">Course Details</h2>
+                
               <div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                  Course Details
-                </h2>
-                <p className="text-gray-600 dark:text-gray-400">
-                  Provide basic information about your course
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Course Title *
                   </label>
                   <Input
-                    type="text"
                     value={courseData.title}
-                    onChange={(e) => setCourseData(prev => ({ ...prev, title: e.target.value }))}
-                    placeholder="Enter course title"
+                    onChange={(e) => updateCourse('title', e.target.value)}
+                    placeholder="Enter course title (minimum 10 characters)"
                     className="w-full"
                   />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Short Description *
-                  </label>
-                  <Input
-                    type="text"
-                    value={courseData.shortDescription}
-                    onChange={(e) => setCourseData(prev => ({ ...prev, shortDescription: e.target.value }))}
-                    placeholder="Brief course description"
-                    className="w-full"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Detailed Description *
-                  </label>
-                  <textarea
-                    value={courseData.description}
-                    onChange={(e) => setCourseData(prev => ({ ...prev, description: e.target.value }))}
-                    rows={4}
-                    placeholder="Detailed course description"
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {courseData.title.length}/100 characters
+                  </p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Course Description *
+                  </label>
+                  <textarea
+                    value={courseData.description}
+                    onChange={(e) => updateCourse('description', e.target.value)}
+                    placeholder="Describe your course (minimum 50 characters)"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    rows={4}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {courseData.description.length}/2000 characters
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                     Category *
                   </label>
                   <select
                     value={courseData.category}
-                    onChange={(e) => setCourseData(prev => ({ ...prev, category: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                      onChange={(e) => updateCourse('category', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Select category</option>
-                    {CATEGORIES.map(category => (
-                      <option key={category.value} value={category.value}>
-                        {category.label}
-                      </option>
+                      {categories.map(cat => (
+                        <option key={cat.value} value={cat.value}>{cat.label}</option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                     Level *
                   </label>
                   <select
                     value={courseData.level}
-                    onChange={(e) => setCourseData(prev => ({ ...prev, level: e.target.value as any }))}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                  >
-                    {LEVELS.map(level => (
-                      <option key={level.value} value={level.value}>
-                        {level.label}
-                      </option>
+                      onChange={(e) => updateCourse('level', e.target.value as any)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      {levels.map(level => (
+                        <option key={level.value} value={level.value}>{level.label}</option>
                     ))}
                   </select>
+                  </div>
                 </div>
 
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Course Thumbnail
                   </label>
                   <FileUploadComponent
                     fileType="thumbnail"
-                    entityType="course"
-                    currentFileUrl={courseData.thumbnail}
                     onFileUploaded={handleThumbnailUpload}
-                    onFileDeleted={() => setCourseData(prev => ({ ...prev, thumbnail: undefined, thumbnailFileId: undefined }))}
-                    maxSize={10}
+                    maxSize={5}
                     className="w-full"
                   />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Tags *
-                  </label>
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {courseData.tags.map(tag => (
-                      <span
-                        key={tag}
-                        className="inline-flex items-center px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 rounded-full text-sm"
-                      >
-                        {tag}
-                        <button
-                          onClick={() => removeTag(tag)}
-                          className="ml-2 text-blue-600 hover:text-blue-800"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                  <div className="flex space-x-2">
-                    <Input
-                      type="text"
-                      value={newTag}
-                      onChange={(e) => setNewTag(e.target.value)}
-                      placeholder="Add tag"
-                      className="flex-1"
-                      onKeyPress={(e) => e.key === 'Enter' && addTag()}
-                    />
-                    <Button onClick={addTag} variant="outline">
-                      <Plus className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Learning Objectives *
-                  </label>
-                  <div className="space-y-2 mb-3">
-                    {courseData.learningObjectives.map((objective, index) => (
-                      <div key={index} className="flex items-center space-x-2">
-                        <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">
-                          • {objective}
-                        </span>
-                        <button
-                          onClick={() => removeObjective(objective)}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex space-x-2">
-                    <Input
-                      type="text"
-                      value={newObjective}
-                      onChange={(e) => setNewObjective(e.target.value)}
-                      placeholder="Add learning objective"
-                      className="flex-1"
-                      onKeyPress={(e) => e.key === 'Enter' && addObjective()}
-                    />
-                    <Button onClick={addObjective} variant="outline">
-                      <Plus className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
               </div>
             </div>
           )}
 
-          {/* Modules Tab */}
-          {activeTab === 1 && (
-            <div className="p-6 space-y-6">
+            {/* Step 1: Modules */}
+            {currentStep === 1 && (
+              <div className="space-y-6">
               <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                    Course Modules
-                  </h2>
-                  <p className="text-gray-600 dark:text-gray-400">
-                    Add modules with content and short quizzes
-                  </p>
-                </div>
-                <Button onClick={addModule} className="flex items-center space-x-2">
-                  <Plus className="w-4 h-4" />
-                  <span>Add Module</span>
+                  <h2 className="text-xl font-semibold text-gray-900">Modules & Content</h2>
+                  <Button onClick={addModule} size="sm">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Module
                 </Button>
               </div>
 
               {courseData.modules.length === 0 ? (
-                <Card className="p-8 text-center">
-                  <Video className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                    No modules added yet
-                  </h3>
-                  <p className="text-gray-600 dark:text-gray-400 mb-4">
-                    Start by adding your first course module
-                  </p>
-                  <Button onClick={addModule} className="flex items-center space-x-2">
-                    <Plus className="w-4 h-4" />
-                    <span>Add First Module</span>
+                  <div className="text-center py-12 bg-gray-50 rounded-lg">
+                    <Video className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No modules yet</h3>
+                    <p className="text-gray-500 mb-4">Add your first module to get started</p>
+                    <Button onClick={addModule}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Module
                   </Button>
-                </Card>
-              ) : (
-                <div className="space-y-6">
-                  {courseData.modules.map((module, index) => (
-                    <Card key={module.id} className="p-6">
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {courseData.modules.map((module, moduleIndex) => (
+                      <Card key={module.id} className="p-4">
                       <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                          Module {index + 1}
-                        </h3>
+                          <h3 className="text-lg font-medium">Module {moduleIndex + 1}</h3>
             <Button
+                            onClick={() => removeModule(module.id)}
               variant="outline"
                           size="sm"
-                          onClick={() => removeModule(module.id)}
                           className="text-red-600 hover:text-red-700"
                         >
-                          <Trash2 className="w-4 h-4" />
+                            <X className="w-4 h-4" />
             </Button>
                       </div>
 
                       <div className="space-y-4">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
                             Module Title *
                           </label>
                           <Input
-                            type="text"
                             value={module.title}
-                            onChange={(e) => updateModule(module.id, { title: e.target.value })}
+                              onChange={(e) => updateModule(module.id, 'title', e.target.value)}
                             placeholder="Enter module title"
-                            className="w-full"
                           />
                         </div>
 
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
                             Module Description *
                           </label>
                           <textarea
                             value={module.description}
-                            onChange={(e) => updateModule(module.id, { description: e.target.value })}
-                            rows={2}
-                            placeholder="Describe what students will learn"
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                              onChange={(e) => updateModule(module.id, 'description', e.target.value)}
+                              placeholder="Describe this module"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              rows={3}
                           />
                         </div>
 
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Module Video *
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Module Video
                           </label>
                           <FileUploadComponent
                             fileType="video"
-                            entityType="course"
-                            currentFileUrl={module.videoUrl}
                             onFileUploaded={(fileData) => handleVideoUpload(module.id, fileData)}
-                            onFileDeleted={() => updateModule(module.id, { videoUrl: undefined, videoFileId: undefined })}
                             maxSize={100}
-                            className="w-full"
                           />
                         </div>
 
+                          {/* Quiz Questions */}
                         <div>
-                          <h4 className="text-md font-medium text-gray-900 dark:text-white mb-3">
-                            Module Quiz (3 Questions)
-                          </h4>
-                          <div className="space-y-4">
-                            {module.quiz.questions.map((question, qIndex) => (
-                              <div key={question.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                                <div className="mb-3">
-                                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                    Question {qIndex + 1} *
+                            <div className="flex items-center justify-between mb-3">
+                              <label className="block text-sm font-medium text-gray-700">
+                                Quiz Questions
                                   </label>
-                                  <Input
-                                    type="text"
-                                    value={question.questionText}
-                                                                          onChange={(e) => {
-                                        const newQuestions = [...module.quiz.questions];
-                                        newQuestions[qIndex] = { ...question, questionText: e.target.value };
-                                        updateModule(module.id, { quiz: { ...module.quiz, questions: newQuestions } });
-                                      }}
-                                    placeholder="Enter question"
-                                    className="w-full"
-                                  />
+                              <Button
+                                onClick={() => addQuestion(module.id)}
+                                variant="outline"
+                                size="sm"
+                              >
+                                <Plus className="w-4 h-4 mr-1" />
+                                Add Question
+                              </Button>
+                            </div>
+
+                            {module.questions.map((question, qIndex) => (
+                              <div key={question.id} className="border border-gray-200 rounded-lg p-4 mb-3">
+                                <div className="flex items-center justify-between mb-3">
+                                  <span className="text-sm font-medium text-gray-700">
+                                    Question {qIndex + 1}
+                                  </span>
+                                  <Button
+                                    onClick={() => removeQuestion(module.id, question.id)}
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-red-600"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
                                 </div>
-                                <div className="space-y-2">
-                                  {question.options.map((option, oIndex) => (
-                                    <div key={oIndex} className="flex items-center space-x-2">
+
+                                <div className="space-y-3">
+                                  <Input
+                                    value={question.questionText}
+                                    onChange={(e) => updateQuestion(module.id, question.id, 'questionText', e.target.value)}
+                                    placeholder="Enter question text"
+                                  />
+
+                                  <div className="grid grid-cols-2 gap-2">
+                                    {question.options.map((option, optIndex) => (
+                                      <div key={optIndex} className="flex items-center space-x-2">
                                       <input
                                         type="radio"
                                         name={`correct-${question.id}`}
-                                        checked={question.correctAnswer === oIndex}
-                                        onChange={() => {
-                                          const newQuestions = [...module.quiz.questions];
-                                          newQuestions[qIndex] = { ...question, correctAnswer: oIndex };
-                                          updateModule(module.id, { quiz: { ...module.quiz, questions: newQuestions } });
-                                        }}
-                                        className="w-4 h-4 text-blue-600"
+                                          checked={question.correctAnswer === optIndex}
+                                          onChange={() => updateQuestion(module.id, question.id, 'correctAnswer', optIndex)}
+                                          className="text-blue-600"
                                       />
                                       <Input
-                                        type="text"
                                         value={option}
-                                        onChange={(e) => {
-                                          const newQuestions = [...module.quiz.questions];
-                                          const newOptions = [...question.options] as [string, string, string, string];
-                                          newOptions[oIndex] = e.target.value;
-                                          newQuestions[qIndex] = { ...question, options: newOptions };
-                                          updateModule(module.id, { quiz: { ...module.quiz, questions: newQuestions } });
-                                        }}
-                                        placeholder={`Option ${oIndex + 1}`}
+                                          onChange={(e) => updateQuestionOption(module.id, question.id, optIndex, e.target.value)}
+                                          placeholder={`Option ${optIndex + 1}`}
                                         className="flex-1"
                                       />
                                     </div>
                                   ))}
+                                  </div>
                                 </div>
                               </div>
                             ))}
-                          </div>
                         </div>
                       </div>
                     </Card>
@@ -1001,277 +853,318 @@ const CourseCreation: React.FC = () => {
             </div>
           )}
 
-          {/* Assessment Tab */}
-          {activeTab === 2 && (
-            <div className="p-6 space-y-6">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                  Final Assessment (Optional)
-                </h2>
-                <p className="text-gray-600 dark:text-gray-400">
-                  Add a comprehensive assessment with 10 multiple choice questions
-                </p>
-              </div>
-
-              <Card className="p-6">
+                         {/* Step 2: Assessment */}
+             {currentStep === 2 && (
+               <div className="space-y-6">
                 <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-                    <Award className="w-8 h-8 text-blue-600" />
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                        Add Final Assessment
-                      </h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Test students' overall understanding
-                      </p>
+                   <h2 className="text-xl font-semibold text-gray-900">Final Assessment</h2>
+                   <div className="flex items-center space-x-2">
+                     <input
+                       type="checkbox"
+                       id="enableAssessment"
+                       checked={!!courseData.finalAssessment}
+                       onChange={(e) => {
+                         if (e.target.checked) {
+                           enableAssessment();
+                         } else {
+                           disableAssessment();
+                         }
+                       }}
+                       className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                     />
+                     <label htmlFor="enableAssessment" className="text-sm font-medium text-gray-700">
+                       Include final assessment
+                     </label>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-3">
-                    {courseData.finalAssessment ? (
-                      <>
-                        <span className="text-sm text-green-600 font-medium">
-                          Assessment Enabled
-                        </span>
-              <Button
-                variant="outline"
-                          onClick={disableAssessment}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          Remove
-                        </Button>
-                      </>
-                    ) : (
-                      <Button onClick={enableAssessment} className="flex items-center space-x-2">
-                        <Plus className="w-4 h-4" />
-                        <span>Add Assessment</span>
-              </Button>
-                    )}
-                  </div>
-                </div>
-              </Card>
 
-              {courseData.finalAssessment && (
+                 {!courseData.finalAssessment ? (
+                   <div className="text-center py-12 bg-gray-50 rounded-lg">
+                     <Award className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                     <h3 className="text-lg font-medium text-gray-900 mb-2">No final assessment</h3>
+                     <p className="text-gray-500 mb-4">Add an optional final assessment to test overall course knowledge</p>
+                     <Button onClick={enableAssessment}>
+                       <Award className="w-4 h-4 mr-2" />
+                       Add Assessment
+                        </Button>
+                  </div>
+                 ) : (
                 <div className="space-y-6">
                   <Card className="p-6">
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                       <div className="space-y-4">
+                         <div>
+                           <label className="block text-sm font-medium text-gray-700 mb-2">
                         Assessment Title *
                       </label>
                       <Input
-                        type="text"
                         value={courseData.finalAssessment.title}
-                        onChange={(e) => setCourseData(prev => ({
-                          ...prev,
-                          finalAssessment: prev.finalAssessment ? {
-                            ...prev.finalAssessment,
+                             onChange={(e) => updateCourse('finalAssessment', {
+                               ...courseData.finalAssessment!,
                             title: e.target.value
-                          } : undefined
-                        }))}
+                             })}
                         placeholder="Enter assessment title"
-                        className="w-full"
-                      />
+                           />
+                         </div>
+
+                         <div>
+                           <label className="block text-sm font-medium text-gray-700 mb-2">
+                             Assessment Description
+                           </label>
+                           <textarea
+                             value={courseData.finalAssessment.description}
+                             onChange={(e) => updateCourse('finalAssessment', {
+                               ...courseData.finalAssessment!,
+                               description: e.target.value
+                             })}
+                             placeholder="Describe the final assessment"
+                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                             rows={3}
+                           />
+                         </div>
+
+                         <div className="grid grid-cols-3 gap-4">
+                           <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-2">
+                               Time Limit (minutes)
+                             </label>
+                             <Input
+                               type="number"
+                               value={courseData.finalAssessment.settings.timeLimit}
+                               onChange={(e) => updateCourse('finalAssessment', {
+                                 ...courseData.finalAssessment!,
+                                 settings: {
+                                   ...courseData.finalAssessment!.settings,
+                                   timeLimit: parseInt(e.target.value) || 0
+                                 }
+                               })}
+                               placeholder="60"
+                             />
+                           </div>
+
+                           <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-2">
+                               Max Attempts
+                             </label>
+                             <Input
+                               type="number"
+                               value={courseData.finalAssessment.settings.attempts}
+                               onChange={(e) => updateCourse('finalAssessment', {
+                                 ...courseData.finalAssessment!,
+                                 settings: {
+                                   ...courseData.finalAssessment!.settings,
+                                   attempts: parseInt(e.target.value) || 1
+                                 }
+                               })}
+                               placeholder="3"
+                             />
+                           </div>
+
+                           <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-2">
+                               Passing Score (%)
+                             </label>
+                             <Input
+                               type="number"
+                               value={courseData.finalAssessment.settings.passingScore}
+                               onChange={(e) => updateCourse('finalAssessment', {
+                                 ...courseData.finalAssessment!,
+                                 settings: {
+                                   ...courseData.finalAssessment!.settings,
+                                   passingScore: parseInt(e.target.value) || 70
+                                 }
+                               })}
+                               placeholder="70"
+                             />
+                           </div>
+                         </div>
                     </div>
                   </Card>
 
                   <Card className="p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                      Assessment Questions (10 Questions)
-                    </h3>
-                    <div className="space-y-6">
+                       <div className="flex items-center justify-between mb-4">
+                         <h3 className="text-lg font-medium text-gray-900">Assessment Questions</h3>
+                         <Button onClick={addAssessmentQuestion} size="sm">
+                           <Plus className="w-4 h-4 mr-2" />
+                           Add Question
+                         </Button>
+                       </div>
+
+                       {courseData.finalAssessment.questions.length === 0 ? (
+                         <div className="text-center py-8 bg-gray-50 rounded-lg">
+                           <h4 className="text-md font-medium text-gray-900 mb-2">No questions yet</h4>
+                           <p className="text-gray-500 mb-4">Add questions to test students' knowledge</p>
+                           <Button onClick={addAssessmentQuestion} size="sm">
+                             <Plus className="w-4 h-4 mr-2" />
+                             Add First Question
+                           </Button>
+                         </div>
+                       ) : (
+                         <div className="space-y-4">
                       {courseData.finalAssessment.questions.map((question, qIndex) => (
-                        <div key={question.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                          <div className="mb-3">
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                              Question {qIndex + 1} *
-                            </label>
+                             <div key={question.id} className="border border-gray-200 rounded-lg p-4">
+                               <div className="flex items-center justify-between mb-3">
+                                 <span className="text-sm font-medium text-gray-700">
+                                   Question {qIndex + 1}
+                                 </span>
+                                 <Button
+                                   onClick={() => removeAssessmentQuestion(question.id)}
+                                   variant="outline"
+                                   size="sm"
+                                   className="text-red-600"
+                                 >
+                                   <Trash2 className="w-4 h-4" />
+                                 </Button>
+                               </div>
+
+                               <div className="space-y-3">
                             <Input
-                              type="text"
                               value={question.questionText}
-                              onChange={(e) => {
-                                const newQuestions = [...courseData.finalAssessment!.questions];
-                                newQuestions[qIndex] = { ...question, questionText: e.target.value };
-                                setCourseData(prev => ({
-                                  ...prev,
-                                  finalAssessment: prev.finalAssessment ? {
-                                    ...prev.finalAssessment,
-                                    questions: newQuestions
-                                  } : undefined
-                                }));
-                              }}
-                              placeholder="Enter question"
-                              className="w-full"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            {question.options.map((option, oIndex) => (
-                              <div key={oIndex} className="flex items-center space-x-2">
+                                   onChange={(e) => updateAssessmentQuestion(question.id, 'questionText', e.target.value)}
+                                   placeholder="Enter question text"
+                                 />
+
+                                 <div className="grid grid-cols-2 gap-2">
+                                   {question.options.map((option, optIndex) => (
+                                     <div key={optIndex} className="flex items-center space-x-2">
                                 <input
                                   type="radio"
-                                  name={`final-correct-${question.id}`}
-                                  checked={question.correctAnswer === oIndex}
-                                  onChange={() => {
-                                    const newQuestions = [...courseData.finalAssessment!.questions];
-                                    newQuestions[qIndex] = { ...question, correctAnswer: oIndex };
-                                    setCourseData(prev => ({
-                                      ...prev,
-                                      finalAssessment: prev.finalAssessment ? {
-                                        ...prev.finalAssessment,
-                                        questions: newQuestions
-                                      } : undefined
-                                    }));
-                                  }}
-                                  className="w-4 h-4 text-blue-600"
+                                         name={`correct-assessment-${question.id}`}
+                                         checked={question.correctAnswer === optIndex}
+                                         onChange={() => updateAssessmentQuestion(question.id, 'correctAnswer', optIndex)}
+                                         className="text-blue-600"
                                 />
                                 <Input
-                                  type="text"
                                   value={option}
-                                  onChange={(e) => {
-                                    const newQuestions = [...courseData.finalAssessment!.questions];
-                                    const newOptions = [...question.options] as [string, string, string, string];
-                                    newOptions[oIndex] = e.target.value;
-                                    newQuestions[qIndex] = { ...question, options: newOptions };
-                                    setCourseData(prev => ({
-                                      ...prev,
-                                      finalAssessment: prev.finalAssessment ? {
-                                        ...prev.finalAssessment,
-                                        questions: newQuestions
-                                      } : undefined
-                                    }));
-                                  }}
-                                  placeholder={`Option ${oIndex + 1}`}
+                                         onChange={(e) => updateAssessmentQuestionOption(question.id, optIndex, e.target.value)}
+                                         placeholder={`Option ${optIndex + 1}`}
                                   className="flex-1"
                                 />
-                                {question.correctAnswer === oIndex && (
-                                  <span className="text-green-600 text-sm font-medium">Correct</span>
-                                )}
                               </div>
                             ))}
+                                 </div>
                           </div>
                         </div>
                       ))}
                     </div>
+                       )}
                   </Card>
                 </div>
               )}
             </div>
           )}
 
-          {/* Submission Tab */}
-          {activeTab === 3 && (
-            <div className="p-6 space-y-6">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                  Review & Submit
-                </h2>
-                <p className="text-gray-600 dark:text-gray-400">
-                  Review your course details and submit for approval
-                </p>
-              </div>
+             {/* Step 3: Review */}
+             {currentStep === 3 && (
+               <div className="space-y-6">
+                 <h2 className="text-xl font-semibold text-gray-900">Review & Submit</h2>
 
               <Card className="p-6">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                  Course Summary
-                </h3>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                   <h3 className="text-lg font-medium mb-4">Course Summary</h3>
+                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <span className="text-sm font-medium text-gray-500">Title:</span>
-                      <p className="text-gray-900 dark:text-white">{courseData.title || 'Not set'}</p>
+                       <span className="font-medium text-gray-500">Title:</span>
+                       <p className="text-gray-900">{courseData.title || 'Not set'}</p>
                     </div>
                     <div>
-                      <span className="text-sm font-medium text-gray-500">Category:</span>
-                      <p className="text-gray-900 dark:text-white">{courseData.category || 'Not set'}</p>
+                       <span className="font-medium text-gray-500">Category:</span>
+                       <p className="text-gray-900">{courseData.category || 'Not set'}</p>
                     </div>
                     <div>
-                      <span className="text-sm font-medium text-gray-500">Level:</span>
-                      <p className="text-gray-900 dark:text-white">{courseData.level}</p>
+                       <span className="font-medium text-gray-500">Level:</span>
+                       <p className="text-gray-900">{courseData.level}</p>
                     </div>
                     <div>
-                      <span className="text-sm font-medium text-gray-500">Modules:</span>
-                      <p className="text-gray-900 dark:text-white">{courseData.modules.length}</p>
+                       <span className="font-medium text-gray-500">Modules:</span>
+                       <p className="text-gray-900">{courseData.modules.length}</p>
                     </div>
                     <div>
-                      <span className="text-sm font-medium text-gray-500">Tags:</span>
-                      <p className="text-gray-900 dark:text-white">{courseData.tags.length}</p>
+                       <span className="font-medium text-gray-500">Module Questions:</span>
+                       <p className="text-gray-900">{courseData.modules.reduce((total, module) => total + module.questions.length, 0)}</p>
                     </div>
                     <div>
-                      <span className="text-sm font-medium text-gray-500">Final Assessment:</span>
-                      <p className="text-gray-900 dark:text-white">
-                        {courseData.finalAssessment ? 'Yes' : 'No'}
+                       <span className="font-medium text-gray-500">Final Assessment:</span>
+                       <p className="text-gray-900">
+                         {courseData.finalAssessment ? 
+                           `Yes (${courseData.finalAssessment.questions.length} questions)` : 
+                           'No'
+                         }
                       </p>
                     </div>
                   </div>
 
-                  <div>
-                    <span className="text-sm font-medium text-gray-500">Description:</span>
-                    <p className="text-gray-900 dark:text-white">{courseData.description || 'Not set'}</p>
+                   {courseData.description && (
+                     <div className="mt-4 pt-4 border-t border-gray-200">
+                       <span className="font-medium text-gray-500">Description:</span>
+                       <p className="text-gray-900 mt-1">{courseData.description}</p>
                   </div>
-
-                  <div>
-                    <span className="text-sm font-medium text-gray-500">Learning Objectives:</span>
-                    <ul className="list-disc list-inside text-gray-900 dark:text-white">
-                      {courseData.learningObjectives.map((obj, index) => (
-                        <li key={index}>{obj}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
+                   )}
               </Card>
 
-              <Card className="p-6 bg-blue-50 dark:bg-blue-900/20">
-                <div className="flex items-center space-x-3">
-                  <Info className="w-5 h-5 text-blue-600" />
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <div className="flex">
+                    <Info className="w-5 h-5 text-yellow-600 mr-3 mt-0.5" />
                   <div>
-                    <h4 className="font-medium text-blue-900 dark:text-blue-100">
-                      Submission Guidelines
-                    </h4>
-                    <p className="text-sm text-blue-700 dark:text-blue-300">
-                      Once submitted, your course will be reviewed by our team. You can save as draft to continue editing later.
+                      <h4 className="text-sm font-medium text-yellow-800">Ready to Submit?</h4>
+                      <p className="text-sm text-yellow-700 mt-1">
+                        Once submitted, your course will be reviewed by administrators before being published.
                     </p>
                   </div>
                 </div>
-              </Card>
+                </div>
+              </div>
+            )}
+          </div>
 
+          {/* Footer */}
+          <div className="px-8 py-6 border-t border-gray-200 bg-gray-50">
+            <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 <Button
                   onClick={saveDraft}
-                  variant="outline"
                   disabled={saving}
-                  className="flex items-center space-x-2"
+                  variant="outline"
+                  className="px-6"
                 >
-                  {saving ? <LoadingSpinner size="sm" /> : <Save className="w-4 h-4" />}
-                  <span>Save Draft</span>
+                  {saving ? <LoadingSpinner size="sm" /> : <Save className="w-4 h-4 mr-2" />}
+                  Save Draft
                 </Button>
-                <Button
-                  onClick={submitCourse}
-                  disabled={loading || !canProceed(3)}
-                  className="flex items-center space-x-2"
-                >
-                  {loading ? <LoadingSpinner size="sm" /> : <Send className="w-4 h-4" />}
-                  <span>Submit for Approval</span>
-                </Button>
+                
+                {saving && (
+                  <span className="text-sm text-gray-600">Saving...</span>
+                )}
               </div>
-            </div>
-          )}
 
-          {/* Navigation Footer */}
-          <div className="flex items-center justify-between p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
+              <div className="flex items-center space-x-3">
+                {currentStep > 0 && (
             <Button
+                    onClick={prevStep} 
               variant="outline"
-              onClick={() => setActiveTab(Math.max(0, activeTab - 1))}
-              disabled={activeTab === 0}
+                    className="px-6"
             >
               Previous
             </Button>
-            <div className="text-sm text-gray-500">
-              Step {activeTab + 1} of {tabs.length}
-            </div>
+                )}
+                
+                {currentStep < steps.length - 1 ? (
             <Button
-              onClick={() => setActiveTab(Math.min(tabs.length - 1, activeTab + 1))}
-              disabled={activeTab === tabs.length - 1}
+                    onClick={nextStep}
+                    disabled={!isStepValid(currentStep)}
+                    className="px-6 bg-blue-600 hover:bg-blue-700"
             >
               Next
             </Button>
+                ) : (
+                  <Button 
+                    onClick={submitCourse}
+                    disabled={loading || !isStepValid(currentStep)}
+                    className="px-6 bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    {loading ? <LoadingSpinner size="sm" /> : <Send className="w-4 h-4 mr-2" />}
+                    Submit Course
+                  </Button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>

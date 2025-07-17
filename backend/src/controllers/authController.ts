@@ -39,9 +39,7 @@ export class AuthController {
       }
 
       // Create user immediately with verified: false
-      const userId = userModel.generateUserId();
       const user = await userModel.create({
-        id: userId,
         name,
         email,
         password,

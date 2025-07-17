@@ -69,25 +69,25 @@ TekRiders is a full-stack e-learning platform that enables seamless knowledge sh
 ### Installation
 
 1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd TekRiderz
+```bash
+git clone <repository-url>
+cd TekRiderz
    ```
 
 2. **Install dependencies**
    ```bash
-   npm install
+npm install
    ```
 
 3. **Environment setup**
    ```bash
    # Copy environment templates
-   cp backend/env.example backend/.env
-   cp client/env.example client/.env
+cp backend/env.example backend/.env
+cp client/env.example client/.env
    ```
 
 4. **Start development servers**
-   ```bash
+```bash
    npm run dev
    ```
 
