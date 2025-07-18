@@ -2892,79 +2892,35 @@ router.post('/users/bulk-action', async (req: Request, res: Response): Promise<v
   }
 });
 
-// Advanced user search and filtering
+// Basic user search
 router.get('/users/search', async (req: Request, res: Response) => {
   try {
-    const {
-      query,
-      role,
-      status,
-      verified,
-      dateFrom,
-      dateTo,
-      sortBy = 'createdAt',
-      sortOrder = 'desc',
-      page = 1,
-      limit = 20
-    } = req.query;
+    const { query, role, page = 1, limit = 50 } = req.query;
 
     const usersResult = await userModel.findAll({ limit: 10000 });
     let users = usersResult.docs;
 
-    // Apply advanced filters
+    // Simple search by name or email
     if (query) {
       const searchLower = (query as string).toLowerCase();
       users = users.filter((user: User) => 
         user.name.toLowerCase().includes(searchLower) ||
-        user.email.toLowerCase().includes(searchLower) ||
-        user.profile?.bio?.toLowerCase().includes(searchLower)
+        user.email.toLowerCase().includes(searchLower)
       );
     }
 
+    // Filter by role if specified
     if (role) {
       users = users.filter((user: User) => user.role === role);
     }
 
-    if (status) {
-      users = users.filter((user: User) => user.status === status);
-    }
-
-    if (verified !== undefined) {
-      const isVerified = verified === 'true';
-      users = users.filter((user: User) => user.verified === isVerified);
-    }
-
-    if (dateFrom || dateTo) {
-      const fromDate = dateFrom ? new Date(dateFrom as string) : new Date(0);
-      const toDate = dateTo ? new Date(dateTo as string) : new Date();
-      
-      users = users.filter((user: User) => {
-        const userDate = new Date(user.createdAt);
-        return userDate >= fromDate && userDate <= toDate;
-      });
-    }
-
-    // Sort users
-    users.sort((a: User, b: User) => {
-      const aValue = a[sortBy as keyof User] as string;
-      const bValue = b[sortBy as keyof User] as string;
-      
-      if (sortOrder === 'asc') {
-        return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
-      } else {
-        return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
-      }
-    });
-
-    // Pagination
+    // Simple pagination
     const pageNum = parseInt(page as string);
     const limitNum = parseInt(limit as string);
-    const total = users.length;
     const startIndex = (pageNum - 1) * limitNum;
-    const endIndex = startIndex + limitNum;
-    const paginatedUsers = users.slice(startIndex, endIndex);
+    const paginatedUsers = users.slice(startIndex, startIndex + limitNum);
 
-    // Remove sensitive data
+    // Return basic user data
     const safeUsers = paginatedUsers.map((user: User) => ({
       id: user.id,
       name: user.name,
@@ -2973,35 +2929,19 @@ router.get('/users/search', async (req: Request, res: Response) => {
       status: user.status,
       verified: user.verified,
       createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-      profile: user.profile,
-      lastLogin: user.lastLogin,
     }));
 
     res.json({
       success: true,
       data: {
         users: safeUsers,
-        pagination: {
-          currentPage: pageNum,
-          totalPages: Math.ceil(total / limitNum),
-          totalItems: total,
-          itemsPerPage: limitNum,
-        },
-        filters: {
-          query,
-          role,
-          status,
-          verified,
-          dateFrom,
-          dateTo,
-          sortBy,
-          sortOrder,
-        },
+        total: users.length,
+        page: pageNum,
+        limit: limitNum,
       },
     });
   } catch (error) {
-    logger.error('Advanced user search failed:', error);
+    logger.error('User search failed:', error);
     res.status(500).json({
       success: false,
       message: 'User search failed',
@@ -3117,8 +3057,7 @@ router.get('/settings', async (req: Request, res: Response) => {
         maintenance: false,
         registrationEnabled: true,
         emailVerificationRequired: true,
-        maxFileUploadSize: 100 * 1024 * 1024, // 100MB
-        allowedFileTypes: ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'mp4', 'mp3', 'jpg', 'png'],
+
       },
       email: {
         enabled: true,
@@ -3750,131 +3689,7 @@ router.put('/notifications/:notificationId/read', async (req: Request, res: Resp
   }
 });
 
-// Advanced analytics with custom date ranges and filters
-router.get('/analytics/advanced', async (req: Request, res: Response) => {
-  try {
-    const {
-      startDate,
-      endDate,
-      groupBy = 'day',
-      metrics = 'all',
-      compareWith,
-      filters = '{}'
-    } = req.query;
 
-    const start = startDate ? new Date(startDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const end = endDate ? new Date(endDate as string) : new Date();
-    const parsedFilters = JSON.parse(typeof filters === 'string' ? filters : '{}');
-
-    // Fetch data with date filtering
-    const [usersResult, coursesResult, enrollmentsResult, progressResult] = await Promise.all([
-      userModel.findAll({ limit: 10000 }),
-      courseModel.findAll({ limit: 10000 }),
-      enrollmentModel.findAll({ limit: 10000 }),
-      progressModel.findAll({ limit: 10000 })
-    ]);
-
-    const users = usersResult.docs.filter((u: User) => {
-      const userDate = new Date(u.createdAt);
-      return userDate >= start && userDate <= end;
-    });
-
-    const courses = coursesResult.docs.filter((c: Course) => {
-      const courseDate = new Date(c.createdAt);
-      return courseDate >= start && courseDate <= end;
-    });
-
-    const enrollments = enrollmentsResult.docs.filter((e: Enrollment) => {
-      const enrollmentDate = new Date(e.createdAt);
-      return enrollmentDate >= start && enrollmentDate <= end;
-    });
-
-    // Generate time series data based on groupBy
-    const generateTimeSeries = (data: any[], dateField: string) => {
-      const grouped = new Map();
-      
-      data.forEach(item => {
-        const date = new Date(item[dateField]);
-        let key = '';
-        
-        switch (groupBy) {
-          case 'hour':
-            key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:00`;
-            break;
-          case 'day':
-            key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-            break;
-          case 'week':
-            const weekStart = new Date(date);
-            weekStart.setDate(date.getDate() - date.getDay());
-            key = `${weekStart.getFullYear()}-W${Math.ceil(weekStart.getDate() / 7)}`;
-            break;
-          case 'month':
-            key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-            break;
-        }
-        
-        grouped.set(key, (grouped.get(key) || 0) + 1);
-      });
-      
-      return Array.from(grouped.entries()).map(([date, count]) => ({ date, count }));
-    };
-
-    const analytics = {
-      period: {
-        startDate: start.toISOString(),
-        endDate: end.toISOString(),
-        groupBy,
-      },
-      overview: {
-        totalUsers: users.length,
-        totalCourses: courses.length,
-        totalEnrollments: enrollments.length,
-        growthRate: {
-          users: users.length > 0 ? ((users.length / Math.max(usersResult.docs.length - users.length, 1)) * 100).toFixed(2) : '0',
-          courses: courses.length > 0 ? ((courses.length / Math.max(coursesResult.docs.length - courses.length, 1)) * 100).toFixed(2) : '0',
-          enrollments: enrollments.length > 0 ? ((enrollments.length / Math.max(enrollmentsResult.docs.length - enrollments.length, 1)) * 100).toFixed(2) : '0',
-        },
-      },
-      timeSeries: {
-        users: generateTimeSeries(users, 'createdAt'),
-        courses: generateTimeSeries(courses, 'createdAt'),
-        enrollments: generateTimeSeries(enrollments, 'createdAt'),
-      },
-      demographics: {
-        usersByRole: {
-          admin: users.filter(u => u.role === 'admin').length,
-          tutor: users.filter(u => u.role === 'tutor').length,
-          learner: users.filter(u => u.role === 'learner').length,
-        },
-        coursesByCategory: courses.reduce((acc, course) => {
-          acc[course.category] = (acc[course.category] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>),
-        coursesByLevel: courses.reduce((acc, course) => {
-          acc[course.level] = (acc[course.level] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>),
-      },
-      performance: {
-        averageCoursesPerInstructor: courses.length > 0 ? (courses.length / users.filter(u => u.role === 'tutor').length).toFixed(2) : '0',
-        averageEnrollmentsPerCourse: courses.length > 0 ? (enrollments.length / courses.length).toFixed(2) : '0',
-        completionRate: enrollments.length > 0 ? ((enrollments.filter(e => e.status === 'completed').length / enrollments.length) * 100).toFixed(2) : '0',
-      },
-    };
-
-    res.json({
-      success: true,
-      data: analytics,
-    });
-  } catch (error) {
-    logger.error('Advanced analytics failed:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch advanced analytics',
-    });
-  }
-});
 
 export { router as adminRoutes };
 export default router; 

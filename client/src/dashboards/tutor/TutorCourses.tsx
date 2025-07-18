@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useCourseStore } from '../../stores/courseStore';
@@ -66,6 +66,7 @@ const TutorCourses: React.FC = () => {
   const { user } = useAuth();
   const { language } = useLanguage();
   const navigate = useNavigate();
+  const location = useLocation();
   const { myCourses, setMyCourses } = useCourseStore();
   
   const [courses, setCourses] = useState<Course[]>([]);
@@ -96,6 +97,93 @@ const TutorCourses: React.FC = () => {
   // Use the same getFileUrl utility used on the course page for consistent URL handling
   const getThumbnailUrl = (course: Course): string => {
     return getFileUrl(course.thumbnail, 'thumbnail');
+  };
+
+  // Thumbnail component with fallback handling
+  const ThumbnailWithFallback = ({ course, getThumbnailUrl, getStatusBadge }: { 
+    course: Course; 
+    getThumbnailUrl: (course: Course) => string; 
+    getStatusBadge: (status: string) => React.ReactNode 
+  }) => {
+    const [imageError, setImageError] = useState(false);
+    const thumbnailUrl = getThumbnailUrl(course);
+
+    return (
+      <div className="relative h-32 bg-gray-100 dark:bg-gray-700 flex-shrink-0">
+        {!imageError ? (
+          <img 
+            className="w-full h-full object-cover"
+            src={thumbnailUrl}
+            alt={course.title}
+            style={{
+              objectFit: 'cover',
+              objectPosition: 'center'
+            }}
+            loading="eager"
+            crossOrigin="anonymous"
+            onError={(e) => {
+              console.warn('Course thumbnail failed to load:', thumbnailUrl, 'for course:', course.title);
+              setImageError(true);
+            }}
+            onLoad={() => {
+              console.log('Course thumbnail loaded successfully:', thumbnailUrl);
+            }}
+          />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center text-gray-500 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800">
+            <div className="p-2 bg-white dark:bg-gray-600 rounded-lg mb-1">
+              <BookOpen className="h-6 w-6 text-blue-600" />
+            </div>
+            <span className="text-xs font-medium text-center px-2">Course Image</span>
+          </div>
+        )}
+        {/* Status Badge Overlay */}
+        <div className="absolute top-2 left-2">
+          {getStatusBadge(course.status)}
+        </div>
+      </div>
+    );
+  };
+
+  // Modal thumbnail component with fallback handling
+  const ModalThumbnail = ({ course, getThumbnailUrl }: { 
+    course: Course; 
+    getThumbnailUrl: (course: Course) => string; 
+  }) => {
+    const [imageError, setImageError] = useState(false);
+    const thumbnailUrl = getThumbnailUrl(course);
+
+    return (
+      <div className="w-32 h-32 bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden shadow-sm">
+        {!imageError ? (
+          <img 
+            src={thumbnailUrl}
+            alt={course.title}
+            className="w-full h-full object-cover"
+            style={{
+              objectFit: 'cover',
+              objectPosition: 'center'
+            }}
+            loading="eager"
+            crossOrigin="anonymous"
+            onError={(e) => {
+              console.warn('Modal thumbnail failed to load:', thumbnailUrl, 'for course:', course.title);
+              setImageError(true);
+            }}
+            onLoad={() => {
+              console.log('Modal thumbnail loaded successfully:', thumbnailUrl);
+            }}
+          />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center text-gray-500 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800">
+            <div className="p-2 bg-white dark:bg-gray-600 rounded-lg mb-1">
+              <BookOpen className="h-6 w-6 text-blue-600" />
+            </div>
+            <span className="text-xs font-medium text-center">Thumbnail</span>
+          </div>
+        )}
+      </div>
+    );
   };
 
   // Enhanced load tutor's courses with better data processing
@@ -145,7 +233,13 @@ const TutorCourses: React.FC = () => {
         
         console.log('Processed courses:', processedCourses.length, 'courses');
         setCourses(processedCourses);
-        setMyCourses(processedCourses);
+        
+        // Safely update store without causing storage errors
+        try {
+          setMyCourses(processedCourses);
+        } catch (storeError: any) {
+          console.warn('Failed to update course store, continuing with local state:', storeError);
+        }
 
         // Calculate comprehensive stats
         const safeProcessedCourses = Array.isArray(processedCourses) ? processedCourses : [];
@@ -265,6 +359,18 @@ const TutorCourses: React.FC = () => {
       loadCourses();
     }
   }, [user]);
+
+  // Handle success message from course creation navigation
+  useEffect(() => {
+    if (location.state?.message && location.state?.type === 'success') {
+      setSuccess(location.state.message);
+      // Clear the message after showing it
+      setTimeout(() => setSuccess(''), 5000);
+      
+      // Clear navigation state to prevent showing message again
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.state, navigate]);
 
   // Auto-refresh data every 60 seconds
   useEffect(() => {
@@ -703,23 +809,11 @@ const TutorCourses: React.FC = () => {
             <div key={course.id} onClick={() => openCoursePage(course._id || course.id)} className="cursor-pointer">
               <Card className="bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden border border-gray-200 dark:border-gray-700 flex flex-col h-full">
                 {/* Course Thumbnail */}
-                <div className="relative h-32 bg-gray-100 dark:bg-gray-700 flex-shrink-0">
-                  <img 
-                    className="w-full h-full object-cover"
-                    src={getThumbnailUrl(course)}
-                    alt={course.title}
-                    style={{
-                      objectFit: 'cover',
-                      objectPosition: 'center'
-                    }}
-                    loading="eager"
-                    crossOrigin="anonymous"
-                  />
-                  {/* Status Badge Overlay */}
-                  <div className="absolute top-2 left-2">
-                    {getStatusBadge(course.status)}
-                  </div>
-                </div>
+                <ThumbnailWithFallback 
+                  course={course}
+                  getThumbnailUrl={getThumbnailUrl}
+                  getStatusBadge={getStatusBadge}
+                />
 
                 {/* Course Content */}
                 <div className="p-3 flex flex-col flex-grow">
@@ -844,17 +938,7 @@ const TutorCourses: React.FC = () => {
                 {/* Course Header */}
                 <div className="flex flex-col md:flex-row md:items-start space-y-4 md:space-y-0 md:space-x-6">
                   <div className="flex-shrink-0">
-                    <img 
-                      src={getThumbnailUrl(selectedCourse)} 
-                      alt={selectedCourse.title}
-                      className="w-32 h-32 object-cover rounded-lg shadow-sm"
-                      style={{
-                        objectFit: 'cover',
-                        objectPosition: 'center'
-                      }}
-                      loading="eager"
-                      crossOrigin="anonymous"
-                    />
+                    <ModalThumbnail course={selectedCourse} getThumbnailUrl={getThumbnailUrl} />
                   </div>
                   
                   <div className="flex-1">

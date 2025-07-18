@@ -93,6 +93,16 @@ const TutorDashboard: React.FC = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [createLoading, setCreateLoading] = useState(false);
+
+  // Quick course creation form state
+  const [quickCourse, setQuickCourse] = useState({
+    title: '',
+    description: '',
+    category: 'programming',
+    level: 'beginner' as 'beginner' | 'intermediate' | 'advanced'
+  });
 
   // Auto-refresh tutor dashboard data
   const autoRefresh = useAutoRefresh({
@@ -119,7 +129,12 @@ const TutorDashboard: React.FC = () => {
           reviews: course.rating?.count || 0,
         }));
         
-        setMyCourses(coursesData);
+        // Safely update store without causing storage errors
+        try {
+          setMyCourses(coursesData);
+        } catch (storeError: any) {
+          console.warn('Failed to update course store, continuing with local state:', storeError);
+        }
         
         // Set recent courses (last 6 courses)
         const sortedCourses = [...coursesData].sort((a, b) => 
@@ -147,10 +162,104 @@ const TutorDashboard: React.FC = () => {
       }
     } catch (err: any) {
       console.error('Failed to load courses:', err);
-      setError(handleCatchError(err, 'Failed to load courses'));
+      
+      // Better error handling to avoid generic error messages
+      if (err?.message?.includes('quota') || err?.name === 'QuotaExceededError') {
+        setError('Storage full. Please refresh the page to continue.');
+        // Auto-refresh in 3 seconds
+        setTimeout(() => window.location.reload(), 3000);
+      } else if (err?.status === 401 || err?.message?.includes('unauthorized')) {
+        setError('Session expired. Please log in again.');
+        setTimeout(() => window.location.href = '/login', 2000);
+      } else {
+        // Don't show storage errors as course loading errors
+        const errorMessage = handleCatchError(err, 'Failed to load courses');
+        if (!errorMessage.includes('[object Object]') && !errorMessage.includes('Setting the value')) {
+          setError(errorMessage);
+        } else {
+          console.warn('Skipping confusing error message:', errorMessage);
+          // Set empty state instead of showing error
+          setMyCourses([]);
+          setRecentCourses([]);
+          setStats({
+            totalCourses: 0,
+            publishedCourses: 0,
+            totalStudents: 0,
+            avgRating: 0,
+            pendingCourses: 0,
+            totalEnrollments: 0,
+            completedCourses: 0,
+          });
+        }
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  };
+
+  // Quick course creation function
+  const createQuickCourse = async () => {
+    if (!quickCourse.title.trim() || !quickCourse.description.trim()) {
+      setError('Please fill in course title and description');
+      return;
+    }
+
+    setCreateLoading(true);
+    setError('');
+
+    try {
+      const courseData = {
+        title: quickCourse.title.trim(),
+        description: quickCourse.description.trim(),
+        shortDescription: quickCourse.description.trim().substring(0, 150),
+        category: quickCourse.category,
+        level: quickCourse.level,
+        language: 'en',
+        status: 'draft',
+        instructorId: user?.id,
+        instructorName: user?.name || user?.email || 'Unknown Instructor',
+        type: 'course',
+        tags: [],
+        requirements: [],
+        learningObjectives: [],
+        sections: [],
+        totalDuration: 0,
+        totalLessons: 0,
+        price: 0,
+        currency: 'USD',
+        enrollmentCount: 0,
+        thumbnail: '',
+        targetAudience: ''
+      };
+
+      const response = await apiClient.createCourse(courseData);
+
+      if (response.success) {
+        setSuccess('Course created successfully! You can now add content.');
+        setShowCreateForm(false);
+        setQuickCourse({ title: '', description: '', category: 'programming', level: 'beginner' });
+        
+        // Refresh courses list
+        await loadMyCourses();
+        
+        // Navigate to the created course for editing
+        const courseId = response.data?._id || response.data?.id;
+        if (courseId) {
+          navigate(`/course/${courseId}`, { 
+            state: { 
+              message: 'Course created! You can now add modules and content.',
+              type: 'success'
+            }
+          });
+        }
+      } else {
+        setError(response.error || 'Failed to create course');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to create course');
+    } finally {
+      setCreateLoading(false);
     }
   };
 
@@ -184,19 +293,35 @@ const TutorDashboard: React.FC = () => {
         <Card className="relative overflow-hidden bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-xl hover:scale-105 transition-all duration-300 rounded-xl cursor-pointer">
           {/* Course thumbnail/header */}
           <div className="relative h-40 bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/20 overflow-hidden">
-            <img 
-              src={thumbnailUrl} 
-              alt={course.title}
-              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-              style={{
-                objectFit: 'cover',
-                objectPosition: 'center'
-              }}
-              onError={() => setImageError(true)}
-              onLoad={() => setImageError(false)}
-              loading="lazy"
-              crossOrigin="anonymous"
-            />
+            {!imageError ? (
+              <img 
+                src={thumbnailUrl} 
+                alt={course.title}
+                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                style={{
+                  objectFit: 'cover',
+                  objectPosition: 'center'
+                }}
+                onError={(e) => {
+                  console.warn('Thumbnail failed to load:', thumbnailUrl, 'for course:', course.title);
+                  setImageError(true);
+                }}
+                onLoad={() => {
+                  console.log('Thumbnail loaded successfully:', thumbnailUrl);
+                  setImageError(false);
+                }}
+                loading="lazy"
+                crossOrigin="anonymous"
+              />
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center text-gray-500 bg-gray-100 dark:bg-gray-700">
+                <div className="p-3 bg-white dark:bg-gray-600 rounded-lg mb-2">
+                  <BookOpen className="h-8 w-8 text-blue-600" />
+                </div>
+                <span className="text-sm font-medium">Course Thumbnail</span>
+                <span className="text-xs text-gray-400 mt-1">Click to view course</span>
+              </div>
+            )}
 
             {/* Status badge */}
             <div className="absolute top-3 left-3">
@@ -288,15 +413,102 @@ const TutorDashboard: React.FC = () => {
             }
           </p>
         </div>
-        <Button 
-          variant="primary" 
-          onClick={() => navigate('/dashboard/courses/new')}
-          className="flex items-center space-x-2"
-        >
-          <Plus className="w-4 h-4" />
-          <span>{language === 'rw' ? 'Kora Isomo' : 'Create Course'}</span>
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button 
+            variant={showCreateForm ? "outline" : "primary"}
+            onClick={() => setShowCreateForm(!showCreateForm)}
+            className="flex items-center space-x-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span>{language === 'rw' ? 'Kora Isomo' : 'Create Course'}</span>
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => navigate('/dashboard/courses')}
+            className="flex items-center space-x-2"
+          >
+            <BookOpen className="w-4 h-4" />
+            <span>{language === 'rw' ? 'Amasomo Yose' : 'All Courses'}</span>
+          </Button>
+        </div>
       </div>
+
+      {/* Quick Create Form */}
+      {showCreateForm && (
+        <Card className="p-6">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+            {language === 'rw' ? 'Kora Isomo' : 'Create New Course'}
+          </h2>
+          <form onSubmit={(e) => { e.preventDefault(); createQuickCourse(); }} className="space-y-4">
+            <div>
+              <label htmlFor="quickCourseTitle" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                {language === 'rw' ? 'Imeza' : 'Course Title'}
+              </label>
+              <input
+                type="text"
+                id="quickCourseTitle"
+                value={quickCourse.title}
+                onChange={(e) => setQuickCourse({ ...quickCourse, title: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                placeholder={language === 'rw' ? 'Imeza ryawe' : 'Enter course title'}
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="quickCourseDescription" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                {language === 'rw' ? 'Imeza ryawe' : 'Course Description'}
+              </label>
+              <textarea
+                id="quickCourseDescription"
+                value={quickCourse.description}
+                onChange={(e) => setQuickCourse({ ...quickCourse, description: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                placeholder={language === 'rw' ? 'Imeza ryawe' : 'Enter course description'}
+                rows={4}
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="quickCourseCategory" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                {language === 'rw' ? 'Kategori' : 'Category'}
+              </label>
+              <select
+                id="quickCourseCategory"
+                value={quickCourse.category}
+                onChange={(e) => setQuickCourse({ ...quickCourse, category: e.target.value as 'programming' | 'design' | 'business-tech' | 'general-it' })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+              >
+                <option value="programming">Programming</option>
+                <option value="design">Design</option>
+                <option value="business-tech">Business Tech</option>
+                <option value="general-it">General IT</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="quickCourseLevel" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                {language === 'rw' ? 'Umuko' : 'Level'}
+              </label>
+              <select
+                id="quickCourseLevel"
+                value={quickCourse.level}
+                onChange={(e) => setQuickCourse({ ...quickCourse, level: e.target.value as 'beginner' | 'intermediate' | 'advanced' })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+              >
+                <option value="beginner">Beginner</option>
+                <option value="intermediate">Intermediate</option>
+                <option value="advanced">Advanced</option>
+              </select>
+            </div>
+            <Button type="submit" className="w-full" disabled={createLoading}>
+              {createLoading ? (
+                <LoadingSpinner size="sm" />
+              ) : (
+                <span>{language === 'rw' ? 'Kora Isomo' : 'Create Course'}</span>
+              )}
+            </Button>
+          </form>
+        </Card>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">

@@ -389,26 +389,7 @@ export class CourseCreationErrorHandler {
     return this.errorHandler.handleError(error, `Validation error${field ? ` in ${field}` : ''}`);
   }
 
-  // Handle file upload errors
-  handleFileUploadError(error: any, filename?: string) {
-    const recoveryActions: ErrorRecoveryAction[] = [
-      {
-        label: 'Try again',
-        action: () => window.location.reload(),
-        primary: true
-      },
-      {
-        label: 'Choose different file',
-        action: () => console.log('File selection triggered')
-      }
-    ];
 
-    return this.errorHandler.handleError(
-      error, 
-      `File upload error${filename ? ` for ${filename}` : ''}`,
-      recoveryActions
-    );
-  }
 
   // Handle auto-save errors
   handleAutoSaveError(error: any) {
@@ -476,10 +457,7 @@ export const handleApiError = (error: any, context?: string) => {
   return errorHandler.handleError(error, context);
 };
 
-export const handleFileError = (error: any, filename?: string) => {
-  const courseErrorHandler = new CourseCreationErrorHandler();
-  return courseErrorHandler.handleFileUploadError(error, filename);
-};
+
 
 export const handleValidationError = (errors: string[], field?: string) => {
   const courseErrorHandler = new CourseCreationErrorHandler();
@@ -545,7 +523,7 @@ export const useErrorHandler = () => {
   return {
     handleError: (error: any, context?: string) => errorHandler.handleError(error, context),
     handleValidationError: (errors: string[], field?: string) => handleValidationError(errors, field),
-    handleFileError: (error: any, filename?: string) => handleFileError(error, filename),
+
     handleNetworkError: (error: any, action?: string) => handleNetworkError(error, action),
     getErrorHistory: () => errorHandler.getErrorHistory(),
     getErrorStats: () => errorHandler.getErrorStats(),

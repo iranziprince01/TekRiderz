@@ -60,11 +60,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
           icon: Home
         },
         { 
-          name: language === 'rw' ? 'Amasomo Yanjye' : 'My Courses', 
-          href: '/dashboard/courses', 
-          icon: BookOpen
-        },
-        { 
           name: language === 'rw' ? 'Kora Isomo' : 'Create Course', 
           href: '/dashboard/courses/new', 
           icon: Upload
@@ -88,11 +83,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
         name: language === 'rw' ? 'Amasomo Yanjye' : 'My Courses', 
         href: '/dashboard/courses', 
         icon: BookOpen
-      },
-      { 
-        name: language === 'rw' ? 'Impamyabushobozi' : 'Certificates', 
-        href: '/dashboard/certificates', 
-        icon: Award
       },
       { 
         name: language === 'rw' ? 'Umwirondoro' : 'Profile', 

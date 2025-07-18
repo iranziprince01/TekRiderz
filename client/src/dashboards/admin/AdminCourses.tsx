@@ -544,8 +544,8 @@ const AdminCourses: React.FC = () => {
             <option value="">All Categories</option>
             <option value="programming">Programming</option>
             <option value="design">Design</option>
-            <option value="business_tech">Business Tech</option>
-            <option value="general_it">General IT</option>
+            <option value="business-tech">Business Tech</option>
+            <option value="general-it">General IT</option>
           </select>
 
           <select

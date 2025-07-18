@@ -10,49 +10,20 @@ import { config } from './config/config';
 import { logger } from './utils/logger';
 import { errorHandler } from './middleware/errorHandler';
 import { notFoundHandler } from './middleware/notFoundHandler';
-import { connectToDatabases } from './config/database-simplified';
+import { connectToDatabases } from './config/database';
 import { authRoutes } from './routes/auth';
 import { userRoutes } from './routes/users';
 import courseRoutes from './routes/courses';
 import { adminRoutes } from './routes/admin';
-import { fileUploadRoutes } from './routes/fileUpload';
-import { certificateRoutes } from './routes/certificates';
+import uploadRoutes from './routes/upload';
+// Certificate and file upload routes removed
 import syncRoutes from './routes/sync';
 import { globalRateLimiter, getRateLimitStatus, clearRateLimit } from './middleware/rateLimiter';
 
 const app = express();
 const server = createServer(app);
 
-// Create uploads directory structure
-async function createUploadsStructure() {
-  const uploadsPath = path.join(__dirname, '../uploads');
-  const directories = [
-    'courses/thumbnails',
-    'courses/videos',
-    'users/avatars',
-    'lessons/materials',
-    'lessons/documents',
-    'documents',
-    'images',
-    'certificates'
-  ];
-
-  try {
-    // Create base uploads directory
-    await fs.mkdir(uploadsPath, { recursive: true });
-    
-    // Create subdirectories
-    for (const dir of directories) {
-      const fullPath = path.join(uploadsPath, dir);
-      await fs.mkdir(fullPath, { recursive: true });
-      logger.info(`Created uploads directory: ${dir}`);
-    }
-    
-    logger.info('Uploads directory structure created successfully');
-  } catch (error) {
-    logger.error('Error creating uploads structure:', error);
-  }
-}
+// Upload directory structure removed - using external services only
 
 // Configure CORS with specific origins
 const corsOptions = {
@@ -87,80 +58,9 @@ app.use(cookieParser());
 // Apply global rate limiting
 app.use(globalRateLimiter);
 
-// CORS middleware for uploads - must be before static middleware
-app.use('/uploads', (req, res, next) => {
-  // Simple and permissive CORS for uploads in development
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', '*');
-  res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
-  
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
-  }
-  
-  next();
-});
+// Upload CORS middleware removed - no local file serving
 
-// Static file serving for uploads
-app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
-  maxAge: '30d', // Cache for 30 days
-  etag: true,
-  lastModified: true,
-  index: false, // Don't serve index.html files
-  dotfiles: 'deny', // Deny access to dotfiles
-  // Additional security headers
-  setHeaders: (res, filePath, stat) => {
-    // Only allow specific file types
-    const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.pdf', '.doc', '.docx', '.txt'];
-    const ext = path.extname(filePath).toLowerCase();
-    
-    if (allowedExtensions.includes(ext)) {
-      // Security headers
-      res.setHeader('X-Content-Type-Options', 'nosniff');
-      res.setHeader('X-Frame-Options', 'DENY');
-      res.setHeader('X-XSS-Protection', '1; mode=block');
-      
-      // Set proper MIME types
-      if (['.jpg', '.jpeg'].includes(ext)) {
-        res.setHeader('Content-Type', 'image/jpeg');
-      } else if (ext === '.png') {
-        res.setHeader('Content-Type', 'image/png');
-      } else if (ext === '.gif') {
-        res.setHeader('Content-Type', 'image/gif');
-      } else if (ext === '.webp') {
-        res.setHeader('Content-Type', 'image/webp');
-      } else if (ext === '.mp4') {
-        res.setHeader('Content-Type', 'video/mp4');
-        res.setHeader('Accept-Ranges', 'bytes'); // Enable range requests for videos
-      } else if (ext === '.pdf') {
-        res.setHeader('Content-Type', 'application/pdf');
-      }
-      
-      // Add cache control based on file type
-      if (['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(ext)) {
-        res.setHeader('Cache-Control', 'public, max-age=2592000, immutable'); // 30 days for images
-      } else if (ext === '.mp4') {
-        res.setHeader('Cache-Control', 'public, max-age=604800'); // 7 days for videos
-      }
-    } else {
-      // Reject non-allowed file types
-      res.status(403).end('File type not allowed');
-    }
-  }
-}));
-
-// Handle 404 for uploads directory
-app.use('/uploads/*', (req, res) => {
-  logger.warn('File not found:', req.originalUrl);
-  res.status(404).json({
-    success: false,
-    error: 'File not found',
-    message: 'The requested file does not exist'
-  });
-});
+// Static file serving removed - using external services only
 
 // Request logging
 app.use((req, res, next) => {
@@ -173,8 +73,8 @@ app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/courses', courseRoutes);
 app.use('/api/v1/admin', adminRoutes);
-app.use('/api/v1/upload', fileUploadRoutes);
-app.use('/api/v1/certificates', certificateRoutes);
+app.use('/api/v1/upload', uploadRoutes);
+// Certificate and upload routes removed
 app.use('/api/v1/sync', syncRoutes);
 
 // Rate limiting status endpoint
@@ -365,9 +265,7 @@ app.use('/api/courses*', (req, res) => {
 app.use('/api/admin*', (req, res) => {
   res.redirect(301, `/api/v1${req.originalUrl.replace('/api', '')}`);
 });
-app.use('/api/upload*', (req, res) => {
-  res.redirect(301, `/api/v1${req.originalUrl.replace('/api', '')}`);
-});
+// Upload API redirects removed
 app.get('/api/health', (req, res) => {
   res.redirect(301, '/api/v1/health');
 });
@@ -383,8 +281,7 @@ const startServer = async () => {
     await connectToDatabases();
     logger.info('Database connected successfully');
 
-    // Create uploads directory structure
-    await createUploadsStructure();
+    // Upload directory creation removed - using external services only
 
     // Start HTTP server
     const PORT = config.server.port;
@@ -392,7 +289,7 @@ const startServer = async () => {
       logger.info(`TekRiders E-Learning API Server running on port ${PORT}`);
       logger.info(`Environment: ${config.server.nodeEnv}`);
       logger.info(`API Base URL: http://localhost:${PORT}/api/v1`);
-      logger.info(`Uploads served from: http://localhost:${PORT}/uploads`);
+      logger.info(`External services: Cloudinary (images) + YouTube (videos)`);
       
       if (config.server.isDevelopment) {
         logger.info(`Development mode - CORS enabled for: ${config.cors.allowedOrigins.join(', ')}`);

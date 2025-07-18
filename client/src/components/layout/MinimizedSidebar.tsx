@@ -65,12 +65,6 @@ const MinimizedSidebar: React.FC<MinimizedSidebarProps> = ({ isOpen = false, onC
           gradient: 'from-blue-500 to-purple-500'
         },
         { 
-          name: language === 'rw' ? 'Amasomo Yanjye' : 'My Courses', 
-          href: '/dashboard/courses', 
-          icon: BookOpen,
-          gradient: 'from-orange-500 to-red-500'
-        },
-        { 
           name: language === 'rw' ? 'Kora Isomo' : 'Create Course', 
           href: '/dashboard/courses/new', 
           icon: Upload,

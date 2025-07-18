@@ -7,6 +7,9 @@ import { NetworkStatusProvider } from './contexts/NetworkStatusContext';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { NotificationManager } from './components/ui/NotificationManager';
 import ProtectedRoute from './components/ProtectedRoute';
+import OfflineIndicator from './components/common/OfflineIndicator';
+import NetworkStatusIndicator from './components/common/NetworkStatusIndicator';
+import OfflineLoginIndicator from './components/common/OfflineLoginIndicator';
 
 // Pages
 import Landing from './pages/Landing';
@@ -16,8 +19,6 @@ import OTPVerify from './pages/OTPVerify';
 import ForgotPassword from './pages/ForgotPassword';
 import Dashboard from './pages/Dashboard';
 import Course from './pages/Course';
-import OfflineCourse from './pages/OfflineCourse';
-import OfflineTest from './pages/OfflineTest';
 import Profile from './pages/Profile';
 import NotFound from './pages/NotFound';
 
@@ -26,23 +27,33 @@ function App() {
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        console.log('🚀 Initializing TekRiders App...');
+        console.log('Initializing TekRiders App...');
         
         // Initialize service worker in production only
         if (import.meta.env.PROD && 'serviceWorker' in navigator) {
-      try {
+          try {
             const registration = await navigator.serviceWorker.register('/sw.js', {
               scope: '/'
             });
-            console.log('✅ Service Worker registered:', registration.scope);
+            console.log('Service Worker registered:', registration.scope);
           } catch (swError: any) {
-            console.warn('⚠️ Service Worker registration failed:', swError?.message || 'Unknown error');
+                          console.warn('Service Worker registration failed:', swError?.message || 'Unknown error');
           }
         }
 
-        console.log('✅ App initialization completed successfully');
+        console.log('App initialization completed successfully');
+        
+        // Dev tools message
+        if (import.meta.env.DEV) {
+          console.log(`
+      TekRiders Development Tools Available:
+   🧹 clearAllStorage()        - Clear all browser storage
+   
+Type any command in the console to use these tools.
+          `);
+        }
       } catch (error: any) {
-        console.error('❌ App initialization failed:', error?.message || 'Unknown error');
+        console.error('App initialization failed:', error?.message || 'Unknown error');
         // Don't throw - allow app to continue with basic functionality
       }
     };
@@ -116,18 +127,6 @@ function App() {
                       <ProtectedRoute>
                         <Course />
                       </ProtectedRoute>
-                  } />
-                  
-                  <Route path="/offline-course/:id" element={
-                    <ProtectedRoute>
-                      <OfflineCourse />
-                    </ProtectedRoute>
-                  } />
-                  
-                  <Route path="/offline-test/:id" element={
-                    <ProtectedRoute>
-                      <OfflineTest />
-                    </ProtectedRoute>
                   } />
                   
                   <Route path="/profile" element={

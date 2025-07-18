@@ -265,11 +265,11 @@ export const NetworkStatusProvider: React.FC<{ children: React.ReactNode }> = ({
             updateNetworkStatus(false, true);
           }
         }
-      }, 120000); // Check every 2 minutes
+      }, 300000); // Check every 5 minutes (reduced frequency)
 
-      // Only log in development
+      // Only log in development and less frequently
       if (import.meta.env.DEV) {
-        console.log('🌐 Global network monitoring started');
+        console.log('🌐 Network monitoring active');
       }
     }
 

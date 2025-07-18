@@ -194,12 +194,51 @@ export const useCourseStore = create<CourseState>()(
     }),
     {
       name: 'course-storage',
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => ({
+        getItem: (key: string) => {
+          try {
+            return localStorage.getItem(key);
+          } catch (error) {
+            console.warn('Failed to read from localStorage:', error);
+            return null;
+          }
+        },
+        setItem: (key: string, value: string) => {
+          try {
+            localStorage.setItem(key, value);
+          } catch (error) {
+            console.warn('Failed to write to localStorage, clearing and retrying:', error);
+            // Try emergency cleanup and retry once
+            try {
+              localStorage.clear();
+              localStorage.setItem(key, value);
+            } catch (retryError) {
+              console.error('Failed to write to localStorage even after cleanup:', retryError);
+            }
+          }
+        },
+        removeItem: (key: string) => {
+          try {
+            localStorage.removeItem(key);
+          } catch (error) {
+            console.warn('Failed to remove from localStorage:', error);
+          }
+        },
+      })),
       partialize: (state) => ({
-        enrolledCourses: state.enrolledCourses,
-        enrollments: state.enrollments,
-        myCourses: state.myCourses,
+        // Only persist essential enrollment data, not full course objects
+        enrollments: state.enrollments.slice(0, 10), // Limit to 10 most recent enrollments
+        // Don't persist full course data - too large and causes quota issues
+        // enrolledCourses: state.enrolledCourses,
+        // myCourses: state.myCourses,
       }),
+      // Increase version to reset storage and clear old data
+      version: 3,
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          console.log('Course store rehydrated successfully');
+        }
+      },
     }
   )
 ); 

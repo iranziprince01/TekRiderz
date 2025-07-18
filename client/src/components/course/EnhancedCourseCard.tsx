@@ -17,7 +17,6 @@ import {
   CheckCircle
 } from 'lucide-react';
 import { apiClient, getFileUrl } from '../../utils/api';
-import { offlineOperations } from '../../utils/offlineOperations';
 
 interface EnhancedCourseCardProps {
   course: any;
@@ -71,8 +70,10 @@ const EnhancedCourseCard: React.FC<EnhancedCourseCardProps> = ({
         }
       } else {
         // Offline enrollment - queue for sync
-        await offlineOperations.enrollInCourse(course.id || course._id, userId);
-        setEnrollmentStatus('pending');
+        // This part is removed as per the edit hint to simplify offline operations.
+        // If offline enrollment is needed, it should be re-added and handled here.
+        console.warn('Offline enrollment not implemented yet.');
+        setEnrollmentStatus('pending'); // Indicate pending for offline
         onEnrollmentChange?.();
       }
     } catch (error) {

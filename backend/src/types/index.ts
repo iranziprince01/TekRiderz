@@ -56,16 +56,8 @@ export type CourseStatus = 'draft' | 'pending' | 'submitted' | 'under_review' | 
 export type CourseCategory = 
   | 'programming' 
   | 'design' 
-  | 'business' 
-  | 'marketing' 
-  | 'data-science' 
-  | 'photography' 
-  | 'music' 
-  | 'language' 
-  | 'ai' 
-  | 'general-it' 
   | 'business-tech' 
-  | 'digital-marketing';
+  | 'general-it';
 
 // Course workflow and audit types
 export type CourseWorkflowAction = 
@@ -983,47 +975,6 @@ export interface RefreshTokenPayload {
   exp?: number;
 }
 
-// File upload types
-export interface FileUpload {
-  fieldname: string;
-  originalname: string;
-  encoding: string;
-  mimetype: string;
-  destination: string;
-  filename: string;
-  path: string;
-  size: number;
-}
-
-// File metadata for CouchDB storage
-export interface FileMetadata extends BaseDocument {
-  filename: string;
-  originalName: string;
-  mimetype: string;
-  size: number;
-  path: string;
-  url: string;
-  fileType: 'thumbnail' | 'video' | 'document' | 'image' | 'material';
-  entityType: 'course' | 'user' | 'lesson';
-  entityId: string;
-  uploadedBy: string;
-  uploadedAt: string;
-  checksum?: string;
-  metadata?: {
-    width?: number;
-    height?: number;
-    duration?: number;
-    bitrate?: number;
-    pages?: number;
-    fileSize?: number;
-    lastModified?: string;
-    type?: string;
-    [key: string]: any;
-  };
-  isActive: boolean;
-  tags?: string[];
-}
-
 // Email types
 export interface EmailOptions {
   to: string;
@@ -1650,61 +1601,7 @@ export interface Message extends BaseDocument {
   };
 }
 
-// Certificate interface
-export interface Certificate extends BaseDocument {
-  type: 'certificate';
-  id: string;
-  userId: string;
-  courseId: string;
-  enrollmentId: string;
-  certificateNumber: string; // Unique certificate number (e.g., CERT-2024-001)
-  templateType: 'completion' | 'achievement' | 'excellence';
-  status: 'active' | 'revoked' | 'expired';
-  
-  // Course and user information
-  courseName: string;
-  courseDescription: string;
-  instructorName: string;
-  learnerName: string;
-  learnerEmail: string;
-  
-  // Completion details
-  completedAt: string;
-  issuedAt: string;
-  totalDuration: number; // Course duration in seconds
-  finalGrade?: number; // Overall grade percentage
-  
-  // Certificate details
-  certificateData: {
-    template: string; // Template name used
-    grade: 'A+' | 'A' | 'B+' | 'B' | 'C+' | 'C' | 'Pass';
-    skills: string[]; // Skills learned/demonstrated
-    achievements: string[]; // Special achievements during course
-    verificationCode: string; // QR code data for verification
-  };
-  
-  // File information
-  pdfUrl: string; // URL to generated PDF certificate
-  pdfFilename: string; // PDF filename
-  fileSize: number; // PDF file size in bytes
-  
-  // Verification and security
-  digitalSignature: string; // Hash for verification
-  verificationUrl: string; // Public verification URL
-  isVerified: boolean;
-  
-  // Metadata
-  generatedBy: 'system' | 'admin' | 'instructor';
-  generatedByUserId?: string;
-  language: 'en' | 'rw';
-  
-  // Validity
-  expiresAt?: string; // Optional expiration date
-  isRevoked: boolean;
-  revokedAt?: string;
-  revokedReason?: string;
-  revokedBy?: string;
-}
+// Certificate interface removed for academic project simplification
 
 // Certificate template configuration
 export interface CertificateTemplate {
@@ -1759,21 +1656,7 @@ export interface CertificateTemplate {
   };
 }
 
-// Certificate verification response
-export interface CertificateVerification {
-  isValid: boolean;
-  certificate?: {
-    id: string;
-    certificateNumber: string;
-    learnerName: string;
-    courseName: string;
-    instructorName: string;
-    completedAt: string;
-    issuedAt: string;
-    status: string;
-  };
-  error?: string;
-}
+// Certificate verification interface removed
 
 // Express Request extensions
 declare global {

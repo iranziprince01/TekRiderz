@@ -12,7 +12,7 @@ import TutorCourses from '../dashboards/tutor/TutorCourses';
 import CourseCreation from '../dashboards/tutor/CourseCreation';
 import LearnerDashboard from '../dashboards/learner/LearnerDashboard';
 import LearnerCourses from '../dashboards/learner/LearnerCourses';
-import LearnerCertificates from '../dashboards/learner/LearnerCertificates';
+
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -50,7 +50,7 @@ const Dashboard = () => {
           <>
             <Route path="/" element={<LearnerDashboard />} />
             <Route path="/courses" element={<LearnerCourses />} />
-            <Route path="/certificates" element={<LearnerCertificates />} />
+
             <Route path="/profile" element={<Profile />} />
           </>
         )}

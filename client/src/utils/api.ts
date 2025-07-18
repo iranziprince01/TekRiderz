@@ -238,7 +238,7 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${token}`;
       console.log('🔐 Token found and set in headers');
     } else {
-      console.warn('⚠️ No authentication token found in IndexedDB storage');
+              console.warn('No authentication token found in IndexedDB storage');
     }
     
     return headers;
@@ -392,7 +392,7 @@ class ApiClient {
     try {
       const refreshToken = await this.tokenStorage.getRefreshToken();
       if (!refreshToken) {
-        console.warn('⚠️ No refresh token available');
+        console.warn('No refresh token available');
         return false;
       }
 
@@ -856,55 +856,9 @@ class ApiClient {
     }
   }
 
-  // File upload methods
-  async uploadFile(file: File, type: string): Promise<ApiResponse> {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('type', type);
 
-    return this.makeRequest('/upload', {
-      method: 'POST',
-      body: formData,
-      headers: this.token ? { 'Authorization': `Bearer ${this.token}` } : {},
-    });
-  }
 
-  // Certificate methods
-  async getUserCertificates(): Promise<ApiResponse> {
-    return this.makeRequest('/certificates/my-certificates');
-  }
-
-  async getCertificate(certificateId: string): Promise<ApiResponse> {
-    return this.makeRequest(`/certificates/${certificateId}`);
-  }
-
-  async viewCertificate(certificateId: string): Promise<ApiResponse> {
-    return this.makeRequest(`/certificates/${certificateId}/view`);
-  }
-
-  async downloadCertificate(certificateId: string): Promise<ApiResponse> {
-    return this.makeRequest(`/certificates/${certificateId}/download`);
-  }
-
-  async verifyCertificate(certificateId: string, certificateNumber?: string): Promise<ApiResponse> {
-    const params = certificateNumber ? `?cert=${certificateNumber}` : '';
-    return this.makeRequest(`/certificates/verify/${certificateId}${params}`);
-  }
-
-  async generateCertificate(userId: string, courseId: string, enrollmentId: string): Promise<ApiResponse> {
-    return this.makeRequest('/certificates/generate', {
-      method: 'POST',
-      body: JSON.stringify({ userId, courseId, enrollmentId }),
-    });
-  }
-
-  async getCourseCertificates(courseId: string): Promise<ApiResponse> {
-    return this.makeRequest(`/certificates/course/${courseId}`);
-  }
-
-  async getCertificateStats(): Promise<ApiResponse> {
-    return this.makeRequest('/certificates/stats');
-  }
+  // Certificate methods removed for academic project simplification
 
   // Enhanced course navigation methods
   async getCourseHome(courseId: string): Promise<ApiResponse> {
@@ -1099,17 +1053,9 @@ export const updateUserProfile = (userData: any) => apiClient.updateUserProfile(
 export const uploadAvatar = (file: File) => apiClient.uploadAvatar(file);
 
 // File upload exports
-export const uploadFile = (file: File, type: string) => apiClient.uploadFile(file, type);
 
-// Certificate exports
-export const getUserCertificates = () => apiClient.getUserCertificates();
-export const getCertificate = (certificateId: string) => apiClient.getCertificate(certificateId);
-export const viewCertificate = (certificateId: string) => apiClient.viewCertificate(certificateId);
-export const downloadCertificate = (certificateId: string) => apiClient.downloadCertificate(certificateId);
-export const verifyCertificate = (certificateId: string, certificateNumber?: string) => apiClient.verifyCertificate(certificateId, certificateNumber);
-export const generateCertificate = (userId: string, courseId: string, enrollmentId: string) => apiClient.generateCertificate(userId, courseId, enrollmentId);
-export const getCourseCertificates = (courseId: string) => apiClient.getCourseCertificates(courseId);
-export const getCertificateStats = () => apiClient.getCertificateStats();
+
+// Certificate exports removed
 
 // Quiz exports
 export const submitQuizAttempt = (courseId: string, attemptData: any) => apiClient.submitQuizAttempt(courseId, attemptData);
@@ -1154,7 +1100,7 @@ class FileUrlService {
     
     // Only log in development mode
     if (import.meta.env.DEV) {
-      console.log('🔧 FileUrlService initialized:', { 
+      console.log('FileUrlService initialized:', { 
         apiUrl: this.apiUrl, 
         baseUrl: this.baseUrl,
         env: import.meta.env.VITE_API_URL,
@@ -1169,18 +1115,46 @@ class FileUrlService {
    */
   getFileUrl(filePath?: string | null, fileType: 'thumbnail' | 'video' | 'avatar' | 'document' | 'material' = 'thumbnail'): string {
     if (import.meta.env.DEV) {
-      console.log('🔍 Getting file URL for:', { filePath, fileType, baseUrl: this.baseUrl });
+      console.log('Getting file URL for:', { filePath, fileType, baseUrl: this.baseUrl });
     }
     
-    if (!filePath || filePath === 'undefined' || filePath === 'null') {
+    // Enhanced validation for garbage data
+    if (!filePath || filePath === 'undefined' || filePath === 'null' || filePath.trim() === '') {
       if (import.meta.env.DEV) {
-        console.log('❌ No file path provided, returning placeholder');
+        console.log('No file path provided, returning placeholder');
       }
       return this.getPlaceholderUrl(fileType);
     }
 
+    // Clean the file path
+    const cleanFilePath = filePath.trim();
+
+    // Improved garbage detection - be more conservative to avoid false positives
+    const suspiciousPatterns = [
+      /^[a-z]{10,30}$/, // Very long lowercase strings without separators
+      /^[0-9a-f]{32,64}$/, // MD5/SHA hash-like strings
+      /^[A-Z]{5,20}$/, // Long uppercase strings
+      /^[\w]{1,3}$/, // Very short random strings
+    ];
+
+    const isGarbage = suspiciousPatterns.some(pattern => 
+      pattern.test(cleanFilePath) && 
+      !cleanFilePath.includes('.') && 
+      !cleanFilePath.includes('/') &&
+      !cleanFilePath.includes('-') &&
+      !cleanFilePath.includes('_')
+    );
+
+    if (isGarbage) {
+      if (import.meta.env.DEV) {
+        console.warn('Detected garbage string as filepath:', cleanFilePath, 'returning placeholder');
+      }
+      this.failedUrls.add(cleanFilePath);
+      return this.getPlaceholderUrl(fileType);
+    }
+
     // Check cache first
-    const cacheKey = `${fileType}:${filePath}`;
+    const cacheKey = `${fileType}:${cleanFilePath}`;
     if (this.urlCache.has(cacheKey)) {
       const cachedUrl = this.urlCache.get(cacheKey)!;
       if (import.meta.env.DEV) {
@@ -1190,9 +1164,9 @@ class FileUrlService {
     }
 
     // Check if this URL has failed before
-    if (this.failedUrls.has(filePath)) {
+    if (this.failedUrls.has(cleanFilePath)) {
       if (import.meta.env.DEV) {
-        console.log('⚠️ URL has failed before, returning placeholder:', filePath);
+        console.log('URL has failed before, returning placeholder:', cleanFilePath);
       }
       return this.getPlaceholderUrl(fileType);
     }
@@ -1200,29 +1174,36 @@ class FileUrlService {
     let finalUrl = '';
 
     try {
-      // Handle different URL formats
-      if (this.isFullUrl(filePath)) {
-        finalUrl = filePath;
-        if (import.meta.env.DEV) console.log('✅ Using full URL:', finalUrl);
-      } else if (this.isBlobUrl(filePath)) {
-        finalUrl = filePath;
-        if (import.meta.env.DEV) console.log('✅ Using blob URL:', finalUrl);
-      } else if (this.isRelativeUploadPath(filePath)) {
-        finalUrl = `${this.baseUrl}${filePath}`;
-        if (import.meta.env.DEV) console.log('✅ Using relative upload path:', finalUrl);
-      } else if (this.isFilename(filePath)) {
-        finalUrl = this.constructFileUrl(filePath, fileType);
-        if (import.meta.env.DEV) console.log('✅ Constructed URL from filename:', finalUrl);
+      // Handle different URL formats with improved logic
+      if (this.isFullUrl(cleanFilePath)) {
+        finalUrl = cleanFilePath;
+        if (import.meta.env.DEV) console.log('Using full URL:', finalUrl);
+      } else if (this.isBlobUrl(cleanFilePath)) {
+        finalUrl = cleanFilePath;
+        if (import.meta.env.DEV) console.log('Using blob URL:', finalUrl);
+      } else if (this.isBase64Image(cleanFilePath)) {
+        finalUrl = cleanFilePath;
+        if (import.meta.env.DEV) console.log('Using base64 image:', finalUrl.substring(0, 50) + '...');
+      } else if (this.isRelativeUploadPath(cleanFilePath)) {
+        finalUrl = `${this.baseUrl}${cleanFilePath}`;
+        if (import.meta.env.DEV) console.log('Using relative upload path:', finalUrl);
+      } else if (this.isFilename(cleanFilePath)) {
+        finalUrl = this.constructFileUrl(cleanFilePath, fileType);
+        if (import.meta.env.DEV) console.log('Constructed URL from filename:', finalUrl);
+      } else if (this.isCloudinaryUrl(cleanFilePath)) {
+        // Handle partial Cloudinary URLs
+        finalUrl = this.normalizeCloudinaryUrl(cleanFilePath);
+        if (import.meta.env.DEV) console.log('Normalized Cloudinary URL:', finalUrl);
       } else {
         // Fallback for unknown formats - assume it's a relative path
-        if (this.isValidPath(filePath)) {
+        if (this.isValidPath(cleanFilePath)) {
           // If path doesn't start with /, add it
-          const cleanPath = filePath.startsWith('/') ? filePath : `/${filePath}`;
+          const cleanPath = cleanFilePath.startsWith('/') ? cleanFilePath : `/${cleanFilePath}`;
           finalUrl = `${this.baseUrl}${cleanPath}`;
-          if (import.meta.env.DEV) console.log('✅ Using fallback relative path:', finalUrl);
+          if (import.meta.env.DEV) console.log('Using fallback relative path:', finalUrl);
         } else {
           finalUrl = this.getPlaceholderUrl(fileType);
-          if (import.meta.env.DEV) console.log('❌ Invalid path, using placeholder:', finalUrl);
+          if (import.meta.env.DEV) console.log('Invalid path, using placeholder:', finalUrl);
         }
       }
 
@@ -1232,14 +1213,14 @@ class FileUrlService {
       }
       
       if (import.meta.env.DEV) {
-        console.log('🎯 Final URL generated:', finalUrl);
+        console.log('Final URL generated:', finalUrl);
         
         // Test the URL immediately in development
         this.testUrlInBackground(finalUrl);
       }
       return finalUrl;
     } catch (error) {
-      console.warn('❌ Error constructing file URL:', error, { filePath, fileType });
+      console.warn('Error constructing file URL:', error, { filePath: cleanFilePath, fileType });
       return this.getPlaceholderUrl(fileType);
     }
   }
@@ -1253,12 +1234,12 @@ class FileUrlService {
     try {
       const response = await fetch(url, { method: 'HEAD' });
       if (response.ok) {
-        console.log('✅ URL is accessible:', url);
+        console.log('URL is accessible:', url);
       } else {
-        console.warn('⚠️ URL returned error:', url, response.status, response.statusText);
+                  console.warn('URL returned error:', url, response.status, response.statusText);
       }
     } catch (error) {
-      console.error('❌ URL test failed:', url, error);
+      console.error('URL test failed:', url, error);
     }
   }
 
@@ -1275,7 +1256,7 @@ class FileUrlService {
     }
     
     if (import.meta.env.DEV) {
-      console.warn('❌ Marked URL as failed:', url);
+      console.warn('Marked URL as failed:', url);
     }
   }
 
@@ -1298,13 +1279,13 @@ class FileUrlService {
       const isValid = response.ok;
       
       if (import.meta.env.DEV) {
-        console.log(`🔍 URL validation for ${url}:`, isValid ? '✅ Valid' : '❌ Invalid', response.status);
+        console.log(`URL validation for ${url}:`, isValid ? 'Valid' : 'Invalid', response.status);
       }
       
       return isValid;
     } catch (error) {
       if (import.meta.env.DEV) {
-        console.error('❌ URL validation failed:', url, error);
+        console.error('URL validation failed:', url, error);
       }
       return false;
     }
@@ -1381,20 +1362,75 @@ class FileUrlService {
   }
 
   private getPlaceholderUrl(fileType: string): string {
-    // Use data URLs for better reliability
+    // Create modern, gradient-based placeholders that match the TekRiders design
     const placeholders = {
-      thumbnail: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAwIiBoZWlnaHQ9IjQwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIyNCIgZmlsbD0iIzZiNzI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkNvdXJzZSBUaHVtYm5haWw8L3RleHQ+Cjwvc3ZnPg==',
-      video: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQwIiBoZWlnaHQ9IjM2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMWYyOTM3Ii8+CiAgPGNpcmNsZSBjeD0iNTAlIiBjeT0iNTAlIiByPSI0MCIgZmlsbD0iIzM3NEY2OCIvPgogIDxwb2x5Z29uIHBvaW50cz0iMjkwLDIwMCAzNTAsMjMwIDI5MCwyNjAiIGZpbGw9IndoaXRlIi8+CiAgPHRleHQgeD0iNTAlIiB5PSI4NSUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxOCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPlZpZGVvIFBsYXllcjwvdGV4dD4KPC9zdmc+',
-      avatar: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8Y2lyY2xlIGN4PSI3NSIgY3k9Ijc1IiByPSI3NSIgZmlsbD0iI2YzZjRmNiIvPgogIDx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiM2YjcyODAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5Vc2VyPC90ZXh0Pgo8L3N2Zz4=',
-      document: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjI1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2IiBzdHJva2U9IiNkMWQ1ZGIiLz4KICA8dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE2IiBmaWxsPSIjNmI3MjgwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+RG9jdW1lbnQ8L3RleHQ+Cjwvc3ZnPg==',
-      material: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2IiBzdHJva2U9IiNkMWQ1ZGIiLz4KICA8dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE2IiBmaWxsPSIjNmI3MjgwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+TWF0ZXJpYWw8L3RleHQ+Cjwvc3ZnPg=='
+      thumbnail: 'data:image/svg+xml;base64,' + btoa(`
+        <svg width="800" height="400" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" style="stop-color:#dbeafe"/>
+              <stop offset="100%" style="stop-color:#e0e7ff"/>
+            </linearGradient>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#bg)"/>
+          <circle cx="400" cy="160" r="40" fill="#3b82f6" opacity="0.1"/>
+          <rect x="350" y="140" width="100" height="40" rx="8" fill="#3b82f6" opacity="0.2"/>
+          <text x="50%" y="65%" font-family="system-ui,-apple-system,sans-serif" font-size="24" font-weight="600" fill="#374151" text-anchor="middle">Course Thumbnail</text>
+          <text x="50%" y="75%" font-family="system-ui,-apple-system,sans-serif" font-size="14" fill="#6b7280" text-anchor="middle">Upload an image to replace this placeholder</text>
+        </svg>
+      `),
+      video: 'data:image/svg+xml;base64,' + btoa(`
+        <svg width="640" height="360" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="videoBg" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" style="stop-color:#1f2937"/>
+              <stop offset="100%" style="stop-color:#374151"/>
+            </linearGradient>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#videoBg)"/>
+          <circle cx="50%" cy="50%" r="50" fill="#4f46e5" opacity="0.8"/>
+          <polygon points="295,155 365,180 295,205" fill="white"/>
+          <text x="50%" y="85%" font-family="system-ui,-apple-system,sans-serif" font-size="16" fill="white" text-anchor="middle" opacity="0.9">Video Player</text>
+        </svg>
+      `),
+      avatar: 'data:image/svg+xml;base64,' + btoa(`
+        <svg width="150" height="150" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="75" cy="75" r="75" fill="#f3f4f6"/>
+          <circle cx="75" cy="60" r="25" fill="#9ca3af"/>
+          <path d="M25 125 Q25 100 50 100 L100 100 Q125 100 125 125" fill="#9ca3af"/>
+          <text x="50%" y="90%" font-family="system-ui,-apple-system,sans-serif" font-size="12" fill="#6b7280" text-anchor="middle">User</text>
+        </svg>
+      `),
+      document: 'data:image/svg+xml;base64,' + btoa(`
+        <svg width="200" height="250" xmlns="http://www.w3.org/2000/svg">
+          <rect width="100%" height="100%" fill="#f9fafb" stroke="#e5e7eb" stroke-width="2"/>
+          <rect x="30" y="40" width="140" height="4" fill="#d1d5db"/>
+          <rect x="30" y="60" width="120" height="4" fill="#d1d5db"/>
+          <rect x="30" y="80" width="100" height="4" fill="#d1d5db"/>
+          <text x="50%" y="85%" font-family="system-ui,-apple-system,sans-serif" font-size="14" fill="#6b7280" text-anchor="middle">Document</text>
+        </svg>
+      `),
+      material: 'data:image/svg+xml;base64,' + btoa(`
+        <svg width="200" height="150" xmlns="http://www.w3.org/2000/svg">
+          <rect width="100%" height="100%" fill="#f9fafb" stroke="#e5e7eb" stroke-width="2"/>
+          <rect x="20" y="30" width="160" height="3" fill="#d1d5db"/>
+          <rect x="20" y="45" width="140" height="3" fill="#d1d5db"/>
+          <rect x="20" y="60" width="120" height="3" fill="#d1d5db"/>
+          <text x="50%" y="85%" font-family="system-ui,-apple-system,sans-serif" font-size="14" fill="#6b7280" text-anchor="middle">Learning Material</text>
+        </svg>
+      `)
     };
 
     const placeholder = placeholders[fileType as keyof typeof placeholders];
     if (import.meta.env.DEV) {
-      console.log('📄 Generated placeholder URL for', fileType);
+      console.log('📄 Generated modern placeholder URL for', fileType);
     }
-    return placeholder || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzZiNzI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pgo8L3N2Zz4=';
+    return placeholder || 'data:image/svg+xml;base64,' + btoa(`
+      <svg width="400" height="300" xmlns="http://www.w3.org/2000/svg">
+        <rect width="100%" height="100%" fill="#f3f4f6"/>
+        <text x="50%" y="50%" font-family="system-ui,-apple-system,sans-serif" font-size="18" fill="#6b7280" text-anchor="middle">No Image Available</text>
+      </svg>
+    `);
   }
 
   /**
@@ -1416,6 +1452,40 @@ class FileUrlService {
       windowLocation: window.location.href
     };
   }
+
+  /**
+   * Check if string is a base64 image
+   */
+  private isBase64Image(str: string): boolean {
+    return /^data:image\/(png|jpg|jpeg|gif|webp|bmp);base64,/.test(str);
+  }
+
+  /**
+   * Check if string appears to be a Cloudinary URL (even partial)
+   */
+  private isCloudinaryUrl(str: string): boolean {
+    return str.includes('cloudinary') || str.includes('res.cloudinary.com');
+  }
+
+  /**
+   * Normalize Cloudinary URLs to ensure they're properly formatted
+   */
+  private normalizeCloudinaryUrl(url: string): string {
+    // If it's already a complete Cloudinary URL, return as-is
+    if (url.startsWith('https://res.cloudinary.com/')) {
+      return url;
+    }
+    
+    // If it contains cloudinary but isn't complete, try to construct
+    if (url.includes('cloudinary')) {
+      // This is a fallback - in production, you'd want more sophisticated parsing
+      return url.startsWith('http') ? url : `https://${url}`;
+    }
+    
+    return url;
+  }
+
+
 }
 
 // Create singleton instance

@@ -23,7 +23,6 @@ const LearnerDashboard: React.FC = () => {
     stats,
     courses,
     enrolledCourses,
-    certificates,
     isLoading,
     error,
     refreshData
@@ -40,18 +39,16 @@ const LearnerDashboard: React.FC = () => {
       course.progress?.completedLessons === course.totalLessons
     ).length || 0;
     const inProgress = totalEnrolled - completed;
-    const totalCertificates = certificates?.length || 0;
 
     return {
       totalEnrolled,
       completed,
       inProgress,
-      totalCertificates,
       averageProgress: stats?.averageProgress || 0,
       timeSpent: stats?.timeSpent || 0,
       streak: stats?.streak?.currentStreak || 0
     };
-  }, [enrolledCourses, certificates, stats]);
+  }, [enrolledCourses, stats]);
 
   // Filter available courses for enrollment
   const availableCourses = useMemo(() => {
@@ -135,7 +132,7 @@ const LearnerDashboard: React.FC = () => {
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <Card className="p-6">
           <div className="flex items-center gap-4">
             <div className="bg-blue-100 p-3 rounded-lg">
@@ -168,18 +165,6 @@ const LearnerDashboard: React.FC = () => {
             <div>
               <div className="text-2xl font-bold">{dashboardStats.inProgress}</div>
               <div className="text-gray-600 text-sm">{t('In Progress')}</div>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6">
-          <div className="flex items-center gap-4">
-            <div className="bg-purple-100 p-3 rounded-lg">
-              <Award className="w-6 h-6 text-purple-600" />
-            </div>
-            <div>
-              <div className="text-2xl font-bold">{dashboardStats.totalCertificates}</div>
-              <div className="text-gray-600 text-sm">{t('Certificates')}</div>
             </div>
           </div>
         </Card>

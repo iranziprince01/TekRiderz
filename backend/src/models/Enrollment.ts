@@ -278,80 +278,12 @@ export class EnrollmentModel extends BaseModel<Enrollment> {
           completedAt: updateData.completedAt
         });
 
-        // Auto-generate certificate for completed course
-        try {
-          const { certificateService } = await import('../services/certificateService');
-          const certificate = await certificateService.generateCertificateOnCompletion(
-            currentEnrollment.userId,
-            currentEnrollment.courseId,
-            enrollmentId
-          );
-
-          if (certificate) {
-            // Update enrollment with certificate reference
-            updateData.certificate = {
-              id: certificate._id!,
-              issuedAt: certificate.issuedAt,
-              url: certificate.pdfUrl || ''
-            };
-            
-            logger.info('Certificate auto-generated for course completion:', {
-              enrollmentId,
-              certificateId: certificate._id,
-              certificateNumber: certificate.certificateNumber,
-              userId: currentEnrollment.userId,
-              courseId: currentEnrollment.courseId
-            });
-          }
-        } catch (certificateError) {
-          logger.error('Failed to auto-generate certificate:', {
-            enrollmentId,
-            userId: currentEnrollment.userId,
-            courseId: currentEnrollment.courseId,
-            error: certificateError
-          });
-          // Don't fail the enrollment update if certificate generation fails
-        }
+        // Certificate generation removed for academic project simplification
       }
 
       const updatedEnrollment = await this.update(enrollmentId, updateData);
 
-      // Auto-generate certificate when course is newly completed
-      if (isNewCompletion) {
-        try {
-          // Import certificate service here to avoid circular dependency
-          const { certificateService } = await import('../services/certificateService');
-          
-          logger.info('Triggering certificate generation for newly completed course', {
-            enrollmentId,
-            userId: updatedEnrollment.userId,
-            courseId: updatedEnrollment.courseId,
-            progress: updatedEnrollment.progress,
-            completedAt: updatedEnrollment.completedAt
-          });
-
-          // Generate certificate asynchronously (don't block enrollment update)
-          certificateService.generateCertificateOnCompletion(
-            updatedEnrollment.userId,
-            updatedEnrollment.courseId,
-            enrollmentId
-          ).catch(error => {
-            logger.error('Certificate generation failed', {
-              enrollmentId,
-              userId: updatedEnrollment.userId,
-              courseId: updatedEnrollment.courseId,
-              error
-            });
-          });
-
-        } catch (error) {
-          logger.error('Failed to trigger certificate generation', {
-            enrollmentId,
-            error
-          });
-          // Don't throw here - certificate generation failure shouldn't block enrollment completion
-        }
-      }
+      // Certificate generation removed for academic project simplification
 
       return updatedEnrollment;
     } catch (error) {

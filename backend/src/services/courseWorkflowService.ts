@@ -545,10 +545,10 @@ export class CourseWorkflowService {
       score -= 20;
     }
 
-    if (!course.description || course.description.trim().length < 50) {
+    if (!course.description || course.description.trim().length < 20) {
       errors.push({
         field: 'description',
-        message: 'Description must be at least 50 characters long',
+        message: 'Description must be at least 20 characters long',
         severity: 'error'
       });
       score -= 15;
@@ -619,15 +619,7 @@ export class CourseWorkflowService {
       }
     }
 
-    // Learning objectives validation
-    if (!course.learningObjectives || course.learningObjectives.length === 0) {
-      warnings.push({
-        field: 'learningObjectives',
-        message: 'Learning objectives help students understand what they will learn',
-        suggestion: 'Add 3-5 clear learning objectives'
-      });
-      score -= 5;
-    }
+    // Learning objectives validation - removed to simplify submission
 
     // Accessibility validation
     if (course.sections) {

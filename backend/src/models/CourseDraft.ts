@@ -568,13 +568,72 @@ export class CourseDraftModel extends BaseModel<CourseDraft> {
       // Import course model to create the actual course
       const { courseModel } = await import('./Course');
       
-      // Prepare course data for creation
+      // Prepare course data for creation with required defaults
       const courseData = {
         ...draft.courseData,
         instructorId: draft.authorId,
         instructorName: draft.authorName,
         status: 'pending' as any, // Will go through approval process
-        type: 'course' as const
+        type: 'course' as const,
+        // Fix category and language types
+        category: (draft.courseData.category || 'programming') as any,
+        language: (draft.courseData.language || 'en') as any,
+        // Add missing required fields with defaults
+        id: `course_${Date.now()}`,
+        version: '1.0.0',
+        isCurrentVersion: true,
+        qualityScore: 0,
+        accessibility: {
+          compliantWith: [],
+          hasTranscriptions: false,
+          hasCaptions: false,
+          hasAudioDescriptions: false,
+          keyboardNavigable: false,
+          screenReaderOptimized: false
+        },
+        schedule: {
+          cohortBased: false
+        },
+        contentFlags: {
+          hasVideo: false,
+          hasQuizzes: false,
+          hasAssignments: false,
+          hasCertificate: false,
+          hasPrerequisites: false,
+          isAccessible: true
+        },
+        // Additional required defaults
+        workflowHistory: [],
+        metrics: {
+          views: 0,
+          completionRate: 0,
+          avgTimeToComplete: 0,
+          dropoffPoints: [],
+          engagement: {
+            avgSessionDuration: 0,
+            returnRate: 0,
+            discussionPosts: 0
+          },
+          performance: {
+            avgQuizScore: 0,
+            assignmentSubmissionRate: 0,
+            certificateEarnedRate: 0
+          }
+        },
+        rating: {
+          average: 0,
+          count: 0,
+          distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 }
+        },
+        enrollmentCount: 0,
+        completionCount: 0,
+        revenue: 0,
+        seo: {
+          metaTitle: draft.courseData.title || '',
+          metaDescription: draft.courseData.description?.substring(0, 150) || '',
+          keywords: [],
+          slug: draft.courseData.title?.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') || ''
+        }
       };
 
       // Create the actual course

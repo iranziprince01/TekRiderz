@@ -24,22 +24,7 @@ const Login: React.FC = () => {
 
   // Check for offline credentials when email changes
   useEffect(() => {
-    const checkOfflineCredentials = async () => {
-      if (email.trim()) {
-        try {
-          const { hasCachedCredentials } = await import('../utils/offlineAuth');
-          const hasCredentials = await hasCachedCredentials(email);
-          setHasOfflineCredentials(hasCredentials);
-        } catch (error: any) {
-          console.warn('Failed to check offline credentials:', error?.message);
-          setHasOfflineCredentials(false);
-        }
-      } else {
-        setHasOfflineCredentials(false);
-      }
-    };
-
-    checkOfflineCredentials();
+    setHasOfflineCredentials(false);
   }, [email]);
 
   // Listen for online/offline changes

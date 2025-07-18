@@ -479,45 +479,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           ]);
 
           if (storedUser && storedToken) {
-            console.log('✅ Found stored credentials');
+            console.log('Found stored credentials');
             
-            // Check if this is an offline session
-            const isOfflineMode = localStorage.getItem('isOfflineMode') === 'true';
-            const offlineSessionId = localStorage.getItem('offlineSessionId');
-            
-            if (isOfflineMode && offlineSessionId && storedToken === 'offline_token') {
-              // Validate offline session
-              try {
-                const offlineAuthModule = await import('../utils/offlineAuth');
-                const sessionResult = await offlineAuthModule.validateOfflineSession(offlineSessionId);
-                
-                if (sessionResult.valid && sessionResult.userData) {
-                  console.log('✅ Valid offline session restored');
-                  setAuthState(prev => ({
-                    ...prev,
-                    user: sessionResult.userData,
-                    token: 'offline_token',
-                    isInitialized: true,
-                    isLoading: false
-                  }));
-                  return;
-                } else {
-                  console.log('❌ Offline session expired, clearing data');
-                  localStorage.removeItem('isOfflineMode');
-                  localStorage.removeItem('offlineSessionId');
-                  await storage.clear();
-                  // Fall through to regular initialization
-                }
-              } catch (offlineError: any) {
-                console.warn('⚠️ Offline session validation failed:', offlineError?.message);
-                localStorage.removeItem('isOfflineMode');
-                localStorage.removeItem('offlineSessionId');
-                await storage.clear();
-                // Fall through to regular initialization
-              }
-            }
-            
-            // Regular online session or fallback from failed offline validation
+            // Regular token validation
             // Set token in apiClient for API requests
             await apiClient.setToken(storedToken);
             
@@ -534,15 +498,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               isLoading: false
             }));
             
-            console.log('✅ Auth state restored from storage');
+            console.log('Auth state restored from storage');
             
             // Verify token in background (don't block initialization)
             setTimeout(async () => {
               try {
                 await authService.getCurrentUser();
-                console.log('✅ Token verified in background');
+                console.log('Token verified in background');
               } catch (error) {
-                console.warn('⚠️ Background token verification failed, user needs to login again');
+                                  console.warn('Background token verification failed, user needs to login again');
                 await storage.clear();
                 await apiClient.setToken(null);
                 setAuthState(prev => ({ 
@@ -562,7 +526,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }));
           }
         } catch (storageError: any) {
-          console.warn('⚠️ Storage access failed:', storageError?.message || 'Unknown error');
+          console.warn('Storage access failed:', storageError?.message || 'Unknown error');
           setAuthState(prev => ({
             ...prev,
             isInitialized: true,
@@ -571,7 +535,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         
       } catch (error: any) {
-        console.error('❌ Auth initialization failed:', error?.message || 'Unknown error');
+        console.error('Auth initialization failed:', error?.message || 'Unknown error');
         setAuthState(prev => ({ 
           ...prev, 
           isInitialized: true,
@@ -581,7 +545,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     initAuth().catch((error: any) => {
-      console.error('❌ Critical auth initialization error:', error?.message || 'Unknown error');
+      console.error('Critical auth initialization error:', error?.message || 'Unknown error');
       setAuthState(prev => ({ 
         ...prev, 
         isInitialized: true,
@@ -635,30 +599,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Set token in apiClient for API requests
         await apiClient.setToken(token);
         
-        // Try to cache credentials for offline access (don't let this fail the login)
-        try {
-          if (typeof window !== 'undefined' && 'indexedDB' in window) {
-            // Import and cache offline credentials
-            import('../utils/offlineAuth').then(async (offlineAuthModule) => {
-              try {
-                await offlineAuthModule.cacheUserCredentials(email, password, user);
-                console.log('✅ Credentials cached for offline access');
-              } catch (cacheError: any) {
-                console.warn('⚠️ Failed to cache credentials for offline:', cacheError?.message);
-              }
-            }).catch(() => {
-              console.warn('⚠️ Offline auth module not available');
-            });
-          }
-        } catch (error) {
-          console.warn('⚠️ Offline caching failed, but login successful');
-        }
-        
-        // Store user data for offline access
-        localStorage.setItem('currentUserId', user.id);
-        localStorage.setItem('userRole', user.role);
-        localStorage.setItem('userEmail', user.email);
-        
         setAuthState(prev => ({
           ...prev,
           user,
@@ -674,59 +614,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const redirectTo = RoleBasedNavigation.getPostLoginRoute(user.role, currentPath);
         navigate(redirectTo, { replace: true });
         
-        console.log('✅ Login successful');
+        console.log('Login successful');
         return;
         
-      } catch (onlineError: any) {
-        // If online login fails and we're offline, try offline authentication
-        if (!navigator.onLine || onlineError?.message?.includes('fetch')) {
-          console.log('🔌 Network unavailable, attempting offline login...');
-          
-          try {
-            // Try offline authentication
-            const offlineAuthModule = await import('../utils/offlineAuth');
-            const offlineResult = await offlineAuthModule.validateOfflineLogin(email, password);
-            
-            if (offlineResult.success && offlineResult.userData) {
-              console.log('✅ Offline login successful');
-              
-              // Store offline session info
-              localStorage.setItem('currentUserId', offlineResult.userData.id);
-              localStorage.setItem('userRole', offlineResult.userData.role);
-              localStorage.setItem('userEmail', offlineResult.userData.email);
-              localStorage.setItem('offlineSessionId', offlineResult.sessionId || '');
-              localStorage.setItem('isOfflineMode', 'true');
-              
-              setAuthState(prev => ({
-                ...prev,
-                user: offlineResult.userData,
-                token: 'offline_token', // Special offline token
-                isLoading: false,
-                otpSent: false,
-                tempEmail: null,
-                tempUserData: null,
-              }));
-
-              // Auto-redirect based on user role
-              const currentPath = window.location.pathname;
-              const redirectTo = RoleBasedNavigation.getPostLoginRoute(offlineResult.userData.role, currentPath);
-              navigate(redirectTo, { replace: true });
-              
-              return;
-            } else {
-              console.log('❌ Offline login failed - no cached credentials or invalid password');
-              throw new Error('Invalid credentials. Please check your email and password, or connect to the internet to login.');
-            }
-          } catch (offlineError: any) {
-            console.error('❌ Offline login failed:', offlineError?.message);
-            throw new Error(offlineError?.message || 'Login failed. Please check your credentials or internet connection.');
-          }
-        } else {
-          // Online error but network is available
-          throw onlineError;
-        }
+      } catch (error: any) {
+        console.error('Login failed:', error?.message);
+        setAuthState(prev => ({ ...prev, isLoading: false }));
+        throw error;
       }
-      
     } catch (error: any) {
       console.error('❌ Login failed:', error?.message);
       setAuthState(prev => ({ ...prev, isLoading: false }));
@@ -812,8 +707,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Clear offline session and cached credentials
       try {
-        localStorage.removeItem('offlineSessionId');
-        localStorage.removeItem('isOfflineMode');
         localStorage.removeItem('currentUserId');
         localStorage.removeItem('userRole');
         localStorage.removeItem('userEmail');
@@ -835,8 +728,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error) {
       // Even if online logout fails, clear offline data
       try {
-        localStorage.removeItem('offlineSessionId');
-        localStorage.removeItem('isOfflineMode');
         localStorage.removeItem('currentUserId');
         localStorage.removeItem('userRole');
         localStorage.removeItem('userEmail');

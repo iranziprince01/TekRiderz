@@ -36,7 +36,7 @@ import {
   ArrowRight,
   Send
 } from 'lucide-react';
-import { AutoGradedQuiz } from '../components/quiz/AutoGradedQuiz';
+
 import { ToastContainer } from '../components/ui/Toast';
 
 // Define comprehensive course data types based on backend structure
@@ -533,6 +533,22 @@ const CourseHome = ({ courseData, onEnrollmentUpdate }: {
       </div>
     </div>
   );
+};
+
+// Helper function to convert YouTube URLs to embed URLs
+const getYouTubeEmbedUrl = (url: string): string => {
+  if (!url) return '';
+  
+  // Extract video ID from various YouTube URL formats
+  const youtubeRegex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+  const match = url.match(youtubeRegex);
+  
+  if (match && match[1]) {
+    const videoId = match[1];
+    return `https://www.youtube.com/embed/${videoId}?controls=1&modestbranding=1&rel=0&enablejsapi=1`;
+  }
+  
+  return url; // Return original URL if not YouTube
 };
 
 // Course Modules Component - Displays course sections and modules with Coursera-style adaptive flow
@@ -1668,81 +1684,92 @@ const CourseModules = ({ courseData }: { courseData: CourseData }) => {
 
                             {/* Active Lesson Content */}
                             {isActive && progress?.isUnlocked && (
-                              <div className="p-6 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+                              <div className="p-8 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
                                 {/* Video Player Section */}
                                 {!showQuizForLesson && (
-                                  <div className="space-y-4">
+                                  <div className="space-y-6">
                                     <h5 className="font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-3 mb-4">
                                       {lesson.title}
                                     </h5>
                                     
                                     {lesson.content?.videoUrl ? (
                                       <div className="space-y-4">
-                                        {/* Video Player */}
-                                        <div className="aspect-video bg-black rounded-lg overflow-hidden relative mb-4">
-                                          <video 
-                                            className="w-full h-full object-contain bg-black" 
-                                            controls 
-                                            preload="metadata"
-                                            src={getFileUrl(lesson.content.videoUrl, 'video')}
-                                            crossOrigin="anonymous"
-                                            playsInline
-                                            style={{ outline: 'none' }}
-                                            onError={(e) => {
-                                              console.error('Video loading error:', e);
-                                              console.log('Video URL:', getFileUrl(lesson.content?.videoUrl || '', 'video'));
-                                              console.log('Video element:', e.target);
-                                            }}
-                                            onLoadStart={() => {
-                                              console.log('Video loading started:', getFileUrl(lesson.content?.videoUrl || '', 'video'));
-                                            }}
-                                            onLoadedMetadata={(e) => {
-                                              console.log('Video metadata loaded successfully');
-                                              handleVideoLoadedMetadata(lessonKey, e.target as HTMLVideoElement);
-                                            }}
-                                            onCanPlay={() => {
-                                              console.log('Video can play');
-                                            }}
-                                            onLoadedData={() => {
-                                              console.log('Video data loaded');
-                                            }}
-                                            onTimeUpdate={(e) => handleVideoTimeUpdate(lessonKey, e.target as HTMLVideoElement)}
-                                            onPause={(e) => {
-                                              // Save progress when video is paused
-                                              const video = e.target as HTMLVideoElement;
-                                              const currentTime = video.currentTime;
-                                              const duration = video.duration;
-                                              const percentageWatched = duration > 0 ? Math.round((currentTime / duration) * 100) : 0;
-                                              
-                                              console.log('Video paused, saving progress:', {
-                                                lessonKey,
-                                                currentTime: Math.round(currentTime),
-                                                percentageWatched
-                                              });
-                                              
-                                              saveVideoProgress(lessonKey, currentTime, duration, percentageWatched);
-                                            }}
-                                            onEnded={(e) => {
-                                              // Save progress when video ends
-                                              const video = e.target as HTMLVideoElement;
-                                              const currentTime = video.currentTime;
-                                              const duration = video.duration;
-                                              
-                                              console.log('🏁 Video ended, saving final progress:', {
-                                                lessonKey,
-                                                duration: Math.round(duration)
-                                              });
-                                              
-                                              saveVideoProgress(lessonKey, currentTime, duration, 100);
-                                            }}
-                                          >
-                                            <p className="text-white p-4">
-                                              Your browser doesn't support HTML5 video. 
-                                              <a href={getFileUrl(lesson.content.videoUrl, 'video')} className="text-blue-400 underline">Download the video</a> instead.
-                                            </p>
-                                          </video>
-                        </div>
-                        
+                                        {/* Video Player - Professional YouTube-style Frame */}
+                                        <div className="w-full bg-black rounded-xl overflow-hidden shadow-2xl border border-gray-800 mb-8" style={{ aspectRatio: '16/9', minHeight: '400px' }}>
+                                          {/* Check if it's a YouTube URL and render iframe accordingly */}
+                                          {lesson.content.videoUrl.includes('youtube.com') || lesson.content.videoUrl.includes('youtu.be') ? (
+                                            <div className="w-full h-full relative">
+                                              <iframe 
+                                                src={getYouTubeEmbedUrl(lesson.content.videoUrl)}
+                                                title={lesson.title}
+                                                className="w-full h-full border-0"
+                                                frameBorder="0"
+                                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                                allowFullScreen
+                                                style={{ minHeight: '400px' }}
+                                                onLoad={() => {
+                                                  console.log('YouTube video loaded successfully for lesson:', lesson.title);
+                                                }}
+                                                onError={(e) => {
+                                                  console.error('YouTube video failed to load:', e);
+                                                }}
+                                              />
+                                            </div>
+                                          ) : (
+                                            <video 
+                                              className="w-full h-full object-contain bg-black rounded-xl" 
+                                              controls 
+                                              preload="metadata"
+                                              src={getFileUrl(lesson.content.videoUrl, 'video')}
+                                              crossOrigin="anonymous"
+                                              playsInline
+                                              style={{ outline: 'none', minHeight: '400px' }}
+                                              onError={(e) => {
+                                                console.error('Video loading error:', e);
+                                                console.log('Video URL:', getFileUrl(lesson.content?.videoUrl || '', 'video'));
+                                                console.log('Video element:', e.target);
+                                              }}
+                                              onLoadStart={() => {
+                                                console.log('Video loading started:', getFileUrl(lesson.content?.videoUrl || '', 'video'));
+                                              }}
+                                              onLoadedMetadata={(e) => {
+                                                console.log('Video metadata loaded successfully');
+                                                handleVideoLoadedMetadata(lessonKey, e.target as HTMLVideoElement);
+                                              }}
+                                              onCanPlay={() => {
+                                                console.log('Video can play');
+                                              }}
+                                              onLoadedData={() => {
+                                                console.log('Video data loaded');
+                                              }}
+                                              onTimeUpdate={(e) => {
+                                                const video = e.target as HTMLVideoElement;
+                                                if (video.currentTime && video.duration) {
+                                                  handleVideoTimeUpdate(lessonKey, video);
+                                                }
+                                              }}
+                                              onEnded={(e) => {
+                                                // Save progress when video ends
+                                                const video = e.target as HTMLVideoElement;
+                                                const currentTime = video.currentTime;
+                                                const duration = video.duration;
+                                                
+                                                console.log('Video ended, saving final progress:', {
+                                                  lessonKey,
+                                                  duration: Math.round(duration)
+                                                });
+                                                
+                                                saveVideoProgress(lessonKey, currentTime, duration, 100);
+                                              }}
+                                            >
+                                              <p className="text-white p-4">
+                                                Your browser doesn't support HTML5 video. 
+                                                <a href={getFileUrl(lesson.content.videoUrl, 'video')} className="text-blue-400 underline">Download the video</a> instead.
+                                              </p>
+                                            </video>
+                                          )}
+                                        </div>
+                                        
                                         {/* Video Controls */}
                                         <div className="flex flex-col items-center mt-4 space-y-2">
                                           {/* Enhanced Video Progress Display */}
@@ -2091,38 +2118,6 @@ const CourseQuizzes = ({ courseData }: { courseData: CourseData }) => {
     }
   };
 
-  // Handle quiz retake
-  const handleQuizRetake = () => {
-    if (!activeQuiz) return;
-    
-    console.log('Retaking quiz:', activeQuiz.id);
-    
-    // Reset quiz state for retake
-    setShowQuizModal(false);
-    setTimeout(() => {
-      setShowQuizModal(true);
-    }, 100);
-  };
-
-    // Handle next module navigation
-  const handleNextModule = () => {
-    if (!activeQuiz) return;
-    
-    console.log('Moving to next module');
-    
-    // Close quiz modal
-    setShowQuizModal(false);
-    setActiveQuiz(null);
-    
-    // Emit event to navigate to next module
-    window.dispatchEvent(new CustomEvent('navigateToNextModule', { 
-      detail: { 
-        courseId: course.id,
-        currentQuizId: activeQuiz.id
-      } 
-    }));
-  };
-
   // Close quiz modal
   const closeQuizModal = () => {
     setShowQuizModal(false);
@@ -2255,41 +2250,13 @@ const CourseQuizzes = ({ courseData }: { courseData: CourseData }) => {
               </Button>
             </div>
             
-            <AutoGradedQuiz
-              config={{
-                id: activeQuiz.id,
-                title: activeQuiz.title,
-                description: activeQuiz.description,
-                questions: (activeQuiz.realQuestions || []).map((q: any, index: number) => ({
-                  id: q.id || `q${index + 1}`,
-                  type: 'multiple-choice' as const,
-                  question: q.questionText || q.question,
-                  options: q.options || [],
-                  correctAnswer: q.correctAnswer || 0,
-                  explanation: q.explanation || 'No explanation provided.',
-                  difficulty: 'medium' as const,
-                  points: q.points || 10,
-                  category: activeQuiz.type === 'final' ? 'Final Assessment' : 'Module Quiz'
-                })),
-                passingScore: activeQuiz.passingScore || 70,
-                maxAttempts: 3, // Maximum 3 attempts as requested
-                showCorrectAnswers: true,
-                showExplanations: true,
-                shuffleQuestions: false,
-                shuffleOptions: false,
-                allowRetry: (activeQuiz.userProgress?.attempts || 0) < 3,
-                isAdaptive: false,
-                courserId: course.id,
-              }}
-              onComplete={handleQuizComplete}
-              onRetake={handleQuizRetake}
-              onNextModule={handleNextModule}
-              canRetake={(activeQuiz.userProgress?.attempts || 0) < 3}
-              hasNextModule={true} // We'll determine this dynamically
-              currentAttempt={(activeQuiz.userProgress?.attempts || 0) + 1}
-              maxAttempts={3}
-              isReadOnly={courseData.isReadOnly}
-            />
+                         <Card className="p-6 text-center">
+               <h3 className="text-lg font-semibold mb-4">{activeQuiz.title}</h3>
+               <p className="text-gray-600 mb-6">Quiz functionality simplified for academic presentation</p>
+               <Button onClick={closeQuizModal}>
+                 Close Quiz
+               </Button>
+             </Card>
           </div>
         </div>
       )}
@@ -3980,6 +3947,7 @@ const Course = () => {
   const [error, setError] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<string>('home');
   const [availableCourses, setAvailableCourses] = useState<any[]>([]);
+  const [successMessage, setSuccessMessage] = useState<string>('');
   const { language } = useLanguage();
 
   // Handle enrollment state updates
@@ -3998,6 +3966,18 @@ const Course = () => {
       fetchCourse();
     }
   }, [id]);
+
+  // Handle success message from course creation navigation
+  useEffect(() => {
+    if (location.state?.message && location.state?.type === 'success') {
+      setSuccessMessage(location.state.message);
+      // Clear the message after showing it
+      setTimeout(() => setSuccessMessage(''), 5000);
+      
+      // Clear navigation state to prevent showing message again
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.state, navigate]);
 
   // Handle URL path changes to update the current view
   useEffect(() => {
@@ -4118,7 +4098,7 @@ const Course = () => {
         let files = response.data.files;
         
         // Debug: Log course structure for presentation validation
-        console.log('📚 COURSE STRUCTURE VALIDATION:');
+        console.log('COURSE STRUCTURE VALIDATION:');
         console.log('- Course ID:', course.id || course._id);
         console.log('- Course Title:', course.title);
         console.log('- Course Status:', course.status);
@@ -4384,6 +4364,17 @@ const Course = () => {
   return (
     <>
       <ToastContainer />
+      
+      {/* Success Message Display */}
+      {successMessage && (
+        <div className="fixed top-4 right-4 z-50 max-w-md">
+          <Alert variant="success" className="bg-green-50 border-green-200">
+            <CheckCircle className="h-4 w-4 text-green-600" />
+            <span className="text-green-800">{successMessage}</span>
+          </Alert>
+        </div>
+      )}
+      
       <CourseLayout 
         courseTitle={courseData.course.title || 'Untitled Course'}
         courseProgress={0} // Will be calculated based on user progress

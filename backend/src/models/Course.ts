@@ -2,8 +2,15 @@ import { BaseModel } from './BaseModel';
 import { Course, CourseStatus, CourseLevel } from '../types';
 import { logger } from '../utils/logger';
 import { databases } from '../config/database';
-import { fileModel } from './File';
 import { config } from '../config/config';
+
+// Stub fileModel for backward compatibility (external services approach)
+const fileModel = {
+  findById: async (id: string) => null,
+  updateFile: async (id: string, data: any) => null,
+  getByEntity: async (type: string, id: string) => [],
+  deleteFile: async (id: string) => true,
+};
 
 export class CourseModel extends BaseModel<Course> {
   constructor() {
@@ -22,29 +29,8 @@ export class CourseModel extends BaseModel<Course> {
       let thumbnailUrl = courseData.thumbnail;
       let previewVideoUrl = courseData.previewVideo;
 
-      if (fileIds.thumbnailId) {
-        const thumbnailFile = await fileModel.findById(fileIds.thumbnailId);
-        if (thumbnailFile) {
-          thumbnailUrl = thumbnailFile.url;
-          // Update file to link to this course
-          await fileModel.updateFile(fileIds.thumbnailId, {
-            entityType: 'course',
-            entityId: '', // Will be updated after course creation
-          });
-        }
-      }
-
-      if (fileIds.previewVideoId) {
-        const videoFile = await fileModel.findById(fileIds.previewVideoId);
-        if (videoFile) {
-          previewVideoUrl = videoFile.url;
-          // Update file to link to this course
-          await fileModel.updateFile(fileIds.previewVideoId, {
-            entityType: 'course',
-            entityId: '', // Will be updated after course creation
-          });
-        }
-      }
+      // External services approach - URLs come directly from courseData
+      // No local file processing needed
 
       // Create course with file URLs
       const course = await this.create({
@@ -53,18 +39,7 @@ export class CourseModel extends BaseModel<Course> {
         previewVideo: previewVideoUrl || courseData.previewVideo || '',
       });
 
-      // Update file entities with course ID
-      if (fileIds.thumbnailId && course._id) {
-        await fileModel.updateFile(fileIds.thumbnailId, {
-          entityId: course._id,
-        });
-      }
-
-      if (fileIds.previewVideoId && course._id) {
-        await fileModel.updateFile(fileIds.previewVideoId, {
-          entityId: course._id,
-        });
-      }
+      // External services approach - no file associations needed
 
       return course;
     } catch (error) {
@@ -74,11 +49,12 @@ export class CourseModel extends BaseModel<Course> {
   }
 
   /**
-   * Get course files
+   * Get course files (external services - no local files)
    */
   async getCourseFiles(courseId: string) {
     try {
-      return await fileModel.getByEntity('course', courseId);
+      // External services approach - no local files to return
+      return [];
     } catch (error) {
       logger.error('Failed to get course files:', error);
       return [];
@@ -100,29 +76,7 @@ export class CourseModel extends BaseModel<Course> {
 
       const updateData: Partial<Course> = {};
 
-      // Handle thumbnail update
-      if (fileIds.thumbnailId) {
-        const thumbnailFile = await fileModel.findById(fileIds.thumbnailId);
-        if (thumbnailFile) {
-          updateData.thumbnail = thumbnailFile.url;
-          await fileModel.updateFile(fileIds.thumbnailId, {
-            entityType: 'course',
-            entityId: courseId,
-          });
-        }
-      }
-
-      // Handle preview video update
-      if (fileIds.previewVideoId) {
-        const videoFile = await fileModel.findById(fileIds.previewVideoId);
-        if (videoFile) {
-          updateData.previewVideo = videoFile.url;
-          await fileModel.updateFile(fileIds.previewVideoId, {
-            entityType: 'course',
-            entityId: courseId,
-          });
-        }
-      }
+      // External services approach - no local file processing needed
 
       return await this.update(courseId, updateData);
     } catch (error) {
@@ -143,12 +97,8 @@ export class CourseModel extends BaseModel<Course> {
       const deleted = await this.delete(courseId);
 
       if (deleted) {
-        // Mark associated files as inactive
-        for (const file of courseFiles) {
-          if (file._id) {
-            await fileModel.deleteFile(file._id);
-          }
-        }
+        // External services approach - no local files to clean up
+        // courseFiles will be empty array from getCourseFiles method
       }
 
       return deleted;
@@ -716,21 +666,14 @@ export class CourseModel extends BaseModel<Course> {
       // Fetch all related files
       const files = await this.getCourseFiles(courseId);
       
-      // Organize files by type
+      // External services approach - files array will be empty
       const organizedFiles = {
-        thumbnail: files.find(f => f.fileType === 'thumbnail'),
-        previewVideo: files.find(f => f.fileType === 'video' && f.entityId === courseId),
-        lessonVideos: {} as { [lessonId: string]: any },
-        documents: files.filter(f => f.fileType === 'document'),
-        materials: files.filter(f => f.fileType === 'material')
+        thumbnail: null,
+        previewVideo: null,
+        lessonVideos: {},
+        documents: [],
+        materials: []
       };
-
-      // Map lesson videos
-      files.filter(f => f.fileType === 'video' && f.entityType === 'lesson').forEach(file => {
-        if (file.entityId) {
-          organizedFiles.lessonVideos[file.entityId] = file;
-        }
-      });
 
       // Enrich course data with proper file URLs
       course = await this.enrichCourseWithFiles(course, organizedFiles);

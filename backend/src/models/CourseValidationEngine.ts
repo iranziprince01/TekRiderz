@@ -245,9 +245,9 @@ export class CourseValidationEngineModel extends BaseModel<any> {
           }
           
           const durations = allLessons.map((lesson: CourseLesson) => lesson.estimatedDuration || 0);
-          const avgDuration = durations.reduce((sum, d) => sum + d, 0) / durations.length;
-          const veryShort = durations.filter(d => d < 300).length; // < 5 minutes
-          const veryLong = durations.filter(d => d > 3600).length; // > 1 hour
+          const avgDuration = durations.reduce((sum: number, d: number) => sum + d, 0) / durations.length;
+          const veryShort = durations.filter((d: number) => d < 300).length; // < 5 minutes
+          const veryLong = durations.filter((d: number) => d > 3600).length; // > 1 hour
           
           if (veryShort > allLessons.length * 0.3) {
             return {
@@ -678,7 +678,7 @@ export class CourseValidationEngineModel extends BaseModel<any> {
     });
 
     // Calculate overall score
-    const totalWeight = Object.values(categoryScores).reduce((sum: number, score: number) => sum + score, 0);
+    const totalWeight = (Object.values(categoryScores) as number[]).reduce((sum: number, score: number) => sum + score, 0);
     const overallScore = Math.round(totalWeight / categories.length);
 
     return {

@@ -6,8 +6,7 @@ import { progressModel } from '../models/Progress';
 import { courseModel } from '../models/Course';
 import { validate } from '../middleware/validation';
 import { logger } from '../utils/logger';
-import { uploadAvatar, handleUploadError } from '../middleware/fileUpload';
-import { fileService } from '../services/fileService';
+// File upload imports removed
 import { body } from 'express-validator';
 
 const router = Router();
@@ -572,53 +571,7 @@ router.put('/progress/:courseId', authenticate, progressValidation, async (req: 
   }
 });
 
-// Get user certificates
-router.get('/certificates', authenticate, async (req: Request, res: Response) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: 'Authentication required',
-      });
-    }
-
-    // Get completed enrollments
-    const completedEnrollments = await enrollmentModel.getUserCompletedCourses(req.user.id);
-
-    // Get certificate details for each completed course
-    const certificates = await Promise.all(
-      completedEnrollments.map(async (enrollment) => {
-        try {
-          const course = await courseModel.findById(enrollment.courseId);
-          return {
-            id: enrollment._id,
-            courseId: enrollment.courseId,
-            courseName: course?.title || 'Unknown Course',
-            completedAt: enrollment.completedAt,
-            certificate: enrollment.certificate,
-            instructor: course?.instructorName || 'Unknown Instructor',
-          };
-        } catch (error) {
-          logger.error('Failed to get certificate details:', { enrollmentId: enrollment._id, error });
-          return null;
-        }
-      })
-    );
-
-    const validCertificates = certificates.filter(cert => cert !== null);
-
-    return res.json({
-      success: true,
-      data: { certificates: validCertificates },
-    });
-  } catch (error) {
-    logger.error('Failed to get user certificates:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to retrieve user certificates',
-    });
-  }
-});
+// Certificate routes removed for academic project simplification
 
 // Get user learning statistics
 router.get('/stats', authenticate, async (req: Request, res: Response) => {
@@ -672,120 +625,7 @@ router.get('/stats', authenticate, async (req: Request, res: Response) => {
   }
 });
 
-// Upload user avatar
-router.post('/avatar', authenticate, uploadAvatar, handleUploadError, async (req: Request, res: Response) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: 'Authentication required',
-      });
-    }
-
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        error: 'No avatar file provided',
-      });
-    }
-
-    // Use file service to handle upload
-    const result = await fileService.handleFileUpload(
-      req.file,
-      'image', // Use 'image' type for avatars
-      {
-      entityType: 'user',
-      entityId: req.user.id,
-      uploadedBy: req.user.id,
-      }
-    );
-
-    // Update user profile with new avatar URL
-    logger.info('Attempting to update user avatar:', { 
-      userId: req.user.id,
-      userEmail: req.user.email,
-      avatarUrl: result.url 
-    });
-    
-    // First check if user exists (with email fallback)
-    let existingUser = await userModel.findById(req.user.id);
-    
-    // If user not found by ID, try email fallback
-    if (!existingUser && req.user.email) {
-      logger.warn('User not found by ID for avatar update, trying email lookup:', { 
-        userId: req.user.id,
-        userEmail: req.user.email 
-      });
-      existingUser = await userModel.findByEmail(req.user.email);
-      
-      if (existingUser) {
-        logger.info('User found by email for avatar update:', { 
-          originalUserId: req.user.id,
-          foundUserId: existingUser.id || existingUser._id,
-          userEmail: req.user.email 
-        });
-      }
-    }
-    
-    if (!existingUser) {
-      logger.error('User not found for avatar update by ID or email:', { 
-        userId: req.user.id,
-        userEmail: req.user.email 
-      });
-      return res.status(404).json({
-        success: false,
-        error: 'User not found',
-      });
-    }
-
-    // Use the correct user ID for update
-    const userIdToUpdate = existingUser.id || existingUser._id || req.user.id;
-    const user = await userModel.update(userIdToUpdate, {
-      avatar: result.url,
-    } as any);
-
-    logger.info('User avatar updated:', { 
-      originalUserId: req.user.id,
-      actualUserId: userIdToUpdate,
-      avatarUrl: result.url,
-      fileId: result.file._id 
-    });
-
-    const responseUser = {
-      id: user.id || user._id,
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      avatar: user.avatar,
-      role: user.role,
-      verified: user.verified
-    };
-
-    return res.json({
-      success: true,
-      message: 'Avatar uploaded successfully',
-      data: {
-        user: responseUser,
-        file: {
-          fileId: result.file._id,
-          filename: result.file.filename,
-          originalName: result.file.originalName,
-          size: result.file.size,
-          mimetype: result.file.mimetype,
-          url: result.url,
-          type: result.file.fileType,
-          metadata: result.file.metadata,
-        },
-      },
-    });
-  } catch (error) {
-    logger.error('Failed to upload avatar:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to upload avatar',
-    });
-  }
-});
+// Avatar upload route removed for academic project simplification
 
 // Get user progress data
 router.get('/progress', authenticate, async (req: Request, res: Response) => {

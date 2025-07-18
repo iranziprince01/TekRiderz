@@ -101,7 +101,7 @@ const Landing: React.FC = () => {
     {
       icon: Shield,
       title: 'Secure & Reliable',
-      description: 'Your data and progress are protected with enterprise-grade security and reliable infrastructure.'
+      description: 'Your data and progress are protected with secure authentication and reliable infrastructure.'
     },
     {
       icon: Globe,
@@ -407,7 +407,6 @@ const Landing: React.FC = () => {
                 <li className="hover:text-white transition-colors cursor-pointer">{t('footer.platform.browseCourses') || 'Browse Courses'}</li>
                 <li className="hover:text-white transition-colors cursor-pointer">{t('footer.platform.becomeTutor') || 'Become Instructor'}</li>
                 <li className="hover:text-white transition-colors cursor-pointer">{t('footer.platform.mobileApp') || 'Mobile App'}</li>
-                <li className="hover:text-white transition-colors cursor-pointer">Enterprise</li>
               </ul>
             </div>
             

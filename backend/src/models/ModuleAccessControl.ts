@@ -128,8 +128,8 @@ export class ModuleAccessControlModel extends BaseModel<any> {
         };
       }
 
-      // Check sequential access if required
-      if (lesson.completionCriteria?.type === 'sequential' && lesson.order > 1) {
+      // Check sequential access if section requires all lessons to be completed
+      if (section.completionCriteria?.type === 'all_lessons' && lesson.order > 1) {
         const sequentialCheck = await this.checkSequentialAccess(
           userId,
           courseId,
@@ -361,7 +361,7 @@ export class ModuleAccessControlModel extends BaseModel<any> {
           reason: 'Next lesson in sequence',
           priority: 'medium',
           estimatedTime: nextLesson.estimatedDuration,
-          prerequisites: nextLesson.prerequisites
+          prerequisites: nextLesson.prerequisites || []
         };
       }
 
