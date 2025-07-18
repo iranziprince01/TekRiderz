@@ -79,10 +79,10 @@ const CourseCanvasLayout: React.FC<CourseCanvasLayoutProps> = ({
       description: 'Tests and assessments'
     },
     { 
-      name: 'Grades', 
+      name: 'Assessments & Grades',
       nameRw: 'Amanota',
-      href: `/course/${id}/grades`, 
-      icon: BarChart3,
+      href: `/course/${id}/assessments`, 
+      icon: BookOpen,
       gradient: 'from-purple-500 to-pink-500',
       description: 'Your scores and progress'
     }

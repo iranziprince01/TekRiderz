@@ -156,7 +156,20 @@ export class ProgressModel extends BaseModel<Progress> {
     }
   ): Promise<Progress> {
     try {
+      logger.info('Starting quiz score update:', {
+        userId,
+        courseId,
+        quizId,
+        score: quizResult.score,
+        percentage: quizResult.percentage,
+        passed: quizResult.passed
+      });
+
       const progress = await this.getOrCreateProgress(userId, courseId);
+      
+      if (!progress._id) {
+        throw new Error('Progress document missing _id - cannot update');
+      }
       
       // Get existing quiz score data
       const existingQuizScore = progress.quizScores[quizId];
@@ -193,6 +206,14 @@ export class ProgressModel extends BaseModel<Progress> {
           passed,
           certificationEligible: passed && bestPercentage >= 80,
         };
+
+        logger.info('Updating existing quiz score:', {
+          quizId,
+          previousAttempts: existingQuizScore.totalAttempts || 0,
+          newTotalAttempts: totalAttempts,
+          previousBestScore: existingQuizScore.bestScore || 0,
+          newBestScore: bestScore
+        });
       } else {
         // First attempt
         updatedQuizScore = {
@@ -203,6 +224,13 @@ export class ProgressModel extends BaseModel<Progress> {
           passed: quizResult.passed,
           certificationEligible: quizResult.passed && quizResult.percentage >= 80,
         };
+
+        logger.info('Creating first quiz score:', {
+          quizId,
+          score: quizResult.score,
+          percentage: quizResult.percentage,
+          passed: quizResult.passed
+        });
       }
       
       const updatedQuizScores = {
@@ -210,11 +238,47 @@ export class ProgressModel extends BaseModel<Progress> {
         [quizId]: updatedQuizScore,
       };
 
-      return await this.update(progress._id!, {
+      // Perform the CouchDB update
+      logger.info('Saving quiz scores to CouchDB:', {
+        progressId: progress._id,
+        userId,
+        courseId,
+        quizId,
+        hasExistingScores: Object.keys(progress.quizScores).length > 0
+      });
+
+      const updatedProgress = await this.update(progress._id!, {
         quizScores: updatedQuizScores,
+        lastWatched: new Date().toISOString(),
       } as Partial<Progress>);
+
+      // Verify the update was successful
+      if (!updatedProgress.quizScores || !updatedProgress.quizScores[quizId]) {
+        throw new Error('Quiz score update verification failed - data not found in updated progress');
+      }
+
+      logger.info('Quiz score successfully saved to CouchDB:', {
+        progressId: progress._id,
+        userId,
+        courseId,
+        quizId,
+        finalBestScore: updatedProgress.quizScores[quizId].bestScore,
+        finalTotalAttempts: updatedProgress.quizScores[quizId].totalAttempts,
+        finalPassed: updatedProgress.quizScores[quizId].passed
+      });
+
+      return updatedProgress;
     } catch (error) {
-      logger.error('Failed to update quiz score:', { userId, courseId, quizId, quizResult, error });
+      logger.error('Failed to update quiz score in CouchDB:', { 
+        userId, 
+        courseId, 
+        quizId, 
+        quizResult, 
+        error: error instanceof Error ? {
+          message: error.message,
+          stack: error.stack
+        } : error
+      });
       throw error;
     }
   }

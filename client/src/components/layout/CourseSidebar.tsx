@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { 
   ArrowLeft,
@@ -10,10 +10,8 @@ import {
   Settings
 } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { useAuth } from '../../contexts/AuthContext';
 import { CoursePermissions } from '../../utils/coursePermissions';
 import { Button } from '../ui/Button';
-import { getCourseProgress, getCourse } from '../../utils/api';
 
 interface CourseSidebarProps {
   isOpen?: boolean;
@@ -27,82 +25,11 @@ const CourseSidebar: React.FC<CourseSidebarProps> = ({
   isOpen = false, 
   onClose,
   courseTitle = "Course Title",
-  courseProgress = 0,
   permissions
 }) => {
   const { language } = useLanguage();
-  const { user } = useAuth();
   const location = useLocation();
   const { id } = useParams<{ id: string }>();
-
-  // Real-time data state
-  const [realTimeStats, setRealTimeStats] = useState({
-    progress: courseProgress,
-    moduleCount: 0,
-    userGrade: 0,
-    loading: true
-  });
-
-  // Fetch real-time course data and user progress
-  useEffect(() => {
-    const fetchRealTimeData = async () => {
-      if (!id || !user) return;
-
-      try {
-        setRealTimeStats(prev => ({ ...prev, loading: true }));
-
-        // Fetch course data and user progress in parallel
-        const [courseResponse, progressResponse] = await Promise.all([
-          getCourse(id),
-          getCourseProgress(id).catch(() => ({ success: false })) // Don't fail if progress doesn't exist
-        ]);
-
-        let moduleCount = 0;
-        let calculatedProgress = 0;
-        let userGrade = 0;
-
-        // Get module count from course data
-        if (courseResponse.success && courseResponse.data?.course) {
-          const course = courseResponse.data.course;
-          moduleCount = course.sections?.length || 0;
-        }
-
-        // Calculate progress and grades from user progress data
-        if (progressResponse.success && progressResponse.data?.progress) {
-          const progress = progressResponse.data.progress;
-          
-          // Calculate overall progress percentage
-          if (progress.completedLessons && progress.totalLessons > 0) {
-            calculatedProgress = Math.round((progress.completedLessons.length / progress.totalLessons) * 100);
-          }
-
-          // Calculate average grade from quiz scores
-          if (progress.quizScores && Object.keys(progress.quizScores).length > 0) {
-            const quizScores = Object.values(progress.quizScores) as any[];
-            const validScores = quizScores.filter(score => score?.bestPercentage !== undefined);
-            
-            if (validScores.length > 0) {
-              const totalPercentage = validScores.reduce((sum, score) => sum + (score.bestPercentage || 0), 0);
-              userGrade = Math.round(totalPercentage / validScores.length);
-            }
-          }
-        }
-
-        setRealTimeStats({
-          progress: calculatedProgress,
-          moduleCount,
-          userGrade,
-          loading: false
-        });
-
-      } catch (error) {
-        console.error('Error fetching real-time course data:', error);
-        setRealTimeStats(prev => ({ ...prev, loading: false }));
-      }
-    };
-
-    fetchRealTimeData();
-  }, [id, user]);
 
   // Generate navigation items based on permissions
   const getNavigation = () => {
@@ -127,21 +54,11 @@ const CourseSidebar: React.FC<CourseSidebarProps> = ({
     }
 
     // Assessments - available for taking quizzes or content management  
-    // Always show for enrolled users, course owners, and admins
     if (permissions?.canTakeQuizzes || permissions?.canManageContent || permissions?.canView) {
       nav.push({
-        name: language === 'rw' ? 'Ipimwa' : 'Assessments',
+        name: language === 'rw' ? 'Ibizamini n\'Amanota' : 'Assessments & Grades',
         href: `/course/${id}/assessments`,
         icon: Award,
-      });
-    }
-
-    // Grades - available for learners to view their grades or instructors/admins for analytics
-    if (permissions?.canViewGrades || permissions?.canViewAnalytics) {
-      nav.push({
-        name: language === 'rw' ? 'Amanota' : 'Grades',
-        href: `/course/${id}/grades`,
-        icon: BarChart3,
       });
     }
 
@@ -172,69 +89,9 @@ const CourseSidebar: React.FC<CourseSidebarProps> = ({
     return location.pathname === href;
   };
 
-
-
   const handleBackToDashboard = () => {
     window.history.back();
   };
-
-  // Refresh stats when course content is updated
-  const refreshStats = async () => {
-    if (!id || !user) return;
-
-    try {
-      const progressResponse = await getCourseProgress(id);
-      
-      if (progressResponse.success && progressResponse.data?.progress) {
-        const progress = progressResponse.data.progress;
-        
-        let calculatedProgress = 0;
-        let userGrade = 0;
-
-        // Calculate overall progress percentage
-        if (progress.completedLessons && progress.totalLessons > 0) {
-          calculatedProgress = Math.round((progress.completedLessons.length / progress.totalLessons) * 100);
-        }
-
-        // Calculate average grade from quiz scores
-        if (progress.quizScores && Object.keys(progress.quizScores).length > 0) {
-          const quizScores = Object.values(progress.quizScores) as any[];
-          const validScores = quizScores.filter(score => score?.bestPercentage !== undefined);
-          
-          if (validScores.length > 0) {
-            const totalPercentage = validScores.reduce((sum, score) => sum + (score.bestPercentage || 0), 0);
-            userGrade = Math.round(totalPercentage / validScores.length);
-          }
-        }
-
-        setRealTimeStats(prev => ({
-          ...prev,
-          progress: calculatedProgress,
-          userGrade
-        }));
-      }
-    } catch (error) {
-      console.error('Error refreshing course stats:', error);
-    }
-  };
-
-  // Listen for course progress updates to refresh stats
-  useEffect(() => {
-    const handleProgressUpdate = () => {
-      refreshStats();
-    };
-
-    // Listen for custom events that indicate progress updates
-    window.addEventListener('courseProgressUpdated', handleProgressUpdate);
-    window.addEventListener('quizCompleted', handleProgressUpdate);
-    window.addEventListener('lessonCompleted', handleProgressUpdate);
-
-    return () => {
-      window.removeEventListener('courseProgressUpdated', handleProgressUpdate);
-      window.removeEventListener('quizCompleted', handleProgressUpdate);
-      window.removeEventListener('lessonCompleted', handleProgressUpdate);
-    };
-  }, [id, user]);
 
   return (
     <>
@@ -257,7 +114,7 @@ const CourseSidebar: React.FC<CourseSidebarProps> = ({
         <div className="flex flex-col h-full">
           {/* Course Header */}
           <div className="p-4 border-b border-border/50">
-            <div className="flex items-center gap-3 mb-3">
+            <div className="flex items-center gap-3">
               <Button
                 variant="ghost"
                 size="sm"
@@ -270,26 +127,6 @@ const CourseSidebar: React.FC<CourseSidebarProps> = ({
                 <h2 className="text-sm font-semibold text-foreground truncate">
                   {courseTitle}
                 </h2>
-              </div>
-            </div>
-            
-            {/* Progress Bar */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs text-foreground/60">
-                <span>Progress</span>
-                <span>
-                  {realTimeStats.loading ? (
-                    <div className="w-8 h-3 bg-gray-200 dark:bg-gray-700 animate-pulse rounded"></div>
-                  ) : (
-                    `${realTimeStats.progress}%`
-                  )}
-                </span>
-              </div>
-              <div className="w-full bg-accent/30 rounded-full h-2">
-                <div 
-                  className="bg-gradient-to-r from-green-500 to-emerald-500 h-2 rounded-full transition-all duration-500"
-                  style={{ width: `${realTimeStats.loading ? 0 : realTimeStats.progress}%` }}
-                />
               </div>
             </div>
           </div>
@@ -316,18 +153,11 @@ const CourseSidebar: React.FC<CourseSidebarProps> = ({
                         transform-gpu text-left no-underline
                       `}
                     >
-                      {/* Icon */}
                       <IconComponent className="w-4 h-4 mr-3 flex-shrink-0" />
-                      
-                      {/* Label */}
                       <span className="flex-1 font-medium">{item.name}</span>
-                      
-                      {/* Active indicator */}
                       {isActive(item.href) && (
                         <div className="absolute right-2 w-1 h-6 bg-primary-500 rounded-full" />
                       )}
-                      
-                      {/* Hover glow effect */}
                       <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-r from-primary-500/10 to-secondary-500/10" />
                     </Link>
                   );
@@ -344,42 +174,6 @@ const CourseSidebar: React.FC<CourseSidebarProps> = ({
               </div>
             )}
           </div>
-
-          {/* Course Stats - Fixed at bottom */}
-          <div className="flex-shrink-0 border-t border-border/50 p-4">
-            <div className="space-y-3">
-              <div className="text-xs font-medium text-foreground/60 uppercase tracking-wide">
-                Quick Stats
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="text-center">
-                  <div className="text-lg font-bold text-primary-600 dark:text-primary-400">
-                    {realTimeStats.loading ? (
-                      <div className="w-6 h-6 bg-gray-200 dark:bg-gray-700 animate-pulse rounded mx-auto"></div>
-                    ) : (
-                      realTimeStats.moduleCount
-                    )}
-                  </div>
-                  <div className="text-xs text-foreground/60">Modules</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-lg font-bold text-green-600 dark:text-green-400">
-                    {realTimeStats.loading ? (
-                      <div className="w-8 h-6 bg-gray-200 dark:bg-gray-700 animate-pulse rounded mx-auto"></div>
-                    ) : (
-                      `${realTimeStats.userGrade}%`
-                    )}
-                  </div>
-                  <div className="text-xs text-foreground/60">Grade</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Subtle background pattern */}
-        <div className="absolute inset-0 pointer-events-none opacity-5">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary-500/10 via-transparent to-secondary-500/10" />
         </div>
       </div>
     </>

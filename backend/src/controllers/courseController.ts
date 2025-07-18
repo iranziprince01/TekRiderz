@@ -640,141 +640,314 @@ export class CourseController {
         return;
       }
 
-      logger.info('Fetching quizzes for course:', { 
-        courseId, 
-        sectionsCount: course.sections?.length || 0,
-        userId: req.user?.id,
-        enrollmentStatus: enrollment.status
-      });
+      // Get user's quiz progress/scores
+      const progress = await progressModel.findByUserAndCourse(req.user!.id, courseId);
+      const quizScores = progress?.quizScores || {};
 
-      // Extract quizzes from course sections
-      const quizzes: any[] = [];
-      let totalLessonsChecked = 0;
-      let quizzesFound = 0;
-      
+      // Extract all quizzes from course structure
+      const allQuizzes: any[] = [];
+
+      // Extract module quizzes from sections/lessons
       if (course.sections && Array.isArray(course.sections)) {
         course.sections.forEach((section: any, sectionIndex: number) => {
-          logger.info('Processing section:', { 
-            sectionId: section.id, 
-            sectionTitle: section.title,
-            lessonsCount: section.lessons?.length || 0 
-          });
-          
+          // Check lessons for quizzes
           if (section.lessons && Array.isArray(section.lessons)) {
             section.lessons.forEach((lesson: any, lessonIndex: number) => {
-              totalLessonsChecked++;
-              
-              logger.info('Checking lesson for quiz:', { 
-                lessonId: lesson.id, 
-                lessonTitle: lesson.title,
-                hasQuiz: !!lesson.quiz,
-                quizStructure: lesson.quiz ? {
-                  id: lesson.quiz.id,
-                  hasQuestions: !!lesson.quiz.questions,
-                  questionsCount: lesson.quiz.questions?.length || 0
-                } : null
-              });
-
-              // Check multiple quiz structures
-              if (lesson.quiz && lesson.quiz.questions && lesson.quiz.questions.length > 0) {
-                quizzesFound++;
-                const quizId = lesson.quiz.id || `${lesson.id}_quiz`;
+              if (lesson.quiz) {
+                const quizScore = quizScores[lesson.quiz.id];
+                const moduleTitle = lesson.title || section.title || `Module ${sectionIndex + 1}`;
                 
-                quizzes.push({
-                  id: quizId,
-                  type: 'lesson',
-                  title: lesson.quiz.title || `${lesson.title} Quiz`,
-                  description: lesson.quiz.description || `Quiz for ${lesson.title}`,
-                  questions: lesson.quiz.questions.map((q: any, qIndex: number) => ({
-                    id: q.id || `q${qIndex}`,
-                    type: q.type || 'multiple-choice',
-                    question: q.questionText || q.question || q.text,
-                    options: q.options || q.choices || [],
-                    // Remove correctAnswer from frontend response for security
-                    // correctAnswer is only used for backend auto-grading
-                    explanation: q.explanation || '',
-                    points: q.points || 1
-                  })),
-                  timeLimit: 0, // Make quizzes untimed
-                  passingScore: lesson.quiz.settings?.passingScore || 70,
-                  maxAttempts: 3, // Allow exactly 3 attempts as requested
+                allQuizzes.push({
+                  id: lesson.quiz.id,
+                  title: lesson.quiz.title || `${moduleTitle} Quiz`,
+                  description: lesson.quiz.description || `Test your knowledge of ${moduleTitle}`,
+                  moduleTitle,
+                  type: 'module',
+                  questions: lesson.quiz.questions || [],
+                  questionsCount: lesson.quiz.questions?.length || 0,
+                  estimatedDuration: lesson.quiz.estimatedDuration || 15,
+                  passingScore: lesson.quiz.passingScore || lesson.quiz.settings?.passingScore || 70,
+                  maxAttempts: lesson.quiz.maxAttempts || lesson.quiz.settings?.attempts || 3,
+                  timeLimit: lesson.quiz.timeLimit || lesson.quiz.settings?.timeLimit || 0,
+                  showCorrectAnswers: lesson.quiz.settings?.showCorrectAnswers ?? true,
+                  showScoreImmediately: lesson.quiz.settings?.showResultsImmediately ?? true,
+                  
+                  // User progress data
+                  isCompleted: quizScore?.passed || false,
+                  bestScore: quizScore?.bestPercentage,
+                  bestPercentage: quizScore?.bestPercentage,
+                  attempts: quizScore?.totalAttempts || 0,
+                  totalAttempts: quizScore?.totalAttempts || 0,
+                  passed: quizScore?.passed || false,
+                  isUnlocked: true, // All quizzes are always unlocked
+                  
+                  // Metadata
                   lessonId: lesson.id,
                   sectionId: section.id,
-                  lessonTitle: lesson.title,
-                  sectionTitle: section.title,
-                  order: sectionIndex * 100 + lessonIndex
-                });
-                
-                logger.info('Added quiz to list:', { 
-                  quizId, 
-                  questionsCount: lesson.quiz.questions.length,
-                  lessonTitle: lesson.title 
+                  courseId: course._id || course.id
                 });
               }
+            });
+          }
+          
+          // Check for section-level module quizzes
+          if (section.moduleQuiz) {
+            const quizScore = quizScores[section.moduleQuiz.id];
+            const moduleTitle = section.title || `Module ${sectionIndex + 1}`;
+            
+            allQuizzes.push({
+              id: section.moduleQuiz.id,
+              title: section.moduleQuiz.title || `${moduleTitle} Assessment`,
+              description: section.moduleQuiz.description || `Assessment for ${moduleTitle}`,
+              moduleTitle,
+              type: 'module',
+              questions: section.moduleQuiz.questions || [],
+              questionsCount: section.moduleQuiz.questions?.length || 0,
+              estimatedDuration: section.moduleQuiz.estimatedDuration || 20,
+              passingScore: section.moduleQuiz.passingScore || section.moduleQuiz.settings?.passingScore || 70,
+              maxAttempts: section.moduleQuiz.maxAttempts || section.moduleQuiz.settings?.attempts || 3,
+              timeLimit: section.moduleQuiz.timeLimit || section.moduleQuiz.settings?.timeLimit || 0,
+              showCorrectAnswers: section.moduleQuiz.settings?.showCorrectAnswers ?? true,
+              showScoreImmediately: section.moduleQuiz.settings?.showResultsImmediately ?? true,
+              
+              // User progress data
+              isCompleted: quizScore?.passed || false,
+              bestScore: quizScore?.bestPercentage,
+              bestPercentage: quizScore?.bestPercentage,
+              attempts: quizScore?.totalAttempts || 0,
+              totalAttempts: quizScore?.totalAttempts || 0,
+              passed: quizScore?.passed || false,
+              isUnlocked: true, // All quizzes are always unlocked
+              
+              // Metadata
+              sectionId: section.id,
+              courseId: course._id || course.id
             });
           }
         });
       }
 
-      // Process final assessment if exists
-      if (course.finalAssessment && course.finalAssessment.questions && course.finalAssessment.questions.length > 0) {
-        quizzesFound++;
-        const finalAssessmentId = course.finalAssessment.id || `final-assessment-${course.id}`;
+      // Add final assessment
+      if (course.finalAssessment) {
+        const finalScore = quizScores[course.finalAssessment.id];
         
-        quizzes.push({
-          id: finalAssessmentId,
+        allQuizzes.push({
+          id: course.finalAssessment.id,
+          title: course.finalAssessment.title || 'Final Course Assessment',
+          description: course.finalAssessment.description || 'Comprehensive assessment covering all course material',
           type: 'final',
-          title: course.finalAssessment.title || 'Final Assessment',
-          description: course.finalAssessment.description || 'This comprehensive assessment covers all course material.',
-          questions: course.finalAssessment.questions.map((q: any, qIndex: number) => ({
-            id: q.id || `final-q${qIndex}`,
-            type: q.type || 'multiple-choice',
-            question: q.questionText || q.question || q.text,
-            options: q.options || q.choices || [],
-            // Remove correctAnswer from frontend response for security
-            // correctAnswer is only used for backend auto-grading
-            explanation: q.explanation || '',
-            points: q.points || 1
-          })),
-          timeLimit: 0, // Make quizzes untimed
+          questions: course.finalAssessment.questions || [],
+          questionsCount: course.finalAssessment.questions?.length || 0,
+          estimatedDuration: 30,
           passingScore: course.finalAssessment.settings?.passingScore || 70,
-          maxAttempts: 3, // Allow exactly 3 attempts as requested
-          lessonId: null,
-          sectionId: null,
-          lessonTitle: null,
-          sectionTitle: null,
-          order: 9999 // Final assessment comes last
-        });
-        
-        logger.info('Added final assessment to quiz list:', { 
-          finalAssessmentId, 
-          questionsCount: course.finalAssessment.questions.length,
-          title: course.finalAssessment.title
+          maxAttempts: course.finalAssessment.settings?.attempts || 3,
+          timeLimit: course.finalAssessment.settings?.timeLimit || 0,
+          showCorrectAnswers: course.finalAssessment.settings?.showCorrectAnswers ?? true,
+          showScoreImmediately: course.finalAssessment.settings?.showResultsImmediately ?? true,
+          
+          // User progress data
+          isCompleted: finalScore?.passed || false,
+          bestScore: finalScore?.bestPercentage,
+          bestPercentage: finalScore?.bestPercentage,
+          attempts: finalScore?.totalAttempts || 0,
+          totalAttempts: finalScore?.totalAttempts || 0,
+          passed: finalScore?.passed || false,
+          isUnlocked: true, // Always unlocked
+          
+          // Metadata
+          courseId: course._id || course.id
         });
       }
 
-      logger.info('Quiz extraction complete:', { 
-        courseId, 
-        totalLessonsChecked,
-        quizzesFound,
-        finalQuizzesCount: quizzes.length 
-      });
+      // If no quizzes found, create sample quizzes for demonstration
+      if (allQuizzes.length === 0) {
+        logger.info('No quizzes found in course, creating sample quizzes for demonstration:', { courseId });
+        
+        // Create sample module quizzes based on course sections or default
+        const sectionCount = course.sections?.length || 3;
+        for (let i = 1; i <= Math.min(sectionCount, 3); i++) {
+          allQuizzes.push({
+            id: `sample_module_quiz_${i}_${courseId}`,
+            title: `Module ${i} Assessment`,
+            description: `Test your understanding of Module ${i} concepts and material.`,
+            moduleTitle: `Module ${i}`,
+            type: 'module',
+            questions: [
+              {
+                id: `q${i}_1`,
+                type: 'multiple-choice',
+                question: `Which of the following best describes the main concept covered in Module ${i}?`,
+                points: 1,
+                options: [
+                  { id: 'a', text: 'Basic fundamentals and introduction', isCorrect: i === 1 },
+                  { id: 'b', text: 'Intermediate concepts and applications', isCorrect: i === 2 },
+                  { id: 'c', text: 'Advanced techniques and best practices', isCorrect: i === 3 },
+                  { id: 'd', text: 'None of the above', isCorrect: false }
+                ],
+                correctAnswer: i === 1 ? 'a' : i === 2 ? 'b' : 'c',
+                explanation: `Module ${i} focuses on ${i === 1 ? 'fundamental concepts' : i === 2 ? 'intermediate applications' : 'advanced techniques'}.`
+              },
+              {
+                id: `q${i}_2`,
+                type: 'true-false',
+                question: `Module ${i} builds upon concepts from previous modules.`,
+                points: 1,
+                correctAnswer: i > 1 ? 'true' : 'false',
+                explanation: `${i > 1 ? 'Yes, each module builds upon previous knowledge.' : 'No, Module 1 is introductory and standalone.'}`
+              },
+              {
+                id: `q${i}_3`,
+                type: 'multiple-select',
+                question: `Which of the following are key learning objectives for Module ${i}? (Select all that apply)`,
+                points: 2,
+                options: [
+                  { id: 'a', text: 'Understanding core concepts', isCorrect: true },
+                  { id: 'b', text: 'Practical application skills', isCorrect: true },
+                  { id: 'c', text: 'Historical background only', isCorrect: false },
+                  { id: 'd', text: 'Assessment preparation', isCorrect: true }
+                ],
+                correctAnswer: ['a', 'b', 'd'],
+                explanation: 'The module focuses on understanding, application, and assessment preparation.'
+              }
+            ],
+            questionsCount: 3,
+            estimatedDuration: 10,
+            passingScore: 70,
+            maxAttempts: 3,
+            timeLimit: 0,
+            showCorrectAnswers: true,
+            showScoreImmediately: true,
+            
+            // User progress data
+            isCompleted: false,
+            bestScore: undefined,
+            bestPercentage: undefined,
+            attempts: 0,
+            totalAttempts: 0,
+            passed: false,
+            isUnlocked: true,
+            
+            // Metadata
+            courseId: course._id || course.id,
+            isSample: true
+          });
+        }
+        
+        // Create sample final assessment
+        allQuizzes.push({
+          id: `sample_final_assessment_${courseId}`,
+          title: 'Final Course Assessment',
+          description: 'Comprehensive assessment covering all course modules and learning objectives.',
+          type: 'final',
+          questions: [
+            {
+              id: 'final_q1',
+              type: 'multiple-choice',
+              question: 'Which module introduced the fundamental concepts of this course?',
+              points: 2,
+              options: [
+                { id: 'a', text: 'Module 1', isCorrect: true },
+                { id: 'b', text: 'Module 2', isCorrect: false },
+                { id: 'c', text: 'Module 3', isCorrect: false },
+                { id: 'd', text: 'All modules equally', isCorrect: false }
+              ],
+              correctAnswer: 'a',
+              explanation: 'Module 1 typically introduces fundamental concepts in any course structure.'
+            },
+            {
+              id: 'final_q2',
+              type: 'multiple-select',
+              question: 'What are the key benefits of completing this course? (Select all that apply)',
+              points: 3,
+              options: [
+                { id: 'a', text: 'Enhanced technical skills', isCorrect: true },
+                { id: 'b', text: 'Better problem-solving abilities', isCorrect: true },
+                { id: 'c', text: 'Industry-relevant knowledge', isCorrect: true },
+                { id: 'd', text: 'Guaranteed employment', isCorrect: false }
+              ],
+              correctAnswer: ['a', 'b', 'c'],
+              explanation: 'Courses provide skills and knowledge but cannot guarantee employment outcomes.'
+            },
+            {
+              id: 'final_q3',
+              type: 'essay',
+              question: 'Describe how you would apply the concepts learned in this course to a real-world project. Provide specific examples and explain your reasoning. (Minimum 100 words)',
+              points: 5,
+              explanation: 'This question assesses your ability to synthesize and apply course concepts practically.'
+            },
+            {
+              id: 'final_q4',
+              type: 'fill-blank',
+              question: 'The most important skill I learned in this course is _________ because it enables _________ in professional settings.',
+              points: 2,
+              explanation: 'This allows you to reflect on your personal learning outcomes.'
+            },
+            {
+              id: 'final_q5',
+              type: 'true-false',
+              question: 'Continuous learning and skill development are essential for career growth in technology fields.',
+              points: 1,
+              correctAnswer: 'true',
+              explanation: 'Technology fields evolve rapidly, making continuous learning essential for career success.'
+            }
+          ],
+          questionsCount: 5,
+          estimatedDuration: 45,
+          passingScore: 70,
+          maxAttempts: 3,
+          timeLimit: 0,
+          showCorrectAnswers: true,
+          showScoreImmediately: true,
+          
+          // User progress data
+          isCompleted: false,
+          bestScore: undefined,
+          bestPercentage: undefined,
+          attempts: 0,
+          totalAttempts: 0,
+          passed: false,
+          isUnlocked: true,
+          
+          // Metadata
+          courseId: course._id || course.id,
+          isSample: true
+        });
+      }
+
+      // Calculate overall quiz statistics
+      const totalQuizzes = allQuizzes.length;
+      const completedQuizzes = allQuizzes.filter(q => q.isCompleted).length;
+      const averageScore = allQuizzes.filter(q => q.bestScore !== undefined).length > 0
+        ? Math.round(allQuizzes.filter(q => q.bestScore !== undefined).reduce((sum, q) => sum + (q.bestScore || 0), 0) / allQuizzes.filter(q => q.bestScore !== undefined).length)
+        : 0;
 
       const response: ApiResponse = {
         success: true,
         data: { 
-          quizzes,
-          totalQuizzes: quizzes.length,
-          moduleQuizzes: quizzes.filter(q => q.type === 'lesson').length,
-          finalAssessments: quizzes.filter(q => q.type === 'final').length,
-          canTakeQuizzes: req.user?.role === 'learner',
-          debug: {
-            sectionsCount: course.sections?.length || 0,
-            lessonsChecked: totalLessonsChecked,
-            quizzesFound: quizzesFound
+          quizzes: allQuizzes,
+          stats: {
+            totalQuizzes,
+            completedQuizzes,
+            averageScore,
+            moduleQuizzes: allQuizzes.filter(q => q.type === 'module').length,
+            finalAssessments: allQuizzes.filter(q => q.type === 'final').length,
+            passedQuizzes: allQuizzes.filter(q => q.passed).length
+          },
+          course: {
+            id: course._id || course.id,
+            title: course.title
           }
         }
       };
+
+      logger.info('Course quizzes fetched successfully:', {
+        courseId,
+        userId: req.user!.id,
+        totalQuizzes,
+        completedQuizzes,
+        averageScore,
+        hasSampleQuizzes: allQuizzes.some(q => q.isSample)
+      });
 
       res.json(response);
     } catch (error) {
@@ -786,7 +959,7 @@ export class CourseController {
     }
   }
 
-  // Submit quiz - Enhanced with better validation and error handling
+  // Enhanced quiz submission with auto-grading and direct grade saving
   async submitQuiz(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id: courseId, quizId } = req.params;
@@ -800,7 +973,7 @@ export class CourseController {
         timeSpent
       });
       
-      // Enhanced validation
+      // Basic validation
       if (!courseId || !quizId) {
         res.status(400).json({
           success: false,
@@ -825,46 +998,9 @@ export class CourseController {
         return;
       }
 
-      // Validate user enrollment - enhanced for free courses
-      let enrollment = await enrollmentModel.findByUserAndCourse(req.user.id, courseId);
-      
-      // For free courses, auto-enroll users who try to access quizzes
-      if (!enrollment) {
-        try {
-          logger.info('Auto-enrolling user for quiz access:', { userId: req.user.id, courseId });
-          enrollment = await enrollmentModel.enrollUser(req.user.id, courseId);
-          
-          // Update course enrollment count
-          await courseModel.updateEnrollmentCount(courseId, 1);
-          
-          logger.info('User auto-enrolled for quiz access:', { 
-            userId: req.user.id, 
-            courseId, 
-            enrollmentId: enrollment._id 
-          });
-        } catch (enrollError) {
-          logger.error('Failed to auto-enroll user for quiz:', { userId: req.user.id, courseId, error: enrollError });
-          res.status(403).json({
-            success: false,
-            error: 'Unable to access course quizzes. Please try again.'
-          });
-          return;
-        }
-      }
-      
-      // Allow access for active and completed enrollments
-      if (enrollment.status !== 'active' && enrollment.status !== 'completed') {
-        res.status(403).json({
-          success: false,
-          error: 'Course access is suspended. Please contact support.'
-        });
-        return;
-      }
-
-      // Get quiz from course
+      // Get course and quiz data
       const course = await courseModel.findById(courseId);
       if (!course) {
-        logger.error('Course not found for quiz submission:', { courseId });
         res.status(404).json({
           success: false,
           error: 'Course not found'
@@ -872,160 +1008,74 @@ export class CourseController {
         return;
       }
 
+      // Find quiz in course structure or use sample quiz
       let quiz: any = null;
-      let lessonId: string | null = null;
-      let sectionId: string | null = null;
+      let lessonId: string | undefined;
+      let sectionId: string | undefined;
 
-      // Enhanced quiz finding logic - handle both lesson.quiz and section.moduleQuiz patterns
-      if (course.sections && Array.isArray(course.sections)) {
+      // Search in course sections for the quiz
+      if (course.sections) {
         for (const section of course.sections) {
-          // Check section-level moduleQuiz first (legacy pattern)
-          if (section.moduleQuiz) {
-            const possibleQuizIds: string[] = [
-              section.moduleQuiz.id,
-              `${section.id}_quiz`,
-              `quiz_${section.id}`,
-              `module-quiz-${section.id}`,
-              quizId
-            ].filter(Boolean);
-            
-            if (possibleQuizIds.includes(quizId)) {
-              quiz = section.moduleQuiz;
-              lessonId = section.lessons?.[0]?.id || section.id;
-              sectionId = section.id;
-              logger.info('Found quiz in section moduleQuiz:', { 
-                quizId, 
-                foundQuizId: section.moduleQuiz.id,
-                lessonId,
-                sectionId: section.id
-              });
-              break;
-            }
-          }
-          
-          // Check lesson-level quiz (current pattern)
-          if (section.lessons && Array.isArray(section.lessons)) {
+          if (section.lessons) {
             for (const lesson of section.lessons) {
-              if (lesson.quiz) {
-                const possibleQuizIds: string[] = [
-                  lesson.quiz.id,
-                  `${lesson.id}_quiz`,
-                  `quiz_${lesson.id}`,
-                  `module-quiz-${lesson.id}`,
-                  quizId
-                ].filter(Boolean);
-                
-                if (possibleQuizIds.includes(quizId)) {
+              if (lesson.quiz && lesson.quiz.id === quizId) {
                   quiz = lesson.quiz;
                   lessonId = lesson.id;
                   sectionId = section.id;
-                  logger.info('Found quiz in lesson:', { 
-                    quizId, 
-                    foundQuizId: lesson.quiz.id,
-                    lessonId: lesson.id,
-                    sectionId: section.id
-                  });
                   break;
                 }
               }
-              
-              // Pattern matching for generated quiz IDs
-              if (quizId.startsWith('module-quiz-')) {
-                const moduleId = quizId.replace('module-quiz-', '');
-                if (lesson.id === moduleId || lesson.id === `lesson_${moduleId}`) {
-                  if (lesson.quiz) {
-                    quiz = lesson.quiz;
-                    lessonId = lesson.id;
+          }
+          
+          if (section.moduleQuiz && section.moduleQuiz.id === quizId) {
+            quiz = section.moduleQuiz;
                     sectionId = section.id;
-                    logger.info('Found quiz by pattern match in lesson:', { 
-                      quizId, 
-                      moduleId,
-                      lessonId: lesson.id,
-                      sectionId: section.id
-                    });
                     break;
                   }
-                }
-              }
-            }
-            if (quiz) break;
-          }
         }
       }
 
-      // Check final assessment if not found in sections
-      if (!quiz && course.finalAssessment) {
-        const possibleFinalAssessmentIds: string[] = [
-          course.finalAssessment.id,
-          `final-assessment-${course.id}`,
-          `final-assessment-${course._id}`,
-          'final-assessment',
-          quizId
-        ].filter(Boolean);
-        
-        if (possibleFinalAssessmentIds.includes(quizId)) {
+      // Check final assessment
+      if (!quiz && course.finalAssessment && course.finalAssessment.id === quizId) {
           quiz = course.finalAssessment;
-          lessonId = null;
-          sectionId = null;
-          logger.info('Found final assessment:', { 
-            quizId, 
-            foundQuizId: course.finalAssessment.id,
-            questionsCount: course.finalAssessment.questions?.length || 0
-          });
-        }
+      }
+
+      // Generate sample quiz if not found (for demo purposes)
+      if (!quiz && quizId.startsWith('sample_')) {
+        quiz = this.generateSampleQuiz(quizId, course);
       }
 
       if (!quiz) {
-        logger.error('Quiz not found in course:', { 
-          courseId,
-          quizId, 
-          sectionsCount: course.sections?.length || 0,
-          lessonsChecked: course.sections?.reduce((total, section) => total + (section.lessons?.length || 0), 0) || 0,
-          availableLessons: course.sections?.flatMap(s => s.lessons || []).map(l => ({
-            id: l.id,
-            title: l.title,
-            hasQuiz: !!l.quiz,
-            quizId: l.quiz?.id
-          })) || []
-        });
         res.status(404).json({
           success: false,
-          error: 'Quiz not found in course'
+          error: 'Quiz not found'
         });
         return;
       }
 
-      // Validate quiz has questions
-      if (!quiz.questions || quiz.questions.length === 0) {
-        res.status(400).json({
+      // Check enrollment (allow for free courses)
+      let enrollment = await enrollmentModel.findByUserAndCourse(req.user.id, courseId);
+      if (!enrollment && course.price > 0) {
+        res.status(403).json({
           success: false,
-          error: 'Quiz has no questions'
+          error: 'You must be enrolled to take this quiz'
         });
         return;
       }
 
-      // Check attempts limit - FIXED to exactly 3 attempts
-      const progress = await progressModel.findByUserAndCourse(req.user.id, courseId);
-      const existingQuizScore = progress?.quizScores?.[quizId];
-      const maxAttempts = 3; // Fixed to exactly 3 attempts as requested
+      // Check attempt limits
+      const existingProgress = await progressModel.findByUserAndCourse(req.user.id, courseId);
+      const existingQuizScore = existingProgress?.quizScores?.[quizId];
+      const maxAttempts = quiz.settings?.maxAttempts || quiz.maxAttempts || 3;
       
       if (existingQuizScore && existingQuizScore.totalAttempts >= maxAttempts) {
-        logger.warn('User exceeded maximum quiz attempts:', {
-          userId: req.user.id,
-          courseId,
-          quizId,
-          currentAttempts: existingQuizScore.totalAttempts,
-          maxAttempts
-        });
-        
         res.status(400).json({
           success: false,
-          error: `You have reached the maximum number of attempts (${maxAttempts}) for this quiz.`,
+          error: `Maximum attempts (${maxAttempts}) reached for this quiz`,
           data: {
             currentAttempts: existingQuizScore.totalAttempts,
             maxAttempts,
-            bestScore: existingQuizScore.bestPercentage || 0,
-            passed: existingQuizScore.passed || false
+            bestScore: existingQuizScore.bestPercentage || 0
           }
         });
         return;
@@ -1037,7 +1087,6 @@ export class CourseController {
         questionMap.set(question.id, question);
       });
 
-      // Check if all questions are answered
       const missingQuestions = quiz.questions.filter((q: any) => 
         !answers.some((a: any) => a.questionId === q.id)
       );
@@ -1045,25 +1094,12 @@ export class CourseController {
       if (missingQuestions.length > 0) {
         res.status(400).json({
           success: false,
-          error: `Missing answers for ${missingQuestions.length} question(s)`,
-          data: {
-            missingQuestions: missingQuestions.map((q: any) => q.id)
-          }
+          error: `Missing answers for ${missingQuestions.length} question(s)`
         });
         return;
       }
 
-      // Check for invalid question IDs
-      const invalidAnswers = answers.filter((a: any) => !questionMap.has(a.questionId));
-      if (invalidAnswers.length > 0) {
-        res.status(400).json({
-          success: false,
-          error: `Invalid question ID(s) in answers: ${invalidAnswers.map(a => a.questionId).join(', ')}`
-        });
-        return;
-      }
-
-      // Use enhanced grading service
+      // Auto-grade quiz using preset correct answers
       const gradingResponse = await quizGradingService.gradeQuiz(
         quiz.questions,
         answers.map((answer: any) => ({
@@ -1075,9 +1111,7 @@ export class CourseController {
         })),
         {
           passingScore: quiz.settings?.passingScore || quiz.passingScore || 70,
-          showCorrectAnswers: quiz.settings?.showCorrectAnswers ?? true,
-          partialCreditEnabled: quiz.settings?.partialCredit ?? false,
-          timeLimit: 0 // Remove time limit for untimed quizzes
+          showCorrectAnswers: quiz.settings?.showCorrectAnswers ?? true
         }
       );
 
@@ -1094,37 +1128,36 @@ export class CourseController {
         feedback
       } = summary;
 
-      // Log comprehensive grading results
-      logger.info('Quiz auto-grading completed:', {
+      // Log grading results
+      logger.info('Quiz auto-graded successfully:', {
         courseId,
         quizId,
         userId: req.user.id,
-        totalQuestions,
-        correctAnswers,
         score,
+        passed,
         totalPoints,
         maxPossiblePoints,
-        letterGrade,
-        passed,
-        passingScore,
-        timeSpent,
-        attemptNumber: (existingQuizScore?.totalAttempts || 0) + 1,
-        questionBreakdown: results.map(r => ({
-          questionId: r.questionId,
-          correct: r.isCorrect,
-          points: r.points
-        }))
+        attemptNumber: (existingQuizScore?.totalAttempts || 0) + 1
       });
 
-      // Update progress with enhanced data
+      // Save quiz score to user progress (auto-save to account)
       try {
-        const updatedProgress = await progressModel.updateQuizScore(
+        logger.info('Saving quiz score to CouchDB:', {
+          userId: req.user.id,
+          courseId,
+          quizId,
+          score: totalPoints,
+          percentage: score,
+          passed
+        });
+
+        const progressUpdateResult = await progressModel.updateQuizScore(
           req.user.id,
           courseId,
           quizId,
           {
-            score,
-            maxScore: 100,
+            score: totalPoints,
+            maxScore: maxPossiblePoints,
             percentage: score,
             passed,
             answers: results,
@@ -1132,29 +1165,52 @@ export class CourseController {
           }
         );
 
+        // Verify the save was successful by checking the returned progress
+        if (!progressUpdateResult || !progressUpdateResult.quizScores || !progressUpdateResult.quizScores[quizId]) {
+          throw new Error('Quiz score was not properly saved to progress');
+        }
+
         // If quiz passed, mark lesson as complete
         if (passed && lessonId) {
+          try {
           await progressModel.completeLesson(req.user.id, courseId, lessonId);
-          logger.info('Lesson marked complete after quiz pass:', {
+            logger.info('Lesson marked as complete after quiz pass:', { lessonId });
+          } catch (lessonError) {
+            logger.warn('Failed to mark lesson complete but quiz score saved:', { lessonId, error: lessonError });
+          }
+        }
+
+        logger.info('Quiz grade successfully saved to CouchDB:', {
             userId: req.user.id,
             courseId,
-            lessonId,
-            quizScore: score
+          quizId,
+          score,
+          passed,
+          quizScoreId: progressUpdateResult.quizScores[quizId]?.attempts?.length || 0,
+          totalAttempts: progressUpdateResult.quizScores[quizId]?.totalAttempts || 0
           });
-        }
       } catch (progressError) {
-        logger.error('Failed to update quiz progress:', progressError);
+        logger.error('Critical: Failed to save quiz grade to CouchDB:', {
+          userId: req.user.id,
+          courseId,
+          quizId,
+          error: progressError,
+          stack: progressError instanceof Error ? progressError.stack : undefined
+        });
+        
         res.status(500).json({
           success: false,
-          error: 'Failed to save quiz progress'
+          error: 'Failed to save quiz results to your account. Please try again.',
+          details: 'Quiz was graded but could not be saved'
         });
         return;
       }
 
-      // Return enhanced response
-      const response: ApiResponse = {
+      // Prepare response with clean navigation
+      const response = {
         success: true,
         data: {
+          // Quiz results
           score,
           passed,
           correctAnswers,
@@ -1164,10 +1220,10 @@ export class CourseController {
             userAnswer: r.userAnswer,
             isCorrect: r.isCorrect,
             points: r.points,
-            questionType: r.questionType,
             timeSpent: r.timeSpent
           })),
-          passingScore,
+          
+          // Grading details
           grading: {
             autoGraded: true,
             gradedAt: new Date().toISOString(),
@@ -1175,26 +1231,29 @@ export class CourseController {
             maxPossiblePoints,
             letterGrade,
             feedback: feedback.overall,
-            detailedFeedback: feedback,
+            performance: feedback.performance,
+            suggestions: feedback.suggestions,
+            passingScore,
             showCorrectAnswers: quiz.settings?.showCorrectAnswers ?? true,
-            allowRetake: !passed && (existingQuizScore?.totalAttempts || 0) + 1 < maxAttempts,
-            difficultyAnalysis: summary.difficultyAnalysis,
-            partiallyCorrect: summary.partiallyCorrect,
-            averageTimePerQuestion: summary.averageTimePerQuestion
+            allowRetake: !passed && (existingQuizScore?.totalAttempts || 0) + 1 < maxAttempts
           },
+          
+          // Quiz metadata
           quiz: {
             id: quiz.id,
             title: quiz.title,
             description: quiz.description,
-            timeLimit: 0, // All quizzes are untimed
             maxAttempts,
             currentAttempt: (existingQuizScore?.totalAttempts || 0) + 1
           },
+          
+          // Submission metadata
           metadata: {
             timeSpent,
             submittedAt: new Date().toISOString(),
             lessonId,
             sectionId,
+            gradeSavedToAccount: true, // Indicate grade was saved
             ...metadata
           }
         }
@@ -1202,11 +1261,92 @@ export class CourseController {
 
       res.json(response);
     } catch (error) {
-      logger.error('Failed to submit quiz:', error);
+      logger.error('Quiz submission failed:', error);
       res.status(500).json({
         success: false,
         error: 'Failed to submit quiz. Please try again.'
       });
+    }
+  }
+
+  // Helper method to generate sample quiz for demo
+  private generateSampleQuiz(quizId: string, course: any): any {
+    if (quizId.includes('final')) {
+      return {
+        id: quizId,
+        title: 'Final Course Assessment',
+        description: 'Comprehensive assessment covering all course material',
+        questions: [
+          {
+            id: 'final_q1',
+            type: 'multiple-choice',
+            question: 'Which of the following best summarizes the main concepts of this course?',
+            points: 2,
+            options: [
+              { id: 'a', text: 'Basic theoretical concepts only' },
+              { id: 'b', text: 'Practical application and understanding' },
+              { id: 'c', text: 'Historical background only' },
+              { id: 'd', text: 'Advanced research topics' }
+            ],
+            correctAnswer: 'b',
+            explanation: 'This course focuses on practical application and deep understanding of concepts.'
+          },
+          {
+            id: 'final_q2',
+            type: 'true-false',
+            question: 'The concepts learned in this course can be applied in real-world scenarios.',
+            points: 1,
+            correctAnswer: 'true',
+            explanation: 'Yes, the course is designed to provide practical, applicable knowledge.'
+          }
+        ],
+        settings: {
+          passingScore: 70,
+          maxAttempts: 3,
+          showCorrectAnswers: true,
+          showScoreImmediately: true
+        }
+      };
+    } else {
+      // Module quiz
+      const moduleNumber = quizId.match(/\d+/)?.[0] || '1';
+      return {
+        id: quizId,
+        title: `Module ${moduleNumber} Quiz`,
+        description: `Test your understanding of Module ${moduleNumber} concepts`,
+        questions: [
+          {
+            id: `q${moduleNumber}_1`,
+            type: 'multiple-choice',
+            question: `What is the main focus of Module ${moduleNumber}?`,
+            points: 1,
+            options: [
+              { id: 'a', text: 'Introduction to basic concepts' },
+              { id: 'b', text: 'Advanced practical applications' },
+              { id: 'c', text: 'Historical background' },
+              { id: 'd', text: 'Research methodologies' }
+            ],
+            correctAnswer: 'a',
+            explanation: 'Module focuses on introducing and understanding basic concepts.'
+          },
+          {
+            id: `q${moduleNumber}_2`,
+            type: 'true-false',
+            question: `Module ${moduleNumber} builds upon previous knowledge.`,
+            points: 1,
+            correctAnswer: moduleNumber === '1' ? 'false' : 'true',
+            explanation: moduleNumber === '1' 
+              ? 'Module 1 is introductory and standalone.' 
+              : 'Yes, each module builds upon previous knowledge.'
+          }
+        ],
+        settings: {
+          passingScore: 70,
+          maxAttempts: 3,
+          showCorrectAnswers: true,
+          showScoreImmediately: true
+        }
+      };
     }
   }
 
@@ -1282,7 +1422,7 @@ export class CourseController {
   // Get comprehensive grades and assessment results for a course
   async getCourseGrades(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const courseId = req.params.id;
+      const { id: courseId } = req.params;
       
       if (!courseId) {
         res.status(400).json({
@@ -1300,8 +1440,24 @@ export class CourseController {
         return;
       }
 
-      // Get course details
+      const userId = req.user.id || (req.user as any)._id;
+      if (!userId) {
+        res.status(401).json({
+          success: false,
+          error: 'User ID is required'
+        });
+        return;
+      }
+
+      logger.info('Fetching course grades:', { 
+        courseId, 
+        userId 
+      });
+
+      // Get course and user progress data
       const course = await courseModel.findById(courseId);
+      const userProgress = await progressModel.findByUserAndCourse(userId, courseId);
+
       if (!course) {
         res.status(404).json({
           success: false,
@@ -1310,200 +1466,193 @@ export class CourseController {
         return;
       }
 
-      // Get user progress for grades
-      const progress = await progressModel.findByUserAndCourse(req.user.id, courseId);
-      const enrollment = await enrollmentModel.findByUserAndCourse(req.user.id, courseId);
-
-      if (!enrollment) {
-        res.status(403).json({
-          success: false,
-          error: 'You must be enrolled in this course to view grades'
+      // If no progress found, return empty grades
+      if (!userProgress) {
+        res.json({
+          success: true,
+          data: {
+            grades: [],
+            overallStats: {
+              overallGrade: 0,
+              gradeLetterEquivalent: 'F',
+              totalTimeSpent: 0,
+              modulesCompleted: 0,
+              totalModules: 0,
+              coursePassed: false,
+              completionDate: null
+            },
+            courseTitle: course.title,
+            lastUpdated: new Date().toISOString()
+          }
         });
         return;
       }
 
-      // Compile quiz grades
-      const quizGrades = [];
-      const quizScores = progress?.quizScores || {};
-      
-      for (const [quizId, quizData] of Object.entries(quizScores)) {
-        // Find quiz details in course structure
-        let quizDetails = null;
-        let sectionTitle = '';
-        let lessonTitle = '';
-        
-        for (const section of course.sections || []) {
-          for (const lesson of section.lessons || []) {
-            if (lesson.quiz?.id === quizId || `module-quiz-${lesson.id}` === quizId) {
-              quizDetails = lesson.quiz;
-              sectionTitle = section.title;
-              lessonTitle = lesson.title;
+      // Process quiz grades from user progress
+      const grades: any[] = [];
+      let totalTimeSpent = 0;
+      let totalScore = 0;
+      let totalMaxScore = 0;
+      let quizCount = 0;
+
+      // Safely process quiz scores
+      if (userProgress.quizScores && typeof userProgress.quizScores === 'object') {
+        for (const [quizId, quizScoreData] of Object.entries(userProgress.quizScores)) {
+          try {
+            // Type-safe quiz score processing
+            const quizScore = quizScoreData as any;
+            
+            if (!quizScore || typeof quizScore !== 'object') {
+              logger.warn('Invalid quiz score data:', { quizId, quizScore });
+              continue;
+            }
+
+            if ((quizScore.totalAttempts || 0) > 0) {
+              // Get quiz details from course structure
+              let quizTitle = 'Quiz';
+              let moduleTitle = '';
+              let quizType: 'module' | 'final' = 'module';
+
+              // Find quiz in course structure
+              if (course.sections && Array.isArray(course.sections)) {
+                let found = false;
+                for (const section of course.sections) {
+                  if (found) break;
+                  
+                  if (section.lessons && Array.isArray(section.lessons)) {
+                    for (const lesson of section.lessons) {
+                      if (lesson.quiz && lesson.quiz.id === quizId) {
+                        quizTitle = lesson.quiz.title || lesson.title || 'Module Quiz';
+                        moduleTitle = section.title || 'Module';
+                        quizType = 'module';
+                        found = true;
               break;
             }
           }
-          if (quizDetails) break;
-        }
+                  }
+                  
+                  if (section.moduleQuiz && section.moduleQuiz.id === quizId) {
+                    quizTitle = section.moduleQuiz.title || `${section.title} Assessment`;
+                    moduleTitle = section.title || 'Module';
+                    quizType = 'module';
+                    found = true;
+                  }
+                }
+              }
 
-        quizGrades.push({
-          quizId,
-          title: quizDetails?.title || `${lessonTitle} Quiz`,
-          sectionTitle,
-          lessonTitle,
-          attempts: quizData.attempts || [],
-          bestScore: quizData.bestScore || 0,
-          bestPercentage: quizData.bestPercentage || 0,
-          totalAttempts: quizData.totalAttempts || 0,
-          passed: quizData.passed || false,
-          passingScore: quizDetails?.settings?.passingScore || 70,
-          maxAttempts: quizDetails?.settings?.attempts || 3,
-          canRetake: (quizData.totalAttempts || 0) < (quizDetails?.settings?.attempts || 3) && !quizData.passed,
-          lastAttemptDate: quizData.attempts && quizData.attempts.length > 0 
-            ? quizData.attempts[quizData.attempts.length - 1]?.completedAt || null
-            : null,
-          timeSpent: quizData.attempts ? quizData.attempts.reduce((total: number, attempt: any) => total + (attempt.timeSpent || 0), 0) : 0
-        });
+              // Check final assessment
+              if (course.finalAssessment && course.finalAssessment.id === quizId) {
+                quizTitle = course.finalAssessment.title || 'Final Assessment';
+                moduleTitle = 'Final Assessment';
+                quizType = 'final';
+              }
+
+              // Handle sample quizzes
+              if (quizId.startsWith('sample_')) {
+                if (quizId.includes('final')) {
+                  quizTitle = 'Final Course Assessment';
+                  moduleTitle = 'Final Assessment';
+                  quizType = 'final';
+                } else {
+                  const moduleNumber = quizId.match(/\d+/)?.[0] || '1';
+                  quizTitle = `Module ${moduleNumber} Quiz`;
+                  moduleTitle = `Module ${moduleNumber}`;
+                  quizType = 'module';
+                }
+              }
+
+              // Get best attempt safely
+              let bestAttempt: any = {};
+              if (quizScore.attempts && Array.isArray(quizScore.attempts) && quizScore.attempts.length > 0) {
+                bestAttempt = quizScore.attempts.reduce((best: any, current: any) => 
+                  (current && current.percentage > (best?.percentage || 0)) ? current : best
+                );
       }
 
-      // Compile assignment grades (placeholder for future implementation)
-      const assignmentGrades = [];
-      const assignments = progress?.assignments || {};
-      
-      for (const [assignmentId, assignmentData] of Object.entries(assignments)) {
-        assignmentGrades.push({
-          assignmentId,
-          title: `Assignment ${assignmentId}`,
-          currentGrade: assignmentData.currentGrade || 0,
-          passed: assignmentData.passed || false,
-          submissions: assignmentData.submissions || [],
-          requiresResubmission: assignmentData.requiresResubmission || false,
-          lastSubmissionDate: assignmentData.submissions && assignmentData.submissions.length > 0
-            ? assignmentData.submissions[assignmentData.submissions.length - 1]?.submittedAt || null
-            : null
-        });
-      }
+              // Calculate time spent (convert seconds to minutes) safely
+              const timeSpentMinutes = Math.round((bestAttempt.timeSpent || 0) / 60);
+              totalTimeSpent += timeSpentMinutes;
 
-      // Calculate overall grade statistics
-      const passedQuizzes = quizGrades.filter(q => q.passed).length;
-      const totalQuizzes = quizGrades.length;
-      const averageQuizScore = quizGrades.length > 0 
-        ? Math.round(quizGrades.reduce((sum, q) => sum + q.bestPercentage, 0) / quizGrades.length)
-        : 0;
+              // Get best score safely
+              const bestScore = quizScore.bestScore || quizScore.bestPercentage || 0;
+              const percentage = Math.round(bestScore);
 
-      const passedAssignments = assignmentGrades.filter(a => a.passed).length;
-      const totalAssignments = assignmentGrades.length;
-      const averageAssignmentGrade = assignmentGrades.length > 0
-        ? Math.round(assignmentGrades.reduce((sum, a) => sum + (a.currentGrade || 0), 0) / assignmentGrades.length)
-        : 0;
+              // Add to totals for overall calculation
+              totalScore += percentage;
+              totalMaxScore += 100; // Assuming 100 is max score
+              quizCount++;
 
-      // Calculate overall course grade
-      const quizWeight = 0.7; // 70% weight for quizzes
-      const assignmentWeight = 0.3; // 30% weight for assignments
-      const overallGrade = Math.round(
-        (averageQuizScore * quizWeight) + (averageAssignmentGrade * assignmentWeight)
-      );
-
-      // Determine letter grade
-      const getLetterGrade = (percentage: number): string => {
-        if (percentage >= 90) return 'A';
-        if (percentage >= 80) return 'B';
-        if (percentage >= 70) return 'C';
-        if (percentage >= 60) return 'D';
-        return 'F';
-      };
-
-      // Get completion statistics
-      const completedLessons = progress?.completedLessons?.length || 0;
-      const totalLessons = course.totalLessons || 0;
-      const progressPercentage = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
-
-      // Course completion status
-      const isCompleted = enrollment.status === 'completed' || progressPercentage >= 100;
-      const canEarnCertificate = isCompleted && overallGrade >= 70 && passedQuizzes === totalQuizzes;
-
-      logger.info('Grades fetched for course:', {
-        userId: req.user.id,
-        courseId,
-        overallGrade,
-        quizzesCompleted: `${passedQuizzes}/${totalQuizzes}`,
-        assignmentsCompleted: `${passedAssignments}/${totalAssignments}`,
-        canEarnCertificate
-      });
-
-      const response: ApiResponse = {
-        success: true,
-        data: {
-          courseId,
-          courseName: course.title,
-          enrollmentStatus: enrollment.status,
-          overallGrade,
-          letterGrade: getLetterGrade(overallGrade),
-          isCompleted,
-          canEarnCertificate,
-          
-          // Progress information
-          progress: {
-            percentage: progressPercentage,
-            completedLessons,
-            totalLessons,
-            timeSpent: progress?.timeSpent || 0,
-            lastAccessed: progress?.lastWatched || enrollment.lastAccessedAt
-          },
-          
-          // Quiz performance
-          quizPerformance: {
-            averageScore: averageQuizScore,
-            totalQuizzes,
-            passedQuizzes,
-            failedQuizzes: totalQuizzes - passedQuizzes,
-            totalAttempts: quizGrades.reduce((sum, q) => sum + q.totalAttempts, 0),
-            totalTimeSpent: quizGrades.reduce((sum, q) => sum + q.timeSpent, 0)
-          },
-          
-          // Assignment performance
-          assignmentPerformance: {
-            averageGrade: averageAssignmentGrade,
-            totalAssignments,
-            passedAssignments,
-            failedAssignments: totalAssignments - passedAssignments,
-            pendingSubmissions: assignmentGrades.filter(a => a.requiresResubmission).length
-          },
-          
-          // Detailed grades
-          quizGrades: quizGrades.sort((a, b) => a.title.localeCompare(b.title)),
-          assignmentGrades: assignmentGrades.sort((a, b) => a.title.localeCompare(b.title)),
-          
-          // Grade breakdown for display
-          gradeBreakdown: {
-            quizzes: {
-              weight: quizWeight * 100,
-              averageScore: averageQuizScore,
-              contribution: Math.round(averageQuizScore * quizWeight)
-            },
-            assignments: {
-              weight: assignmentWeight * 100,
-              averageScore: averageAssignmentGrade,
-              contribution: Math.round(averageAssignmentGrade * assignmentWeight)
+              grades.push({
+                id: quizId,
+                quizTitle,
+                moduleTitle,
+                type: quizType,
+                score: percentage,
+                maxScore: 100,
+                percentage,
+                passingScore: 70, // Default passing score
+                passed: (quizScore.passed || false) || percentage >= 70,
+                attempts: quizScore.totalAttempts || 0,
+                completedAt: bestAttempt.completedAt || bestAttempt.submittedAt || new Date().toISOString(),
+                timeSpent: timeSpentMinutes
+              });
             }
-          },
-          
-          // Engagement metrics
-          engagement: {
-            totalTimeSpent: progress?.timeSpent || 0,
-            averageSessionTime: progress?.engagement?.averageSessionLength || 0,
-            sessionCount: progress?.engagement?.sessionCount || 0,
-            lastActive: progress?.engagement?.lastActiveAt || enrollment.lastAccessedAt
+          } catch (quizError) {
+            logger.error('Error processing quiz score:', { quizId, error: quizError });
+            continue; // Skip this quiz and continue with others
           }
         }
+      }
+
+      // Calculate overall stats
+      const overallGrade = quizCount > 0 ? Math.round(totalScore / quizCount) : 0;
+      const moduleGrades = grades.filter(g => g.type === 'module');
+      const finalGrade = grades.find(g => g.type === 'final');
+      
+      const overallStats = {
+        overallGrade,
+        gradeLetterEquivalent: this.getLetterGrade(overallGrade),
+        totalTimeSpent,
+        modulesCompleted: moduleGrades.filter(g => g.passed).length,
+        totalModules: moduleGrades.length,
+        coursePassed: overallGrade >= 70,
+        completionDate: finalGrade?.completedAt || null
       };
 
-      res.json(response);
+      logger.info('Course grades fetched successfully:', {
+        courseId,
+        userId: req.user.id,
+        totalGrades: grades.length,
+        overallGrade,
+        coursePassed: overallStats.coursePassed
+      });
+
+      res.json({
+        success: true,
+        data: {
+          grades,
+          overallStats,
+          courseTitle: course.title,
+          lastUpdated: new Date().toISOString()
+            }
+      });
+
     } catch (error) {
-      logger.error('Failed to get course grades:', error);
+      logger.error('Failed to fetch course grades:', error);
       res.status(500).json({
         success: false,
-        error: 'Failed to retrieve course grades'
+        error: 'Failed to load grades'
       });
     }
+  }
+
+  // Helper method to get letter grade
+  private getLetterGrade(percentage: number): string {
+    if (percentage >= 90) return 'A';
+    if (percentage >= 80) return 'B';
+    if (percentage >= 70) return 'C';
+    if (percentage >= 60) return 'D';
+    return 'F';
   }
 
   // Get course home/overview with enrollment status and progress

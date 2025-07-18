@@ -621,7 +621,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error('Login failed:', error?.message);
         setAuthState(prev => ({ ...prev, isLoading: false }));
         throw error;
-      }
+            }
     } catch (error: any) {
       console.error('❌ Login failed:', error?.message);
       setAuthState(prev => ({ ...prev, isLoading: false }));

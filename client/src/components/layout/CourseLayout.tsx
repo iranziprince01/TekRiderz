@@ -3,6 +3,7 @@ import { CoursePermissions } from '../../utils/coursePermissions';
 import Header from './Header';
 import MinimizedSidebar from './MinimizedSidebar';
 import CourseSidebar from './CourseSidebar';
+import { CourseAccessibilityBar } from '../accessibility/CourseAccessibilityBar';
 
 interface CourseLayoutProps {
   children: React.ReactNode;
@@ -19,6 +20,7 @@ const CourseLayout: React.FC<CourseLayoutProps> = ({
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('home');
+  const [pageContent, setPageContent] = useState<string>('');
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
@@ -49,6 +51,41 @@ const CourseLayout: React.FC<CourseLayoutProps> = ({
       window.removeEventListener('hashchange', handleHashChange);
     };
   }, []);
+
+  // Auto-detect page content for accessibility
+  useEffect(() => {
+    const extractPageContent = () => {
+      // Wait for content to render
+      setTimeout(() => {
+        const mainElement = document.querySelector('main');
+        if (mainElement) {
+          const headings = Array.from(mainElement.querySelectorAll('h1, h2, h3'))
+            .map(h => h.textContent)
+            .filter(Boolean)
+            .join('. ');
+          
+          const paragraphs = Array.from(mainElement.querySelectorAll('p'))
+            .slice(0, 5)
+            .map(p => p.textContent)
+            .filter(text => text && text.length > 20)
+            .join('. ');
+            
+          const content = `${headings}. ${paragraphs}`.substring(0, 1000);
+          setPageContent(content);
+        }
+      }, 500);
+    };
+
+    extractPageContent();
+    
+    // Re-extract when route changes
+    const handleRouteChange = () => {
+      extractPageContent();
+    };
+
+    window.addEventListener('popstate', handleRouteChange);
+    return () => window.removeEventListener('popstate', handleRouteChange);
+  }, [children]);
 
   // Pass activeTab to children through context or props
   const childrenWithProps = React.Children.map(children, child => {
@@ -83,6 +120,12 @@ const CourseLayout: React.FC<CourseLayoutProps> = ({
       {/* Main content area - adjusted for both sidebars */}
       <div className="lg:ml-80 ml-0"> {/* ml-80 = ml-16 (minimized) + ml-64 (course sidebar) */}
         <main className="pt-16 min-h-screen">
+          {/* Accessibility Bar - positioned at the top of content */}
+          <CourseAccessibilityBar 
+            pageContent={pageContent}
+            courseTitle={courseTitle}
+          />
+          
           <div className="h-[calc(100vh-4rem)] overflow-y-auto">
             <div className="px-4 sm:px-6 lg:px-8 py-4">
               <div className="max-w-7xl mx-auto">

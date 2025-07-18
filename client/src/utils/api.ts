@@ -1796,3 +1796,4 @@ export const getCourseStats = async (courseId: string) => {
     throw error;
   }
 };
+

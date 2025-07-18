@@ -414,14 +414,14 @@ const TutorDashboard: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Button 
+        <Button 
             variant={showCreateForm ? "outline" : "primary"}
             onClick={() => setShowCreateForm(!showCreateForm)}
-            className="flex items-center space-x-2"
-          >
-            <Plus className="w-4 h-4" />
-            <span>{language === 'rw' ? 'Kora Isomo' : 'Create Course'}</span>
-          </Button>
+          className="flex items-center space-x-2"
+        >
+          <Plus className="w-4 h-4" />
+          <span>{language === 'rw' ? 'Kora Isomo' : 'Create Course'}</span>
+        </Button>
           <Button
             variant="outline"
             onClick={() => navigate('/dashboard/courses')}

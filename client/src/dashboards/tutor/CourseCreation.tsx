@@ -223,29 +223,29 @@ export const CourseCreation: React.FC = () => {
         
         // Convert existing course structure to course creation format
         const modules = course.sections?.flatMap((section: any) => 
-          section.lessons?.filter((lesson: any) => lesson.type === 'video').map((lesson: any, index: number) => ({
+            section.lessons?.filter((lesson: any) => lesson.type === 'video').map((lesson: any, index: number) => ({
             id: lesson.id || `lesson_${index}`,
             title: lesson.title || 'Untitled Lesson',
-            description: lesson.description || '',
-            order: index,
+              description: lesson.description || '',
+              order: index,
             content: {
               videoProvider: lesson.content?.videoProvider || 'youtube',
               videoUrl: lesson.content?.videoUrl || '',
               videoId: lesson.content?.videoId || ''
             },
-            quiz: lesson.quiz || {
+              quiz: lesson.quiz || {
               id: `quiz_${lesson.id || index}`,
               title: `${lesson.title || 'Lesson'} Quiz`,
-              description: '',
-              questions: [],
-              settings: {
-                maxAttempts: 3,
-                passingScore: 70,
-                showCorrectAnswers: true
-              }
-            },
-            estimatedDuration: lesson.estimatedDuration || 15
-          }))
+                description: '',
+                questions: [],
+                settings: {
+                  maxAttempts: 3,
+                  passingScore: 70,
+                  showCorrectAnswers: true
+                }
+              },
+              estimatedDuration: lesson.estimatedDuration || 15
+            }))
         ) || [];
         
         console.log('Converted modules:', modules);
@@ -869,21 +869,21 @@ export const CourseCreation: React.FC = () => {
                       <Video className="inline h-4 w-4 mr-2" />
                       {language === 'rw' ? 'Amashusho ya YouTube' : 'YouTube Video'} *
                     </label>
-                    <div className="bg-gray-50 rounded-xl p-4">
-                      <YouTubeVideoInput
-                        onVideoAdded={(videoData) => updateModule(module.id, {
-                          content: {
-                            videoProvider: 'youtube',
-                            videoUrl: videoData.videoUrl,
-                            videoId: videoData.videoId
-                          }
-                        })}
-                        currentVideoUrl={module.content.videoUrl}
-                      />
+                                         <div className="bg-gray-50 rounded-xl p-4">
+                       <YouTubeVideoInput
+                         onVideoAdded={(videoData) => updateModule(module.id, {
+                           content: {
+                             videoProvider: 'youtube',
+                             videoUrl: videoData.videoUrl,
+                             videoId: videoData.videoId
+                           }
+                         })}
+                         currentVideoUrl={module.content.videoUrl}
+                       />
                     </div>
                   </div>
-                </div>
-              </div>
+                     </div>
+                  </div>
 
               {/* Quiz Section - Full Width */}
               <div className="mt-8 pt-8 border-t border-gray-200">
@@ -894,7 +894,7 @@ export const CourseCreation: React.FC = () => {
                     </div>
                     <div className="ml-4">
                       <h4 className="text-xl font-bold text-gray-900">
-                        {language === 'rw' ? 'Ikizamini cy\'Igice' : 'Module Quiz'}
+                      {language === 'rw' ? 'Ikizamini cy\'Igice' : 'Module Quiz'}
                       </h4>
                       <p className="text-gray-600">
                         {language === 'rw' 
@@ -906,47 +906,47 @@ export const CourseCreation: React.FC = () => {
                   </div>
                   
                   <div className="bg-white rounded-xl p-6 shadow-sm">
-                    <JsonQuizCreator
-                      courseId={courseId || 'new'}
-                      sectionId={module.id}
-                      onQuizCreated={(quizData) => updateModule(module.id, { 
-                        quiz: {
-                          id: quizData.id,
-                          title: quizData.title || '',
-                          description: quizData.description || '',
-                          questions: quizData.questions,
-                          settings: {
-                            maxAttempts: 3,
-                            passingScore: 70,
-                            showCorrectAnswers: true
-                          }
-                        }
-                      })}
-                      initialQuiz={{
-                        id: module.quiz.id,
-                        courseId: courseId || 'new',
-                        sectionId: module.id,
-                        title: module.quiz.title,
-                        description: module.quiz.description,
-                        instructions: 'Answer all questions to the best of your ability.',
-                        questions: module.quiz.questions,
-                        settings: {
-                          maxAttempts: 3,
-                          passingScore: 70,
-                          showCorrectAnswers: true,
-                          showScoreImmediately: true,
-                          randomizeQuestions: false,
-                          randomizeOptions: false,
-                          allowReview: true,
-                          requireSequential: false
-                        },
-                        createdAt: new Date().toISOString(),
-                        updatedAt: new Date().toISOString(),
-                        version: 1,
-                        difficulty: 'beginner',
-                        estimatedDuration: 10
-                      }}
-                    />
+                       <JsonQuizCreator
+                         courseId={courseId || 'new'}
+                         sectionId={module.id}
+                         onQuizCreated={(quizData) => updateModule(module.id, { 
+                           quiz: {
+                             id: quizData.id,
+                             title: quizData.title || '',
+                             description: quizData.description || '',
+                             questions: quizData.questions,
+                             settings: {
+                               maxAttempts: 3,
+                               passingScore: 70,
+                               showCorrectAnswers: true
+                             }
+                           }
+                         })}
+                         initialQuiz={{
+                           id: module.quiz.id,
+                           courseId: courseId || 'new',
+                           sectionId: module.id,
+                           title: module.quiz.title,
+                           description: module.quiz.description,
+                           instructions: 'Answer all questions to the best of your ability.',
+                           questions: module.quiz.questions,
+                           settings: {
+                             maxAttempts: 3,
+                             passingScore: 70,
+                             showCorrectAnswers: true,
+                             showScoreImmediately: true,
+                             randomizeQuestions: false,
+                             randomizeOptions: false,
+                             allowReview: true,
+                             requireSequential: false
+                           },
+                           createdAt: new Date().toISOString(),
+                           updatedAt: new Date().toISOString(),
+                           version: 1,
+                           difficulty: 'beginner',
+                           estimatedDuration: 10
+                         }}
+                       />
                   </div>
                 </div>
               </div>
@@ -1056,7 +1056,7 @@ export const CourseCreation: React.FC = () => {
                   </div>
                   <div className="ml-4">
                     <h4 className="text-xl font-bold text-gray-900">
-                      {language === 'rw' ? 'Ibibazo by\'Ikizamini' : 'Assessment Questions'} *
+                  {language === 'rw' ? 'Ibibazo by\'Ikizamini' : 'Assessment Questions'} *
                     </h4>
                     <p className="text-gray-600">
                       {language === 'rw' 
@@ -1068,50 +1068,50 @@ export const CourseCreation: React.FC = () => {
                 </div>
                 
                 <div className="bg-white rounded-xl p-6 shadow-sm">
-                  <JsonQuizCreator
-                    courseId={courseId || 'new'}
-                    sectionId="final_assessment"
-                    onQuizCreated={(quizData) => setCourseData(prev => ({
-                      ...prev,
-                      finalAssessment: {
-                        id: quizData.id,
-                        title: quizData.title || '',
-                        description: quizData.description || '',
-                        questions: quizData.questions,
-                        settings: {
-                          maxAttempts: 3,
-                          passingScore: 70,
-                          showCorrectAnswers: false,
-                          timeLimit: 0
-                        }
-                      }
-                    }))}
-                    initialQuiz={courseData.finalAssessment ? {
-                      id: courseData.finalAssessment.id,
-                      courseId: courseId || 'new',
-                      sectionId: 'final_assessment',
-                      title: courseData.finalAssessment.title,
-                      description: courseData.finalAssessment.description,
-                      instructions: 'Complete this comprehensive assessment to finish the course.',
-                      questions: courseData.finalAssessment.questions,
-                      settings: {
-                        maxAttempts: 3,
-                        passingScore: 70,
-                        showCorrectAnswers: false,
-                        showScoreImmediately: true,
-                        randomizeQuestions: false,
-                        randomizeOptions: false,
-                        allowReview: true,
-                        requireSequential: false
-                      },
-                      createdAt: new Date().toISOString(),
-                      updatedAt: new Date().toISOString(),
-                      version: 1,
-                      difficulty: 'intermediate',
-                      estimatedDuration: 30
-                    } : undefined}
-                  />
-                </div>
+                   <JsonQuizCreator
+                     courseId={courseId || 'new'}
+                     sectionId="final_assessment"
+                     onQuizCreated={(quizData) => setCourseData(prev => ({
+                       ...prev,
+                       finalAssessment: {
+                         id: quizData.id,
+                         title: quizData.title || '',
+                         description: quizData.description || '',
+                         questions: quizData.questions,
+                         settings: {
+                           maxAttempts: 3,
+                           passingScore: 70,
+                           showCorrectAnswers: false,
+                           timeLimit: 0
+                         }
+                       }
+                     }))}
+                     initialQuiz={courseData.finalAssessment ? {
+                       id: courseData.finalAssessment.id,
+                       courseId: courseId || 'new',
+                       sectionId: 'final_assessment',
+                       title: courseData.finalAssessment.title,
+                       description: courseData.finalAssessment.description,
+                       instructions: 'Complete this comprehensive assessment to finish the course.',
+                       questions: courseData.finalAssessment.questions,
+                       settings: {
+                         maxAttempts: 3,
+                         passingScore: 70,
+                         showCorrectAnswers: false,
+                         showScoreImmediately: true,
+                         randomizeQuestions: false,
+                         randomizeOptions: false,
+                         allowReview: true,
+                         requireSequential: false
+                       },
+                       createdAt: new Date().toISOString(),
+                       updatedAt: new Date().toISOString(),
+                       version: 1,
+                       difficulty: 'intermediate',
+                       estimatedDuration: 30
+                     } : undefined}
+                   />
+                 </div>
               </div>
             </div>
           )}

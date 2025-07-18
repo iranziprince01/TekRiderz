@@ -24,7 +24,7 @@ const Login: React.FC = () => {
 
   // Check for offline credentials when email changes
   useEffect(() => {
-    setHasOfflineCredentials(false);
+        setHasOfflineCredentials(false);
   }, [email]);
 
   // Listen for online/offline changes

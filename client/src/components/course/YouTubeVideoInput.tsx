@@ -265,11 +265,10 @@ export const YouTubeVideoInput: React.FC<YouTubeVideoInputProps> = ({
               <iframe
                 src={`https://www.youtube.com/embed/${videoId}?controls=1&modestbranding=1&rel=0`}
                 title={videoInfo.title || 'YouTube video'}
-                frameBorder="0"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 allowFullScreen
-                className="w-full h-full relative z-20 border-0"
-                style={{ minHeight: '300px' }}
+                className="absolute inset-0 w-full h-full border-0 rounded-xl"
+                style={{ border: 'none', minHeight: '300px' }}
                 onLoad={() => {
                   // Hide loading overlay when iframe loads
                   const loadingDiv = document.getElementById(`loading-${videoId}`);
@@ -295,7 +294,7 @@ export const YouTubeVideoInput: React.FC<YouTubeVideoInputProps> = ({
           <Lightbulb className="h-3 w-3 text-blue-600" />
           <p className="text-xs">
             Tip: Make sure your video is set to "Unlisted" for course content
-          </p>
+        </p>
         </div>
       </div>
     </div>

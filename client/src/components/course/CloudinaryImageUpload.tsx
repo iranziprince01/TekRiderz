@@ -364,12 +364,12 @@ export const CloudinaryImageUpload: React.FC<CloudinaryImageUploadProps> = ({
       {isCloudinaryConfigured ? (
         <div className="flex items-center space-x-2 text-sm text-green-600 bg-green-50 p-2 rounded-md">
           <Cloud className="h-4 w-4" />
-          <span>Cloudinary enabled - optimized uploads with CDN delivery</span>
+          <span>Image upload ready</span>
         </div>
       ) : (
-        <div className="flex items-center space-x-2 text-sm text-orange-600 bg-orange-50 p-2 rounded-md">
+        <div className="flex items-center space-x-2 text-sm text-blue-600 bg-blue-50 p-2 rounded-md">
           <Upload className="h-4 w-4" />
-          <span>Local upload mode - Configure Cloudinary for better performance</span>
+          <span>Upload available</span>
         </div>
       )}
 

@@ -23,7 +23,7 @@ interface UseComprehensiveDashboardDataReturn extends DashboardData {
 export const useComprehensiveDashboardData = (): UseComprehensiveDashboardDataReturn => {
   const { user, token } = useAuth();
   const { isOnline } = useNetworkStatus();
-
+  
   const [dashboardData, setDashboardData] = useState<DashboardData>({
     user: null,
     stats: null,
@@ -79,8 +79,8 @@ export const useComprehensiveDashboardData = (): UseComprehensiveDashboardDataRe
         const [enrolledResponse, availableResponse] = await Promise.all([
           apiClient.getEnrolledCourses(),
           apiClient.getPublishedCourses()
-        ]);
-        
+              ]);
+
         enrolledCourses = enrolledResponse?.data?.courses || [];
         courses = availableResponse?.data?.courses || [];
         
@@ -97,8 +97,8 @@ export const useComprehensiveDashboardData = (): UseComprehensiveDashboardDataRe
         stats,
         courses,
         enrolledCourses,
-        isLoading: false,
-        error: null,
+            isLoading: false,
+            error: null,
       });
 
     } catch (error: any) {
