@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -54,6 +55,7 @@ interface ToastNotification {
 }
 
 const AdminUsers: React.FC = () => {
+  const { t } = useLanguage();
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(false); // Changed from true to false
   const [searchTerm, setSearchTerm] = useState('');
@@ -332,9 +334,9 @@ const AdminUsers: React.FC = () => {
 
   const getStatusBadge = (status: string) => {
     const configs = {
-      active: { label: 'Active' },
-      suspended: { label: 'Suspended' },
-      inactive: { label: 'Inactive' }
+      active: { label: t('admin.users.active') },
+      suspended: { label: t('admin.users.suspended') },
+      inactive: { label: t('admin.users.inactive') }
     };
     
     const config = configs[status as keyof typeof configs] || configs.inactive;
@@ -382,10 +384,10 @@ const AdminUsers: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            User Management
+            {t('admin.users.title')}
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Manage all platform users and their permissions
+            {t('admin.users.subtitle')}
           </p>
         </div>
         
@@ -404,7 +406,7 @@ const AdminUsers: React.FC = () => {
         >
           <Card className="p-4">
             <div className="text-center">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Total</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">{t('admin.users.total')}</p>
               <p className="text-xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
             </div>
           </Card>
@@ -416,7 +418,7 @@ const AdminUsers: React.FC = () => {
         >
           <Card className="p-4">
             <div className="text-center">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Admins</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">{t('admin.users.admin')}</p>
               <p className="text-xl font-bold text-blue-600">{stats.admins}</p>
             </div>
           </Card>
@@ -428,7 +430,7 @@ const AdminUsers: React.FC = () => {
         >
           <Card className="p-4">
             <div className="text-center">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Tutors</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">{t('admin.users.tutor')}</p>
               <p className="text-xl font-bold text-blue-500">{stats.tutors}</p>
             </div>
           </Card>
@@ -440,7 +442,7 @@ const AdminUsers: React.FC = () => {
         >
           <Card className="p-4">
             <div className="text-center">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Learners</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">{t('admin.users.learner')}</p>
               <p className="text-xl font-bold text-blue-400">{stats.learners}</p>
             </div>
           </Card>
@@ -452,7 +454,7 @@ const AdminUsers: React.FC = () => {
         >
           <Card className="p-4">
             <div className="text-center">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Active</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">{t('admin.users.active')}</p>
               <p className="text-xl font-bold text-blue-500">{stats.active}</p>
             </div>
           </Card>
@@ -464,7 +466,7 @@ const AdminUsers: React.FC = () => {
         >
           <Card className="p-4">
             <div className="text-center">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Inactive</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">{t('admin.users.inactive')}</p>
               <p className="text-xl font-bold text-gray-600">{stats.inactive}</p>
             </div>
           </Card>
@@ -476,7 +478,7 @@ const AdminUsers: React.FC = () => {
         >
           <Card className="p-4">
             <div className="text-center">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Suspended</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">{t('admin.users.suspended')}</p>
               <p className="text-xl font-bold text-gray-500">{stats.suspended}</p>
             </div>
           </Card>
@@ -488,7 +490,7 @@ const AdminUsers: React.FC = () => {
         <div className="flex-1">
             <Input
               type="text"
-              placeholder="Search users by name or email..."
+              placeholder={t('admin.users.searchPlaceholder')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full"
@@ -500,10 +502,10 @@ const AdminUsers: React.FC = () => {
           onChange={(e) => setRoleFilter(e.target.value)}
           className="px-6 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
         >
-          <option value="">All Roles</option>
-          <option value="admin">Admin</option>
-          <option value="tutor">Tutor</option>
-          <option value="learner">Learner</option>
+          <option value="">{t('admin.users.allRoles')}</option>
+          <option value="admin">{t('admin.users.admin')}</option>
+          <option value="tutor">{t('admin.users.tutor')}</option>
+          <option value="learner">{t('admin.users.learner')}</option>
         </select>
         
         <select
@@ -511,10 +513,10 @@ const AdminUsers: React.FC = () => {
           onChange={(e) => setStatusFilter(e.target.value)}
           className="px-6 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
         >
-          <option value="">All Status</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-          <option value="suspended">Suspended</option>
+          <option value="">{t('admin.users.allStatus')}</option>
+          <option value="active">{t('admin.users.active')}</option>
+          <option value="inactive">{t('admin.users.inactive')}</option>
+          <option value="suspended">{t('admin.users.suspended')}</option>
         </select>
       </div>
 
@@ -543,9 +545,9 @@ const AdminUsers: React.FC = () => {
               </div>
               
               <div className="text-xs text-gray-500 dark:text-gray-400">
-                <p>Joined: {formatDate(user.createdAt)}</p>
+                <p>{t('admin.users.joined')}: {formatDate(user.createdAt)}</p>
                 {user.lastLogin && (
-                  <p>Last login: {formatDate(user.lastLogin)}</p>
+                  <p>{t('admin.users.lastLogin')}: {formatDate(user.lastLogin)}</p>
                 )}
               </div>
             </div>
@@ -562,7 +564,7 @@ const AdminUsers: React.FC = () => {
                 </button>
                 {hoveredButton === `view-${user.id}` && (
                   <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded whitespace-nowrap z-10">
-                    View Details
+                    {t('admin.users.viewDetails')}
                     <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-gray-900 dark:border-t-gray-100"></div>
                   </div>
                 )}
@@ -589,7 +591,7 @@ const AdminUsers: React.FC = () => {
                 </button>
                 {hoveredButton === `${user.status === 'active' ? 'deactivate' : 'activate'}-${user.id}` && (
                   <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded whitespace-nowrap z-10">
-                    {user.status === 'active' ? 'Deactivate User' : 'Activate User'}
+                    {user.status === 'active' ? t('admin.users.deactivateUser') : t('admin.users.activateUser')}
                     <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-gray-900 dark:border-t-gray-100"></div>
                   </div>
                 )}
@@ -614,7 +616,7 @@ const AdminUsers: React.FC = () => {
                 </button>
                 {hoveredButton === `delete-${user.id}` && (
                   <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded whitespace-nowrap z-10">
-                    Delete User
+                    {t('admin.users.deleteUser')}
                     <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-gray-900 dark:border-t-gray-100"></div>
                   </div>
                 )}
@@ -633,11 +635,11 @@ const AdminUsers: React.FC = () => {
             onClick={() => loadUsers(pagination.page - 1)}
             disabled={pagination.page === 1}
           >
-            Previous
+            {t('admin.courses.pagination.previous')}
           </Button>
           
           <span className="text-sm text-gray-600 dark:text-gray-400">
-            Page {pagination.page} of {pagination.pages}
+            {t('admin.courses.pagination.page')} {pagination.page} {t('admin.courses.pagination.of')} {pagination.pages}
           </span>
           
           <Button
@@ -646,7 +648,7 @@ const AdminUsers: React.FC = () => {
             onClick={() => loadUsers(pagination.page + 1)}
             disabled={pagination.page >= pagination.pages}
           >
-            Next
+            {t('admin.courses.pagination.next')}
           </Button>
         </div>
       )}
@@ -658,7 +660,7 @@ const AdminUsers: React.FC = () => {
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                  User Details
+                  {t('admin.users.userDetails')}
                 </h2>
                 <Button
                   variant="ghost"
@@ -690,22 +692,22 @@ const AdminUsers: React.FC = () => {
                 {/* Account Details */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Account Info</h4>
+                    <h4 className="font-semibold text-gray-900 dark:text-white mb-2">{t('admin.users.accountInfo')}</h4>
                     <div className="space-y-2 text-sm">
-                      <p><span className="font-medium">User ID:</span> {selectedUser.id}</p>
-                      <p><span className="font-medium">Verified:</span> {selectedUser.verified ? 'Yes' : 'No'}</p>
-                      <p><span className="font-medium">Joined:</span> {formatDate(selectedUser.createdAt)}</p>
+                      <p><span className="font-medium">{t('admin.users.userId')}:</span> {selectedUser.id}</p>
+                      <p><span className="font-medium">{t('admin.users.verified')}:</span> {selectedUser.verified ? t('admin.users.yes') : t('admin.users.no')}</p>
+                      <p><span className="font-medium">{t('admin.users.joined')}:</span> {formatDate(selectedUser.createdAt)}</p>
                       {selectedUser.lastLogin && (
-                        <p><span className="font-medium">Last Login:</span> {formatDate(selectedUser.lastLogin)}</p>
+                        <p><span className="font-medium">{t('admin.users.lastLogin')}:</span> {formatDate(selectedUser.lastLogin)}</p>
                       )}
                     </div>
                   </div>
                   
                   <div>
-                    <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Learning Stats</h4>
+                    <h4 className="font-semibold text-gray-900 dark:text-white mb-2">{t('admin.users.learningStats')}</h4>
                     <div className="space-y-2 text-sm">
-                      <p><span className="font-medium">Enrolled Courses:</span> {selectedUser.enrolledCourses || 0}</p>
-                      <p><span className="font-medium">Completed Courses:</span> {selectedUser.completedCourses || 0}</p>
+                      <p><span className="font-medium">{t('admin.users.enrolledCourses')}:</span> {selectedUser.enrolledCourses || 0}</p>
+                      <p><span className="font-medium">{t('admin.users.completedCourses')}:</span> {selectedUser.completedCourses || 0}</p>
                     </div>
                   </div>
                 </div>
@@ -713,16 +715,16 @@ const AdminUsers: React.FC = () => {
                 {/* Profile Info */}
                 {selectedUser.profile && (
                   <div>
-                    <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Profile</h4>
+                    <h4 className="font-semibold text-gray-900 dark:text-white mb-2">{t('admin.users.profile')}</h4>
                     <div className="space-y-2 text-sm">
                       {selectedUser.profile.bio && (
-                        <p><span className="font-medium">Bio:</span> {selectedUser.profile.bio}</p>
+                        <p><span className="font-medium">{t('admin.users.bio')}:</span> {selectedUser.profile.bio}</p>
                       )}
                       {selectedUser.profile.location && (
-                        <p><span className="font-medium">Location:</span> {selectedUser.profile.location}</p>
+                        <p><span className="font-medium">{t('admin.users.location')}:</span> {selectedUser.profile.location}</p>
                       )}
                       {selectedUser.profile.website && (
-                        <p><span className="font-medium">Website:</span> {selectedUser.profile.website}</p>
+                        <p><span className="font-medium">{t('admin.users.website')}:</span> {selectedUser.profile.website}</p>
                       )}
                     </div>
                   </div>
@@ -739,9 +741,9 @@ const AdminUsers: React.FC = () => {
                     {actionLoading.includes(selectedUser.id) ? (
                       <LoadingSpinner size="sm" />
                     ) : selectedUser.status === 'active' ? (
-                        'Deactivate'
+                        t('admin.users.deactivate')
                     ) : (
-                        'Activate'
+                        t('admin.users.activate')
                     )}
                   </Button>
                   
@@ -754,7 +756,7 @@ const AdminUsers: React.FC = () => {
                     {actionLoading.includes(selectedUser.id) ? (
                       <LoadingSpinner size="sm" />
                     ) : (
-                        'Delete User'
+                        t('admin.users.deleteUser')
                     )}
                   </Button>
                 </div>

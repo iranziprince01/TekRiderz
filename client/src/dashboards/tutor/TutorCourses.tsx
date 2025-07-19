@@ -64,7 +64,7 @@ interface CourseStats {
 
 const TutorCourses: React.FC = () => {
   const { user } = useAuth();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   const { myCourses, setMyCourses } = useCourseStore();
@@ -516,12 +516,12 @@ const TutorCourses: React.FC = () => {
     };
     
     const labels = {
-      draft: language === 'rw' ? 'Igishushanyo' : 'Draft',
-      submitted: language === 'rw' ? 'Bitegereye' : 'Under Review',
-      pending: language === 'rw' ? 'Bitegereje' : 'Pending',
-      approved: language === 'rw' ? 'Byemejwe' : 'Published',
-      published: language === 'rw' ? 'Byatangajwe' : 'Published',
-      rejected: language === 'rw' ? 'Byanze' : 'Rejected',
+      draft: t('status.draft'),
+      submitted: t('status.submitted'),
+      pending: t('status.pending'),
+      approved: t('status.approved'),
+      published: t('status.published'),
+      rejected: t('status.rejected'),
     };
 
     return (
@@ -540,9 +540,9 @@ const TutorCourses: React.FC = () => {
     };
 
     const labels = {
-      beginner: language === 'rw' ? 'Rwintangiriro' : 'Beginner',
-      intermediate: language === 'rw' ? 'Rwagaciro' : 'Intermediate',
-      advanced: language === 'rw' ? 'Rwimbere' : 'Advanced',
+      beginner: t('level.beginner'),
+      intermediate: t('level.intermediate'),
+      advanced: t('level.advanced'),
     };
 
     return (
@@ -577,12 +577,10 @@ const TutorCourses: React.FC = () => {
       <div className="mx-auto max-w-md">
         <BookOpen className="mx-auto h-12 w-12 text-gray-400" />
         <h3 className="mt-2 text-sm font-semibold text-gray-900 dark:text-white">
-          {language === 'rw' ? 'Nta masomo' : 'No courses'}
+                          {t('tutor.courses.noCourses')}
         </h3>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          {language === 'rw' 
-            ? 'Ntabwo ufite amasomo ubwamutse. Tangira ukore igisomo cyawe cya mbere!' 
-            : 'You haven\'t created any courses yet. Start by creating your first course!'}
+          {t('tutor.courses.noCoursesDesc')}
         </p>
         <div className="mt-6">
           <Button 
@@ -590,7 +588,7 @@ const TutorCourses: React.FC = () => {
             className="bg-blue-600 hover:bg-blue-700"
           >
             <Plus className="w-4 h-4 mr-2" />
-            {language === 'rw' ? 'Kora Isomo' : 'Create Course'}
+            {t('tutor.dashboard.createCourse')}
           </Button>
         </div>
       </div>
@@ -618,22 +616,22 @@ const TutorCourses: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
           <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            {language === 'rw' ? 'Amasomo yanjye' : 'My Courses'}
+            {t('tutor.courses.title')}
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
-            {language === 'rw' ? 'Gucunga no gukurikirana amasomo yawe' : 'Manage your courses and track performance'}
+            {t('tutor.courses.subtitle')}
           </p>
           {/* Connection Status */}
           <div className="flex items-center mt-2">
             {isConnected ? (
               <div className="flex items-center text-green-600 dark:text-green-400">
                 <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                <span className="text-sm">Connected</span>
+                <span className="text-sm">{t('tutor.courses.connected')}</span>
               </div>
             ) : (
               <div className="flex items-center text-red-600 dark:text-red-400">
                 <div className="w-2 h-2 bg-red-500 rounded-full mr-2"></div>
-                <span className="text-sm">Offline</span>
+                <span className="text-sm">{t('tutor.courses.offline')}</span>
               </div>
             )}
           </div>
@@ -643,7 +641,7 @@ const TutorCourses: React.FC = () => {
           className="bg-blue-600 hover:bg-blue-700"
         >
           <Plus className="w-4 h-4 mr-2" />
-          {language === 'rw' ? 'Kora Isomo' : 'Create Course'}
+          {t('tutor.dashboard.createCourse')}
         </Button>
       </div>
 
@@ -652,7 +650,7 @@ const TutorCourses: React.FC = () => {
         <Card className="p-5 hover:shadow-lg transition-shadow border-2 hover:border-blue-300 dark:hover:border-blue-600">
           <div className="text-center">
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-              {language === 'rw' ? 'Amasomo yose' : 'Total Courses'}
+              {t('tutor.courses.totalCourses')}
             </p>
             <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.total}</p>
           </div>
@@ -661,7 +659,7 @@ const TutorCourses: React.FC = () => {
         <Card className="p-5 hover:shadow-lg transition-shadow border-2 hover:border-blue-300 dark:hover:border-blue-600">
           <div className="text-center">
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-              {language === 'rw' ? 'Byemejwe' : 'Approved'}
+              {t('tutor.courses.approvedCourses')}
             </p>
             <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.approved}</p>
           </div>
@@ -670,7 +668,7 @@ const TutorCourses: React.FC = () => {
         <Card className="p-5 hover:shadow-lg transition-shadow border-2 hover:border-blue-300 dark:hover:border-blue-600">
           <div className="text-center">
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-              {language === 'rw' ? 'Bitegereje' : 'Pending'}
+              {t('tutor.courses.pendingCourses')}
             </p>
             <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.pending}</p>
           </div>
@@ -679,7 +677,7 @@ const TutorCourses: React.FC = () => {
         <Card className="p-5 hover:shadow-lg transition-shadow border-2 hover:border-blue-300 dark:hover:border-blue-600">
           <div className="text-center">
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-              {language === 'rw' ? 'Igishushanyo' : 'Draft'}
+              {t('tutor.courses.draftCourses')}
             </p>
             <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.draft}</p>
           </div>
@@ -688,7 +686,7 @@ const TutorCourses: React.FC = () => {
         <Card className="p-5 hover:shadow-lg transition-shadow border-2 hover:border-blue-300 dark:hover:border-blue-600">
           <div className="text-center">
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-              {language === 'rw' ? 'Byanze' : 'Rejected'}
+              {t('tutor.courses.rejectedCourses')}
             </p>
             <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.rejected}</p>
           </div>
@@ -697,7 +695,7 @@ const TutorCourses: React.FC = () => {
         <Card className="p-5 hover:shadow-lg transition-shadow border-2 hover:border-blue-300 dark:hover:border-blue-600">
           <div className="text-center">
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-              {language === 'rw' ? 'Abanyeshuri' : 'Enrollments'}
+              {t('tutor.courses.enrollments')}
             </p>
             <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.enrollments}</p>
           </div>
@@ -711,7 +709,7 @@ const TutorCourses: React.FC = () => {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               type="text"
-              placeholder={language === 'rw' ? 'Shakisha amasomo yawe...' : 'Search your courses...'}
+              placeholder={t('tutor.courses.searchPlaceholder')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -723,19 +721,19 @@ const TutorCourses: React.FC = () => {
               onChange={(e) => setStatusFilter(e.target.value)}
               className="px-6 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white min-w-[140px]"
             >
-              <option value="all">{language === 'rw' ? 'Imiterere yose' : 'All Status'}</option>
-              <option value="draft">{language === 'rw' ? 'Igishushanyo' : 'Draft'}</option>
-              <option value="pending">{language === 'rw' ? 'Bitegereje' : 'Pending'}</option>
-              <option value="submitted">{language === 'rw' ? 'Bitegereye' : 'Under Review'}</option>
-              <option value="published">{language === 'rw' ? 'Byatangajwe' : 'Published'}</option>
-              <option value="rejected">{language === 'rw' ? 'Byanze' : 'Rejected'}</option>
+              <option value="all">{t('tutor.courses.allStatus')}</option>
+              <option value="draft">{t('status.draft')}</option>
+              <option value="pending">{t('status.pending')}</option>
+              <option value="submitted">{t('status.submitted')}</option>
+              <option value="published">{t('status.published')}</option>
+              <option value="rejected">{t('status.rejected')}</option>
             </select>
             <select 
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
               className="px-6 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white min-w-[140px]"
             >
-              <option value="all">{language === 'rw' ? 'Ibyiciro byose' : 'All Categories'}</option>
+              <option value="all">{t('tutor.courses.allCategories')}</option>
               <option value="programming">Programming</option>
               <option value="design">Design</option>
               <option value="business-tech">Business Tech</option>
@@ -753,14 +751,14 @@ const TutorCourses: React.FC = () => {
           </div>
           <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
             {searchTerm || statusFilter !== 'all' || categoryFilter !== 'all' 
-              ? (language === 'rw' ? 'Nta masomo aboneka' : 'No courses found')
-              : (language === 'rw' ? 'Ntamasomo ufite' : 'No courses yet')
+              ? t('tutor.courses.noCoursesFound')
+              : t('tutor.courses.noCourses')
             }
           </h3>
           <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-md mx-auto">
             {searchTerm || statusFilter !== 'all' || categoryFilter !== 'all' 
-              ? (language === 'rw' ? 'Gerageza guhindura inyandiko cyangwa akayunguruzo.' : 'Try adjusting your search or filters to find courses.')
-              : (language === 'rw' ? 'Tangira ukore isomo ryawe rya mbere kandi usangire ubumenyi bwawe n\'abandi.' : 'Create your first course and start sharing your knowledge with students.')
+              ? t('tutor.courses.noCoursesFoundDesc')
+              : t('tutor.courses.noCoursesDesc')
             }
           </p>
           
@@ -772,18 +770,18 @@ const TutorCourses: React.FC = () => {
                 size="lg"
               >
                 <Plus className="w-5 h-5 mr-2" />
-                {language === 'rw' ? 'Kora Isomo Ryawe Rya Mbere' : 'Create Your First Course'}
+                {t('tutor.courses.createFirstCourse')}
               </Button>
               
               <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg text-sm max-w-lg mx-auto">
                 <h4 className="font-medium text-blue-900 dark:text-blue-300 mb-2">
-                  {language === 'rw' ? 'Ubwiyunge' : 'Getting Started'}
+                  {t('tutor.courses.gettingStarted')}
                 </h4>
                 <ul className="text-blue-800 dark:text-blue-200 space-y-1 text-left">
-                  <li>• {language === 'rw' ? 'Kanda "Kora Isomo" kugira ngo utangire' : 'Click "Create Course" to get started'}</li>
-                  <li>• {language === 'rw' ? 'Uzuza amakuru y\'isomo ryawe' : 'Fill in your course details'}</li>
-                  <li>• {language === 'rw' ? 'Ohereza isomo kugira ngo ryemezwe' : 'Submit course for admin approval'}</li>
-                  <li>• {language === 'rw' ? 'Nyuma y\'uko ryemejwe, abanyeshuri bashobora kwiyandikisha' : 'Once approved, students can enroll'}</li>
+                  <li>• {t('tutor.courses.step1')}</li>
+                  <li>• {t('tutor.courses.step2')}</li>
+                  <li>• {t('tutor.courses.step3')}</li>
+                  <li>• {t('tutor.courses.step4')}</li>
                 </ul>
               </div>
             </div>
@@ -799,7 +797,7 @@ const TutorCourses: React.FC = () => {
               }}
             >
               <X className="w-4 h-4 mr-2" />
-              {language === 'rw' ? 'Siba Akayunguruzo' : 'Clear Filters'}
+              {t('tutor.courses.clearFilters')}
             </Button>
           )}
         </Card>
@@ -878,7 +876,7 @@ const TutorCourses: React.FC = () => {
                     {/* Price */}
                     <div>
                       <span className="text-sm font-bold text-blue-600 dark:text-blue-400">
-                        {language === 'rw' ? 'Ubuntu!' : 'Free'}
+                        {t('tutor.courses.free')}
                       </span>
                       <div className="text-xs text-gray-500 dark:text-gray-400">
                         {formatDate(course.createdAt)}
@@ -894,7 +892,7 @@ const TutorCourses: React.FC = () => {
                         className="text-xs px-3 py-1.5 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 dark:hover:bg-blue-900/20"
                       >
                         <Eye className="h-3 w-3 mr-1" />
-                        {language === 'rw' ? 'Reba' : 'View'}
+                        {t('tutor.courses.view')}
                       </Button>
                       <Button
                         variant="outline"
@@ -903,7 +901,7 @@ const TutorCourses: React.FC = () => {
                         className="text-xs px-3 py-1.5 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 dark:hover:bg-blue-900/20"
                       >
                         <Edit className="h-3 w-3 mr-1" />
-                        {language === 'rw' ? 'Hindura' : 'Edit'}
+                        {t('tutor.courses.edit')}
                       </Button>
                     </div>
                   </div>
@@ -922,7 +920,7 @@ const TutorCourses: React.FC = () => {
             <div className="p-6 border-b border-gray-200 dark:border-gray-700">
               <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {language === 'rw' ? 'Amakuru y\'isomo' : 'Course Details'}
+                  {t('tutor.courses.courseDetails')}
                 </h2>
                 <button
                   onClick={() => setShowDetailsModal(false)}
@@ -961,7 +959,7 @@ const TutorCourses: React.FC = () => {
                     <Users className="h-8 w-8 text-gray-600 dark:text-gray-400 mx-auto mb-2" />
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">{selectedCourse.students}</p>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {language === 'rw' ? 'Abanyeshuri' : 'Students'}
+                      {t('tutor.courses.students')}
                     </p>
                   </div>
                   
@@ -971,7 +969,7 @@ const TutorCourses: React.FC = () => {
                       {selectedCourse.rating.average > 0 ? selectedCourse.rating.average.toFixed(1) : '--'}
                     </p>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {language === 'rw' ? 'Amanota' : 'Rating'}
+                      {t('tutor.courses.rating')}
                     </p>
                   </div>
                   
@@ -979,19 +977,19 @@ const TutorCourses: React.FC = () => {
                     <TrendingUp className="h-8 w-8 text-gray-600 dark:text-gray-400 mx-auto mb-2" />
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">{selectedCourse.reviews}</p>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {language === 'rw' ? 'Ibiciro' : 'Reviews'}
+                      {t('tutor.courses.reviews')}
                     </p>
                   </div>
                   
                   <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-center">
                     <Clock className="h-8 w-8 text-gray-600 dark:text-gray-400 mx-auto mb-2" />
                     <p className="text-lg font-bold text-gray-900 dark:text-white">
-                      {selectedCourse.status === 'published' ? (language === 'rw' ? 'Byatangajwe' : 'Live') : 
-                       selectedCourse.status === 'submitted' ? (language === 'rw' ? 'Mu gusuzuma' : 'Pending') :
-                       (language === 'rw' ? 'Igishushanyo' : 'Draft')}
+                                          {selectedCourse.status === 'published' ? t('tutor.courses.liveCourse') :
+                    selectedCourse.status === 'submitted' ? t('tutor.courses.pendingStatus') :
+                    t('tutor.courses.draftStatus')}
                     </p>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {language === 'rw' ? 'Imiterere' : 'Status'}
+                      {t('tutor.courses.status')}
                     </p>
                   </div>
                 </div>
@@ -999,11 +997,11 @@ const TutorCourses: React.FC = () => {
                 {/* Course Description */}
                 <div>
                   <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
-                    {language === 'rw' ? 'Ibisobanuro' : 'Description'}
+                    {t('tutor.courses.description')}
                   </h4>
                   <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
                     <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-                      {selectedCourse.description || (language === 'rw' ? 'Nta bisobanuro byatanzwe.' : 'No description provided.')}
+                      {selectedCourse.description || t('tutor.courses.noDescription')}
                     </p>
                   </div>
                 </div>
@@ -1012,12 +1010,12 @@ const TutorCourses: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
-                      {language === 'rw' ? 'Amakuru rusange' : 'General Information'}
+                      {t('tutor.courses.generalInfo')}
                     </h4>
                     <div className="space-y-3">
                       <div className="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
                         <span className="text-gray-600 dark:text-gray-400">
-                          {language === 'rw' ? 'Icyiciro' : 'Category'}
+                          {t('tutor.dashboard.category')}
                         </span>
                         <span className="font-medium text-gray-900 dark:text-white capitalize">
                           {selectedCourse.category}
@@ -1025,7 +1023,7 @@ const TutorCourses: React.FC = () => {
                       </div>
                       <div className="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
                         <span className="text-gray-600 dark:text-gray-400">
-                          {language === 'rw' ? 'Urwego' : 'Level'}
+                          {t('tutor.dashboard.level')}
                         </span>
                         <span className="font-medium text-gray-900 dark:text-white capitalize">
                           {selectedCourse.level}
@@ -1033,7 +1031,7 @@ const TutorCourses: React.FC = () => {
                       </div>
                       <div className="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
                         <span className="text-gray-600 dark:text-gray-400">
-                          {language === 'rw' ? 'Umwarimu' : 'Instructor'}
+                          {t('tutor.courses.instructor')}
                         </span>
                         <span className="font-medium text-gray-900 dark:text-white">
                           {selectedCourse.instructorName}
@@ -1044,12 +1042,12 @@ const TutorCourses: React.FC = () => {
                   
                   <div>
                     <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
-                      {language === 'rw' ? 'Amakuru y\'igihe' : 'Timeline'}
+                      {t('tutor.courses.timeline')}
                     </h4>
                     <div className="space-y-3">
                       <div className="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
                         <span className="text-gray-600 dark:text-gray-400">
-                          {language === 'rw' ? 'Byakorewe' : 'Created'}
+                          {t('tutor.courses.created')}
                         </span>
                         <span className="font-medium text-gray-900 dark:text-white">
                           {formatDate(selectedCourse.createdAt)}
@@ -1057,7 +1055,7 @@ const TutorCourses: React.FC = () => {
                       </div>
                       <div className="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
                         <span className="text-gray-600 dark:text-gray-400">
-                          {language === 'rw' ? 'Byavuguruwe' : 'Last Updated'}
+                          {t('tutor.courses.lastUpdated')}
                         </span>
                         <span className="font-medium text-gray-900 dark:text-white">
                           {formatDate(selectedCourse.updatedAt)}
@@ -1071,12 +1069,12 @@ const TutorCourses: React.FC = () => {
                 {selectedCourse.status === 'draft' && (
                   <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                     <h4 className="font-semibold text-blue-900 dark:text-blue-300 mb-2">
-                      {language === 'rw' ? 'Ibyiza byagufasha' : 'Next Steps'}
+                      {t('tutor.courses.nextSteps')}
                     </h4>
                     <ul className="text-blue-800 dark:text-blue-200 text-sm space-y-1">
-                      <li>• {language === 'rw' ? 'Uzuza amakuru yose y\'isomo' : 'Complete all course information'}</li>
-                      <li>• {language === 'rw' ? 'Ongeramo ifoto y\'isomo' : 'Add a course thumbnail'}</li>
-                      <li>• {language === 'rw' ? 'Ohereze isomo kugira ngo ryemezwe' : 'Submit course for admin review'}</li>
+                      <li>• {t('tutor.courses.step1Complete')}</li>
+                      <li>• {t('tutor.courses.step2AddThumbnail')}</li>
+                      <li>• {t('tutor.courses.step3Submit')}</li>
                     </ul>
                   </div>
                 )}
@@ -1084,13 +1082,10 @@ const TutorCourses: React.FC = () => {
                 {selectedCourse.status === 'rejected' && (
                   <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
                     <h4 className="font-semibold text-red-900 dark:text-red-300 mb-2">
-                      {language === 'rw' ? 'Isomo ryanze' : 'Course Rejected'}
+                      {t('tutor.courses.courseRejected')}
                     </h4>
                     <p className="text-red-800 dark:text-red-200 text-sm">
-                      {language === 'rw' 
-                        ? 'Isomo ryawe ryanze. Reba ibyo watoranywe kugira ngo ukosore ibyo bimaze osubize isomo.'
-                        : 'Your course was rejected. Please review the feedback and make necessary changes before resubmitting.'
-                      }
+                      {t('tutor.courses.rejectedMessage')}
                     </p>
                   </div>
                 )}
@@ -1098,13 +1093,10 @@ const TutorCourses: React.FC = () => {
                 {selectedCourse.status === 'approved' && (
                   <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
                     <h4 className="font-semibold text-green-900 dark:text-green-300 mb-2">
-                      {language === 'rw' ? 'Isomo ryemejwe!' : 'Course Approved!'}
+                      {t('tutor.courses.courseApproved')}
                     </h4>
                     <p className="text-green-800 dark:text-green-200 text-sm">
-                      {language === 'rw' 
-                        ? 'Isomo ryawe ryemejwe kandi abanyeshuri bashobora kwiyandikisha.'
-                        : 'Your course has been approved and is now available for student enrollment.'
-                      }
+                      {t('tutor.courses.approvedMessage')}
                     </p>
                   </div>
                 )}
@@ -1118,7 +1110,7 @@ const TutorCourses: React.FC = () => {
                   variant="outline"
                   onClick={() => setShowDetailsModal(false)}
                 >
-                  {language === 'rw' ? 'Funga' : 'Close'}
+                  {t('tutor.courses.close')}
                 </Button>
                 
                 {selectedCourse.status === 'approved' && (
@@ -1130,7 +1122,7 @@ const TutorCourses: React.FC = () => {
                     className="bg-green-600 hover:bg-green-700"
                   >
                     <Eye className="w-4 h-4 mr-2" />
-                    {language === 'rw' ? 'Reba ku rubuga' : 'View Live Course'}
+                    {t('tutor.courses.viewLiveCourse')}
                   </Button>
                 )}
                 
@@ -1142,7 +1134,7 @@ const TutorCourses: React.FC = () => {
                   className="bg-purple-600 hover:bg-purple-700"
                 >
                   <Edit className="w-4 h-4 mr-2" />
-                  {language === 'rw' ? 'Hindura' : 'Edit Course'}
+                  {t('tutor.courses.editCourse')}
                 </Button>
                 
                 {selectedCourse.status === 'draft' && (
@@ -1159,7 +1151,7 @@ const TutorCourses: React.FC = () => {
                     ) : (
                       <Send className="w-4 h-4 mr-2" />
                     )}
-                    {language === 'rw' ? 'Ohereza' : 'Submit for Review'}
+                    {t('tutor.courses.submitForReview')}
                   </Button>
                 )}
               </div>
@@ -1178,16 +1170,13 @@ const TutorCourses: React.FC = () => {
               </div>
               <div className="ml-3">
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-                  {language === 'rw' ? 'Gusiba isomo' : 'Delete Course'}
+                  {t('tutor.courses.deleteCourse')}
                 </h3>
               </div>
             </div>
             
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-              {language === 'rw' 
-                ? `Wizeye gusiba "${selectedCourse.title}"? Ibi ntibihinduka.`
-                : `Are you sure you want to delete "${selectedCourse.title}"? This action cannot be undone.`
-              }
+              {t('tutor.courses.deleteMessage')} "{selectedCourse.title}"? {t('tutor.courses.deleteCannotUndo')}
             </p>
 
             <div className="flex justify-end space-x-3">
@@ -1196,7 +1185,7 @@ const TutorCourses: React.FC = () => {
                 onClick={() => setShowDeleteModal(false)}
                 disabled={isSubmitting === selectedCourse.id}
               >
-                {language === 'rw' ? 'Reka' : 'Cancel'}
+                {t('tutor.courses.cancel')}
               </Button>
               <Button
                 onClick={confirmDeleteCourse}
@@ -1208,7 +1197,7 @@ const TutorCourses: React.FC = () => {
                 ) : (
                   <Trash2 className="w-4 h-4 mr-2" />
                 )}
-                {language === 'rw' ? 'Siba' : 'Delete'}
+                {t('tutor.courses.delete')}
               </Button>
             </div>
           </div>

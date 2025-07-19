@@ -14,7 +14,8 @@ import {
   Star,
   Play,
   Plus,
-  CheckCircle
+  CheckCircle,
+  ArrowRight
 } from 'lucide-react';
 import { apiClient, getFileUrl } from '../../utils/api';
 
@@ -42,7 +43,7 @@ const EnhancedCourseCard: React.FC<EnhancedCourseCardProps> = ({
   const isInProgress = course.progress?.percentage > 0 && course.progress?.percentage < 100;
   const isCompleted = course.progress?.percentage >= 100;
 
-  // Handle course enrollment (works offline)
+  // Handle course enrollment with direct navigation
   const handleEnroll = async () => {
     if (!user || isEnrolling) return;
 
@@ -61,24 +62,18 @@ const EnhancedCourseCard: React.FC<EnhancedCourseCardProps> = ({
           
           console.log('Enrollment successful:', response.data);
           
-          // Auto-navigate to course page after successful enrollment
-          setTimeout(() => {
-            window.location.href = `/course/${course.id || course._id}`;
-          }, 1000);
+          // Immediate navigation to course page
+          window.location.href = `/course/${course.id || course._id}`;
         } else {
           throw new Error(response.error || 'Enrollment failed');
         }
       } else {
-        // Offline enrollment - queue for sync
-        // This part is removed as per the edit hint to simplify offline operations.
-        // If offline enrollment is needed, it should be re-added and handled here.
         console.warn('Offline enrollment not implemented yet.');
-        setEnrollmentStatus('pending'); // Indicate pending for offline
+        setEnrollmentStatus('pending');
         onEnrollmentChange?.();
       }
     } catch (error) {
       console.error('Failed to enroll in course:', error);
-      // Show user-friendly error (you might want to add a toast notification here)
     } finally {
       setIsEnrolling(false);
     }
@@ -89,7 +84,7 @@ const EnhancedCourseCard: React.FC<EnhancedCourseCardProps> = ({
     if (isEnrolled || enrollmentStatus === 'enrolled') {
       return (
         <Link to={`/course/${course.id || course._id}`}>
-          <Button className="w-full flex items-center gap-2">
+          <Button className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white">
             {isCompleted ? (
               <>
                 <CheckCircle className="w-4 h-4" />
@@ -108,7 +103,7 @@ const EnhancedCourseCard: React.FC<EnhancedCourseCardProps> = ({
 
     if (enrollmentStatus === 'pending') {
       return (
-        <Button disabled className="w-full flex items-center gap-2">
+        <Button disabled className="w-full flex items-center justify-center gap-2 bg-gray-100 text-gray-500">
           <Clock className="w-4 h-4" />
           {t('Enrollment Pending')}
         </Button>
@@ -119,7 +114,8 @@ const EnhancedCourseCard: React.FC<EnhancedCourseCardProps> = ({
       <Button 
         onClick={handleEnroll}
         disabled={isEnrolling}
-        className="w-full flex items-center gap-2"
+        className="w-full flex items-center justify-center gap-2 border border-blue-200 text-blue-700 hover:bg-blue-50 bg-white"
+        variant="outline"
       >
         {isEnrolling ? (
           <LoadingSpinner className="w-4 h-4" />
@@ -132,9 +128,9 @@ const EnhancedCourseCard: React.FC<EnhancedCourseCardProps> = ({
   };
 
   return (
-    <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-300">
+    <Card className="overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 bg-white">
       {/* Course Thumbnail */}
-      <div className="relative h-48 bg-gradient-to-br from-gray-100 to-gray-200">
+      <div className="relative h-48 bg-gray-100">
         {course.thumbnail ? (
           <img
             src={getFileUrl(course.thumbnail, 'thumbnail')}
@@ -147,34 +143,25 @@ const EnhancedCourseCard: React.FC<EnhancedCourseCardProps> = ({
           </div>
         )}
         
-        {/* Course Status Badge */}
-        <div className="absolute top-3 left-3">
-          {course.featured && (
-            <Badge variant="default" className="text-xs">
-              {t('Featured')}
+        {/* Course Level Badge - Clean Design */}
+        <div className="absolute top-3 right-3">
+          {course.level && (
+            <Badge variant="default" className="bg-white text-gray-700 text-xs shadow-sm">
+              {t(course.level)}
             </Badge>
           )}
         </div>
 
-                 {/* Course Level Badge */}
-         <div className="absolute top-3 right-3">
-           {course.level && (
-             <Badge variant="info" className="text-xs">
-               {t(course.level)}
-             </Badge>
-           )}
-         </div>
-
         {/* Progress Overlay for enrolled courses */}
         {showProgress && course.progress && (
-          <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white p-2">
-            <div className="flex items-center justify-between text-sm">
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent text-white p-3">
+            <div className="flex items-center justify-between text-sm mb-1">
               <span>{course.progress.percentage}% {t('Complete')}</span>
               <span>{course.progress.completedLessons}/{course.progress.totalLessons} {t('Lessons')}</span>
             </div>
-            <div className="w-full bg-gray-600 rounded-full h-1 mt-1">
+            <div className="w-full bg-gray-400/50 rounded-full h-1.5">
               <div 
-                className="bg-green-400 h-1 rounded-full transition-all duration-300"
+                className="bg-green-400 h-1.5 rounded-full transition-all duration-300"
                 style={{ width: `${course.progress.percentage}%` }}
               />
             </div>
@@ -184,31 +171,26 @@ const EnhancedCourseCard: React.FC<EnhancedCourseCardProps> = ({
 
       {/* Course Content */}
       <div className="p-6">
-                 {/* Course Category */}
-         {course.category && (
-           <div className="flex items-center gap-2 mb-2">
-             <Badge variant="info" className="text-xs">
-               {t(course.category)}
-             </Badge>
-             {course.difficulty && (
-               <Badge variant="warning" className="text-xs">
-                 {t(course.difficulty)}
-               </Badge>
-             )}
-           </div>
-         )}
+        {/* Course Category - Simplified */}
+        {course.category && (
+          <div className="mb-3">
+            <Badge variant="default" className="bg-gray-100 text-gray-700 text-xs">
+              {t(course.category)}
+            </Badge>
+          </div>
+        )}
 
         {/* Course Title */}
-        <h3 className="font-bold text-lg text-gray-900 mb-2 line-clamp-2">
+        <h3 className="font-semibold text-lg text-gray-900 mb-2 line-clamp-2">
           {course.title}
         </h3>
 
         {/* Course Description */}
-        <p className="text-gray-600 text-sm mb-4 line-clamp-3">
+        <p className="text-gray-600 text-sm mb-4 line-clamp-3 leading-relaxed">
           {course.description}
         </p>
 
-        {/* Course Metadata */}
+        {/* Course Metadata - Clean Layout */}
         <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
           {course.duration && (
             <div className="flex items-center gap-1">
@@ -220,22 +202,22 @@ const EnhancedCourseCard: React.FC<EnhancedCourseCardProps> = ({
           {course.studentsCount && (
             <div className="flex items-center gap-1">
               <Users className="w-4 h-4" />
-              <span>{course.studentsCount} {t('students')}</span>
+              <span>{course.studentsCount}</span>
             </div>
           )}
           
           {course.rating && (
             <div className="flex items-center gap-1">
-              <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+              <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
               <span>{course.rating}</span>
             </div>
           )}
         </div>
 
-        {/* Instructor */}
+        {/* Instructor - Clean Design */}
         {course.instructorName && (
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-bold">
+          <div className="flex items-center gap-3 mb-6 pb-4 border-b border-gray-100">
+            <div className="w-8 h-8 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center text-sm font-medium">
               {course.instructorName.charAt(0).toUpperCase()}
             </div>
             <div>
@@ -247,15 +229,29 @@ const EnhancedCourseCard: React.FC<EnhancedCourseCardProps> = ({
           </div>
         )}
 
-        {/* All courses are free - no pricing display needed */}
-
         {/* Enrollment Button */}
-        <div className="space-y-2">
+        <div className="space-y-3">
           {getEnrollmentButton()}
           
-          {/* Offline indicator for enrollment */}
+          {/* Course preview link for non-enrolled users */}
+          {!isEnrolled && (
+            <Link 
+              to={`/course/${course.id || course._id}`}
+              className="block text-center"
+            >
+              <Button 
+                variant="ghost" 
+                className="w-full text-gray-600 hover:text-blue-600 text-sm"
+              >
+                {t('View Details')}
+                <ArrowRight className="w-4 h-4 ml-1" />
+              </Button>
+            </Link>
+          )}
+          
+          {/* Offline indicator */}
           {!isOnline && !isEnrolled && (
-            <p className="text-xs text-center text-amber-600">
+            <p className="text-xs text-center text-amber-600 bg-amber-50 py-2 px-3 rounded">
               {t('Enrollment will sync when you\'re back online')}
             </p>
           )}

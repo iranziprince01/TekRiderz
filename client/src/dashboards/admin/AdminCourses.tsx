@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -71,6 +72,7 @@ interface ToastNotification {
 
 const AdminCourses: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [courses, setCourses] = useState<CourseData[]>([]);
   const [loading, setLoading] = useState(false); // Changed from true to false
   const [searchTerm, setSearchTerm] = useState('');
@@ -363,13 +365,13 @@ const AdminCourses: React.FC = () => {
 
   const getStatusBadge = (status: string) => {
     const configs = {
-      draft: { variant: 'default' as const, label: 'Draft' },
-      submitted: { variant: 'default' as const, label: 'Pending' },
-      pending: { variant: 'default' as const, label: 'Pending' },
-      approved: { variant: 'default' as const, label: 'Approved' },
-      published: { variant: 'default' as const, label: 'Published' },
-      rejected: { variant: 'default' as const, label: 'Rejected' },
-      archived: { variant: 'default' as const, label: 'Archived' }
+      draft: { variant: 'default' as const, label: t('admin.courses.status.draft') },
+      submitted: { variant: 'default' as const, label: t('admin.courses.status.submitted') },
+      pending: { variant: 'default' as const, label: t('admin.courses.status.pending') },
+      approved: { variant: 'default' as const, label: t('admin.courses.status.approved') },
+      published: { variant: 'default' as const, label: t('admin.courses.status.published') },
+      rejected: { variant: 'default' as const, label: t('admin.courses.status.rejected') },
+      archived: { variant: 'default' as const, label: t('admin.courses.status.archived') }
     };
 
     const config = configs[status as keyof typeof configs] || configs.draft;
@@ -417,10 +419,10 @@ const AdminCourses: React.FC = () => {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Course Management
+          {t('admin.courses.title')}
         </h1>
         <p className="text-gray-600 dark:text-gray-400 mt-1">
-          Review and manage all platform courses
+          {t('admin.courses.subtitle')}
         </p>
       </div>
 
@@ -437,7 +439,7 @@ const AdminCourses: React.FC = () => {
         >
           <Card className="p-4 h-24 flex items-center justify-center">
             <div className="text-center w-full">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1 h-4">Total</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1 h-4">{t('admin.courses.stats.total')}</p>
               <p className="text-xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
             </div>
           </Card>
@@ -451,7 +453,7 @@ const AdminCourses: React.FC = () => {
         >
           <Card className="p-4 h-24 flex items-center justify-center">
             <div className="text-center w-full">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1 h-4">Pending</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1 h-4">{t('admin.courses.status.pending')}</p>
               <p className="text-xl font-bold text-blue-500">{stats.submitted}</p>
             </div>
           </Card>
@@ -463,7 +465,7 @@ const AdminCourses: React.FC = () => {
         >
           <Card className="p-4 h-24 flex items-center justify-center">
             <div className="text-center w-full">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1 h-4">Approved</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1 h-4">{t('admin.courses.status.approved')}</p>
               <p className="text-xl font-bold text-blue-400">{stats.approved}</p>
             </div>
           </Card>
@@ -475,7 +477,7 @@ const AdminCourses: React.FC = () => {
         >
           <Card className="p-4 h-24 flex items-center justify-center">
             <div className="text-center w-full">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1 h-4">Published</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1 h-4">{t('admin.courses.status.published')}</p>
               <p className="text-xl font-bold text-blue-600">{stats.published}</p>
             </div>
           </Card>
@@ -487,7 +489,7 @@ const AdminCourses: React.FC = () => {
         >
           <Card className="p-4 h-24 flex items-center justify-center">
             <div className="text-center w-full">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1 h-4">Rejected</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1 h-4">{t('admin.courses.status.rejected')}</p>
               <p className="text-xl font-bold text-blue-300">{stats.rejected}</p>
             </div>
           </Card>
@@ -499,7 +501,7 @@ const AdminCourses: React.FC = () => {
         >
           <Card className="p-4 h-24 flex items-center justify-center">
             <div className="text-center w-full">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1 h-4">Archived</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1 h-4">{t('admin.courses.status.archived')}</p>
               <p className="text-xl font-bold text-gray-600">{stats.archived}</p>
             </div>
           </Card>
@@ -513,7 +515,7 @@ const AdminCourses: React.FC = () => {
         <div className="flex-1">
           <Input
             type="text"
-            placeholder="Search courses by title or tutor..."
+            placeholder={t('admin.courses.searchPlaceholder')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full"
@@ -526,14 +528,14 @@ const AdminCourses: React.FC = () => {
             onChange={(e) => setStatusFilter(e.target.value)}
             className="px-6 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white min-w-32"
           >
-            <option value="">All Status</option>
-            <option value="draft">Draft</option>
-            <option value="pending">Pending</option>
-            <option value="submitted">Submitted</option>
-            <option value="approved">Approved</option>
-            <option value="published">Published</option>
-            <option value="rejected">Rejected</option>
-            <option value="archived">Archived</option>
+            <option value="">{t('admin.courses.allStatus')}</option>
+            <option value="draft">{t('admin.courses.status.draft')}</option>
+            <option value="pending">{t('admin.courses.status.pending')}</option>
+            <option value="submitted">{t('admin.courses.status.submitted')}</option>
+            <option value="approved">{t('admin.courses.status.approved')}</option>
+            <option value="published">{t('admin.courses.status.published')}</option>
+            <option value="rejected">{t('admin.courses.status.rejected')}</option>
+            <option value="archived">{t('admin.courses.status.archived')}</option>
           </select>
 
           <select
@@ -541,11 +543,11 @@ const AdminCourses: React.FC = () => {
             onChange={(e) => setCategoryFilter(e.target.value)}
             className="px-6 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white min-w-36"
           >
-            <option value="">All Categories</option>
-            <option value="programming">Programming</option>
-            <option value="design">Design</option>
-            <option value="business-tech">Business Tech</option>
-            <option value="general-it">General IT</option>
+            <option value="">{t('admin.courses.allCategories')}</option>
+            <option value="programming">{t('courses.programming')}</option>
+            <option value="design">{t('courses.design')}</option>
+            <option value="business-tech">{t('courses.businessTech')}</option>
+            <option value="general-it">{t('courses.generalIT')}</option>
           </select>
 
           <select
@@ -553,10 +555,10 @@ const AdminCourses: React.FC = () => {
             onChange={(e) => setLevelFilter(e.target.value)}
             className="px-6 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white min-w-28"
           >
-            <option value="">All Levels</option>
-            <option value="beginner">Beginner</option>
-            <option value="intermediate">Intermediate</option>
-            <option value="advanced">Advanced</option>
+            <option value="">{t('admin.courses.allLevels')}</option>
+            <option value="beginner">{t('courses.beginner')}</option>
+            <option value="intermediate">{t('courses.intermediate')}</option>
+            <option value="advanced">{t('courses.advanced')}</option>
           </select>
         </div>
       </div>
@@ -579,7 +581,7 @@ const AdminCourses: React.FC = () => {
               {/* Tutor/Owner */}
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Tutor</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">{t('admin.courses.tutor')}</p>
                   <p className="font-medium text-gray-900 dark:text-white">{course.instructorName}</p>
                 </div>
                 <div>
@@ -610,7 +612,7 @@ const AdminCourses: React.FC = () => {
                       </button>
                       {hoveredButton === `approve-${course.id}` && (
                         <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded whitespace-nowrap z-10">
-                          Approve Course
+                          {t('admin.courses.approveCourse')}
                           <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-gray-900 dark:border-t-gray-100"></div>
                         </div>
                       )}
@@ -635,7 +637,7 @@ const AdminCourses: React.FC = () => {
                       </button>
                       {hoveredButton === `reject-${course.id}` && (
                         <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded whitespace-nowrap z-10">
-                          Reject Course
+                          {t('admin.courses.rejectCourse')}
                           <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-gray-900 dark:border-t-gray-100"></div>
                         </div>
                       )}
@@ -655,7 +657,7 @@ const AdminCourses: React.FC = () => {
                     </button>
                     {hoveredButton === `view-${course.id}` && (
                       <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded whitespace-nowrap z-10">
-                        View Course
+                        {t('admin.courses.viewCourse')}
                         <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-gray-900 dark:border-t-gray-100"></div>
                       </div>
                     )}
@@ -678,7 +680,7 @@ const AdminCourses: React.FC = () => {
                   </button>
                   {hoveredButton === `delete-${course.id}` && (
                     <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded whitespace-nowrap z-10">
-                      Delete Course
+                      {t('admin.courses.deleteCourse')}
                       <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-gray-900 dark:border-t-gray-100"></div>
                     </div>
                   )}
@@ -698,11 +700,11 @@ const AdminCourses: React.FC = () => {
             onClick={() => loadCourses(pagination.page - 1)}
             disabled={pagination.page === 1}
             >
-              Previous
+              {t('admin.courses.pagination.previous')}
             </Button>
             
           <span className="text-sm text-gray-600 dark:text-gray-400">
-              Page {pagination.page} of {pagination.pages}
+              {t('admin.courses.pagination.page')} {pagination.page} {t('admin.courses.pagination.of')} {pagination.pages}
             </span>
             
             <Button
@@ -711,7 +713,7 @@ const AdminCourses: React.FC = () => {
             onClick={() => loadCourses(pagination.page + 1)}
               disabled={pagination.page >= pagination.pages}
             >
-              Next
+              {t('admin.courses.pagination.next')}
             </Button>
         </div>
       )}
@@ -723,7 +725,7 @@ const AdminCourses: React.FC = () => {
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                  Approve Course
+                  {t('admin.courses.approveModal.title')}
                 </h3>
                 <Button
                   variant="ghost"
@@ -735,18 +737,18 @@ const AdminCourses: React.FC = () => {
             </div>
             
               <p className="text-gray-600 dark:text-gray-400 mb-4">
-                Are you sure you want to approve "{selectedCourse.title}"?
+                {t('admin.courses.approveModal.message')} "{selectedCourse.title}"?
               </p>
               
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Feedback (optional)
+                  {t('admin.courses.approveModal.feedback')}
                 </label>
                 <textarea
                   value={approvalFeedback}
                   onChange={(e) => setApprovalFeedback(e.target.value)}
                   rows={3}
-                  placeholder="Add any feedback for the instructor..."
+                  placeholder={t('admin.courses.approveModal.feedbackPlaceholder')}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                 />
               </div>
@@ -756,7 +758,7 @@ const AdminCourses: React.FC = () => {
                   variant="outline"
                   onClick={() => setShowApprovalModal(false)}
                 >
-                  Cancel
+                  {t('admin.courses.approveModal.cancel')}
                 </Button>
                 <Button
                   onClick={() => handleCourseAction(selectedCourse.id, 'approve')}
@@ -766,7 +768,7 @@ const AdminCourses: React.FC = () => {
                   {actionLoading.includes(selectedCourse.id) ? (
                     <LoadingSpinner size="sm" />
                   ) : (
-                    'Approve Course'
+                    t('admin.courses.approveModal.approve')
                   )}
                 </Button>
               </div>
@@ -782,7 +784,7 @@ const AdminCourses: React.FC = () => {
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                  Reject Course
+                  {t('admin.courses.rejectModal.title')}
                 </h3>
                 <Button
                   variant="ghost"
@@ -794,18 +796,18 @@ const AdminCourses: React.FC = () => {
             </div>
             
               <p className="text-gray-600 dark:text-gray-400 mb-4">
-                Are you sure you want to reject "{selectedCourse.title}"?
+                {t('admin.courses.rejectModal.message')} "{selectedCourse.title}"?
               </p>
               
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Reason for rejection *
+                  {t('admin.courses.rejectModal.reason')} *
                 </label>
                 <textarea
                   value={rejectionReason}
                   onChange={(e) => setRejectionReason(e.target.value)}
                   rows={3}
-                  placeholder="Please provide a reason for rejection..."
+                  placeholder={t('admin.courses.rejectModal.reasonPlaceholder')}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                   required
                 />
@@ -816,7 +818,7 @@ const AdminCourses: React.FC = () => {
                   variant="outline"
                   onClick={() => setShowRejectModal(false)}
                 >
-                  Cancel
+                  {t('admin.courses.approveModal.cancel')}
                 </Button>
                 <Button
                   onClick={() => handleCourseAction(selectedCourse.id, 'reject')}
@@ -826,7 +828,7 @@ const AdminCourses: React.FC = () => {
                   {actionLoading.includes(selectedCourse.id) ? (
                     <LoadingSpinner size="sm" />
                   ) : (
-                    'Reject Course'
+                    t('admin.courses.rejectModal.reject')
                   )}
                 </Button>
               </div>

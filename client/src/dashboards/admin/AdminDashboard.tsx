@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
@@ -59,6 +60,7 @@ interface DashboardStats {
     }>;
     pendingCourses: Array<{
       id: string;
+      _id?: string;
       title: string;
       instructorName: string;
       submittedAt: string;
@@ -69,6 +71,7 @@ interface DashboardStats {
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(false); // Changed from true to false
   const [error, setError] = useState('');
@@ -198,7 +201,7 @@ const AdminDashboard: React.FC = () => {
         </Alert>
         <Button onClick={() => loadDashboardStats()} className="flex items-center gap-2">
           <RefreshCw size={16} />
-          Retry
+          {t('common.retry')}
         </Button>
       </div>
     );
@@ -208,7 +211,7 @@ const AdminDashboard: React.FC = () => {
     return (
       <div className="p-6">
         <Alert variant="warning">
-          No dashboard data available
+          {t('admin.dashboard.noData')}
         </Alert>
       </div>
     );
@@ -220,17 +223,17 @@ const AdminDashboard: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Admin Dashboard
+            {t('admin.dashboard.title')}
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Overview of platform statistics and recent activities
+            {t('admin.dashboard.subtitle')}
           </p>
         </div>
         <div className="flex items-center gap-4">
           {refreshing && (
             <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
               <RefreshCw size={14} className="animate-spin" />
-              Refreshing...
+              {t('admin.dashboard.refreshing')}
             </div>
           )}
           <Button
@@ -240,7 +243,7 @@ const AdminDashboard: React.FC = () => {
             disabled={refreshing}
           >
             <RefreshCw size={14} />
-            Refresh
+            {t('admin.dashboard.refresh')}
           </Button>
         </div>
       </div>
@@ -255,7 +258,7 @@ const AdminDashboard: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                Total Users
+                {t('admin.dashboard.totalUsers')}
               </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
                 {stats.overview.totalUsers}
@@ -276,7 +279,7 @@ const AdminDashboard: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                Total Courses
+                {t('admin.dashboard.totalCourses')}
               </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
                 {stats.overview.totalCourses}
@@ -297,7 +300,7 @@ const AdminDashboard: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                Active Users
+                {t('admin.dashboard.activeUsers')}
               </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
                 {stats.overview.activeUsers}
@@ -318,7 +321,7 @@ const AdminDashboard: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                Total Enrollments
+                {t('admin.dashboard.totalEnrollments')}
               </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
                 {stats.overview.totalEnrollments}
@@ -347,10 +350,10 @@ const AdminDashboard: React.FC = () => {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  User Management
+                  {t('admin.dashboard.userManagement')}
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Manage user accounts and permissions
+                  {t('admin.dashboard.userManagementDesc')}
                 </p>
               </div>
             </div>
@@ -358,25 +361,25 @@ const AdminDashboard: React.FC = () => {
           
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div className="flex items-center justify-between">
-              <span className="text-gray-600 dark:text-gray-400">Admins:</span>
+              <span className="text-gray-600 dark:text-gray-400">{t('admin.dashboard.admins')}:</span>
               <span className="font-semibold text-red-600 dark:text-red-400">
                 {stats.users.admins}
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-gray-600 dark:text-gray-400">Tutors:</span>
+              <span className="text-gray-600 dark:text-gray-400">{t('admin.dashboard.tutors')}:</span>
               <span className="font-semibold text-purple-600 dark:text-purple-400">
                 {stats.users.tutors}
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-gray-600 dark:text-gray-400">Learners:</span>
+              <span className="text-gray-600 dark:text-gray-400">{t('admin.dashboard.learners')}:</span>
               <span className="font-semibold text-green-600 dark:text-green-400">
                 {stats.users.learners}
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-gray-600 dark:text-gray-400">Inactive:</span>
+              <span className="text-gray-600 dark:text-gray-400">{t('admin.dashboard.inactive')}:</span>
               <span className="font-semibold text-gray-600 dark:text-gray-400">
                 {stats.users.inactive + stats.users.suspended}
               </span>
@@ -398,10 +401,10 @@ const AdminDashboard: React.FC = () => {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Course Management
+                  {t('admin.dashboard.courseManagement')}
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Review and manage course content
+                  {t('admin.dashboard.courseManagementDesc')}
                 </p>
               </div>
             </div>
@@ -409,25 +412,25 @@ const AdminDashboard: React.FC = () => {
           
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div className="flex items-center justify-between">
-              <span className="text-gray-600 dark:text-gray-400">Published:</span>
+              <span className="text-gray-600 dark:text-gray-400">{t('admin.dashboard.published')}:</span>
               <span className="font-semibold text-green-600 dark:text-green-400">
                 {stats.courses.published}
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-gray-600 dark:text-gray-400">Pending:</span>
+              <span className="text-gray-600 dark:text-gray-400">{t('admin.dashboard.pending')}:</span>
               <span className="font-semibold text-yellow-600 dark:text-yellow-400">
                 {stats.courses.pendingApproval}
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-gray-600 dark:text-gray-400">Draft:</span>
+              <span className="text-gray-600 dark:text-gray-400">{t('admin.dashboard.draft')}:</span>
               <span className="font-semibold text-gray-600 dark:text-gray-400">
                 {stats.courses.draft}
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-gray-600 dark:text-gray-400">Rejected:</span>
+              <span className="text-gray-600 dark:text-gray-400">{t('admin.dashboard.rejected')}:</span>
               <span className="font-semibold text-red-600 dark:text-red-400">
                 {stats.courses.rejected}
               </span>
@@ -443,10 +446,10 @@ const AdminDashboard: React.FC = () => {
         <Card className="p-6">
           <div className="mb-4">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Recent Activities
+              {t('admin.dashboard.recentActivities')}
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              Latest platform updates and user activities
+              {t('admin.dashboard.recentActivitiesDesc')}
             </p>
           </div>
           
@@ -506,7 +509,7 @@ const AdminDashboard: React.FC = () => {
               <div className="text-center py-8">
                 <Activity className="mx-auto text-gray-400 mb-2" size={48} />
                 <p className="text-gray-600 dark:text-gray-400">
-                  No recent activities
+                  {t('admin.dashboard.noRecentActivities')}
                 </p>
               </div>
             )}
@@ -517,10 +520,10 @@ const AdminDashboard: React.FC = () => {
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Pending Course Approvals
+              {t('admin.dashboard.pendingCourseApprovals')}
             </h3>
             <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard/courses?status=submitted')}>
-              View All
+              {t('admin.dashboard.viewAll')}
             </Button>
           </div>
           
@@ -536,7 +539,7 @@ const AdminDashboard: React.FC = () => {
                       {course.title}
                     </p>
                     <p className="text-xs text-gray-600 dark:text-gray-400">
-                      by {course.instructorName} • {formatDate(course.submittedAt)}
+                      {t('common.by')} {course.instructorName} • {formatDate(course.submittedAt)}
                     </p>
                   </div>
                   <Button 
@@ -544,7 +547,7 @@ const AdminDashboard: React.FC = () => {
                     size="sm"
                     onClick={() => navigate(`/course/${course._id || course.id}`)}
                   >
-                    Review
+                    {t('admin.dashboard.review')}
                   </Button>
                 </div>
               ))
@@ -552,7 +555,7 @@ const AdminDashboard: React.FC = () => {
               <div className="text-center py-8">
                 <CheckCircle2 className="mx-auto text-green-400 mb-2" size={48} />
                 <p className="text-gray-600 dark:text-gray-400">
-                  No pending course approvals
+                  {t('admin.dashboard.noPendingApprovals')}
                 </p>
               </div>
             )}

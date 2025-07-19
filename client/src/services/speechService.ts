@@ -4,6 +4,7 @@ import { apiClient } from '../utils/api';
 export interface SpeechToTextOptions {
   languageCode?: string;
   sampleRateHertz?: number;
+  enableLanguageDetection?: boolean;
 }
 
 export interface TextToSpeechOptions {
@@ -14,33 +15,169 @@ export interface TextToSpeechOptions {
   ssmlGender?: 'NEUTRAL' | 'FEMALE' | 'MALE';
 }
 
-export interface SpeechHealthStatus {
+export interface SpeechHealthResponse {
   success: boolean;
   googleCloudAvailable: boolean;
-  webSpeechFallback: boolean;
   status: string;
+  supportedLanguages?: {
+    tts: string[];
+    stt: string[];
+    note?: string;
+  };
+  timestamp: string;
 }
 
 class SecureSpeechService {
-  private baseUrl = '/api/v1/speech';
+  private baseUrl: string;
+
+  constructor() {
+    this.baseUrl = process.env.NODE_ENV === 'production' 
+      ? '/api' 
+      : 'http://localhost:3001/api';
+  }
 
   /**
-   * Check if backend speech services are available
+   * Get authentication token for API requests
    */
-  async checkHealth(): Promise<SpeechHealthStatus> {
+  private async getAuthToken(): Promise<string | null> {
     try {
-      const response = await fetch(`${this.baseUrl}/health`);
+      const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
+      return token;
+    } catch (error) {
+      console.warn('Could not retrieve auth token:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Convert blob to base64 string
+   */
+  private async blobToBase64(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = (reader.result as string).split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  /**
+   * Convert base64 to blob
+   */
+  private base64ToBlob(base64: string, mimeType: string): Blob {
+    const byteCharacters = atob(base64);
+    const byteNumbers = new Array(byteCharacters.length);
+    
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    
+    const byteArray = new Uint8Array(byteNumbers);
+    return new Blob([byteArray], { type: mimeType });
+  }
+
+  /**
+   * Detect language from text content
+   */
+  private detectLanguageFromText(text: string): string {
+    // Enhanced Kinyarwanda detection
+    const kinyarwandaWords = [
+      // Common words
+      'muri', 'jya', 'erekana', 'fungura', 'amanota', 'ibice', 'rugo', 'ndumva',
+      // Educational terms
+      'isomo', 'kwiga', 'amasomo', 'umwarimu', 'umunyeshuri', 'ikizamini',
+      'amateka', 'iterambere', 'ubumenyi', 'amahugurwa',
+      // Navigation terms
+      'garuka', 'komeza', 'tangira', 'reba', 'saba', 'emeza',
+      // Common verbs and adjectives
+      'kora', 'gukora', 'gutangira', 'gukomeza', 'gusoma', 'kwandika',
+      'neza', 'byiza', 'bya', 'mu', 'ku', 'na', 'ni'
+    ];
+
+    const textLower = text.toLowerCase();
+    const words = textLower.split(/\s+/).filter(word => word.length > 1);
+    
+    if (words.length === 0) return 'en-US';
+    
+    const kinyarwandaCount = words.filter(word => 
+      kinyarwandaWords.some(kw => word.includes(kw) || kw.includes(word))
+    ).length;
+    
+    // If more than 15% of words are Kinyarwanda, consider it Kinyarwanda
+    const isKinyarwanda = (kinyarwandaCount / words.length) > 0.15 || 
+                          kinyarwandaWords.some(word => textLower.includes(word));
+    
+    return isKinyarwanda ? 'rw-RW' : 'en-US';
+  }
+
+  /**
+   * Get optimal TTS settings for different languages
+   */
+  private getOptimalTTSSettings(languageCode: string, text: string): Partial<TextToSpeechOptions> {
+    const baseSettings: Partial<TextToSpeechOptions> = {
+      speakingRate: 1.0,
+      pitch: 0.0,
+      ssmlGender: 'NEUTRAL'
+    };
+
+    if (languageCode.startsWith('rw')) {
+      // Kinyarwanda optimization
+      return {
+        ...baseSettings,
+        speakingRate: 0.9, // Slightly slower for clarity
+        pitch: 0.0,
+        ssmlGender: 'FEMALE', // Female voices often have better clarity for Kinyarwanda
+        languageCode: 'rw-RW' // Backend will handle the voice mapping
+      };
+    } else if (languageCode.startsWith('en')) {
+      // English optimization
+      return {
+        ...baseSettings,
+        speakingRate: 1.0,
+        pitch: 0.0,
+        ssmlGender: 'NEUTRAL'
+      };
+    } else if (languageCode.startsWith('fr')) {
+      // French optimization (common in Rwanda)
+      return {
+        ...baseSettings,
+        speakingRate: 0.95,
+        pitch: 0.0,
+        ssmlGender: 'FEMALE'
+      };
+    }
+
+    return baseSettings;
+  }
+
+  /**
+   * Check backend speech service health
+   */
+  async checkHealth(): Promise<SpeechHealthResponse> {
+    try {
+      const response = await fetch(`${this.baseUrl}/speech/health`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
       if (!response.ok) {
         throw new Error(`Health check failed: ${response.statusText}`);
       }
-      return await response.json();
+
+      const result = await response.json();
+      return result;
     } catch (error) {
-      console.warn('Speech service health check failed:', error);
+      console.error('Speech health check error:', error);
       return {
         success: false,
         googleCloudAvailable: false,
-        webSpeechFallback: true,
-        status: 'Backend speech services unavailable'
+        status: 'Unavailable',
+        timestamp: new Date().toISOString()
       };
     }
   }
@@ -52,16 +189,22 @@ class SecureSpeechService {
     success: boolean;
     transcript: string;
     confidence: number;
+    detectedLanguage?: string;
+    navigation?: any;
     error?: string;
   }> {
     try {
       // Convert audio blob to base64
       const audioData = await this.blobToBase64(audioBlob);
       
+      // Auto-detect language for STT if not specified
+      const defaultLanguage = options.languageCode || 'en-US';
+      
       const requestBody = {
         audioData,
-        languageCode: options.languageCode || 'en-US',
-        sampleRateHertz: options.sampleRateHertz || 48000
+        languageCode: defaultLanguage,
+        sampleRateHertz: options.sampleRateHertz || 48000,
+        enableLanguageDetection: options.enableLanguageDetection !== false // Default to true
       };
 
       // Get auth token for the request
@@ -94,11 +237,13 @@ class SecureSpeechService {
   }
 
   /**
-   * Convert text to speech using backend Google Cloud Text-to-Speech
+   * Convert text to speech using backend Google Cloud Text-to-Speech with enhanced Kinyarwanda support
    */
   async textToSpeech(text: string, options: TextToSpeechOptions = {}): Promise<{
     success: boolean;
     audioUrl?: string;
+    languageUsed?: string;
+    voiceUsed?: any;
     error?: string;
   }> {
     try {
@@ -106,13 +251,26 @@ class SecureSpeechService {
         throw new Error('Text is required');
       }
 
+      // Auto-detect language if not provided
+      const detectedLanguage = options.languageCode || this.detectLanguageFromText(text);
+      
+      // Get optimal settings for the detected language
+      const optimalSettings = this.getOptimalTTSSettings(detectedLanguage, text);
+      
+      // Merge user options with optimal settings (user options take precedence)
+      const finalOptions = {
+        ...optimalSettings,
+        ...options,
+        languageCode: options.languageCode || detectedLanguage
+      };
+
       const requestBody = {
         text: text.trim(),
-        languageCode: options.languageCode || 'en-US',
-        voiceName: options.voiceName,
-        speakingRate: options.speakingRate || 1.0,
-        pitch: options.pitch || 0.0,
-        ssmlGender: options.ssmlGender || 'NEUTRAL'
+        languageCode: finalOptions.languageCode,
+        voiceName: finalOptions.voiceName,
+        speakingRate: finalOptions.speakingRate || 1.0,
+        pitch: finalOptions.pitch || 0.0,
+        ssmlGender: finalOptions.ssmlGender || 'NEUTRAL'
       };
 
       // Get auth token for the request
@@ -140,7 +298,9 @@ class SecureSpeechService {
         
         return {
           success: true,
-          audioUrl
+          audioUrl,
+          languageUsed: result.languageUsed,
+          voiceUsed: result.voiceUsed
         };
       }
 
@@ -155,55 +315,24 @@ class SecureSpeechService {
   }
 
   /**
-   * Get authentication token from the API client
+   * Enhanced text-to-speech specifically optimized for course content
    */
-  private async getAuthToken(): Promise<string | null> {
-    try {
-      // Use the same token storage as the API client
-      const tokenStorage = (apiClient as any).tokenStorage;
-      if (tokenStorage && typeof tokenStorage.getToken === 'function') {
-        return await tokenStorage.getToken();
-      }
-      return null;
-    } catch (error) {
-      console.warn('Failed to get auth token:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Convert blob to base64 string
-   */
-  private async blobToBase64(blob: Blob): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result === 'string') {
-          // Remove data URL prefix (e.g., "data:audio/webm;base64,")
-          const base64 = reader.result.split(',')[1];
-          resolve(base64);
-        } else {
-          reject(new Error('Failed to convert blob to base64'));
-        }
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  }
-
-  /**
-   * Convert base64 to blob
-   */
-  private base64ToBlob(base64: string, mimeType: string): Blob {
-    const byteCharacters = atob(base64);
-    const byteNumbers = new Array(byteCharacters.length);
+  async speakCourseContent(text: string, language: 'en' | 'rw' = 'en'): Promise<{
+    success: boolean;
+    audioUrl?: string;
+    error?: string;
+  }> {
+    const languageCode = language === 'rw' ? 'rw-RW' : 'en-US';
     
-    for (let i = 0; i < byteCharacters.length; i++) {
-      byteNumbers[i] = byteCharacters.charCodeAt(i);
-    }
-    
-    const byteArray = new Uint8Array(byteNumbers);
-    return new Blob([byteArray], { type: mimeType });
+    // Course-specific optimizations
+    const courseOptimizedOptions: TextToSpeechOptions = {
+      languageCode,
+      speakingRate: language === 'rw' ? 0.85 : 0.95, // Slower for better comprehension
+      pitch: 0.0,
+      ssmlGender: 'FEMALE' // Generally clearer for educational content
+    };
+
+    return this.textToSpeech(text, courseOptimizedOptions);
   }
 }
 
@@ -229,6 +358,7 @@ export class WebSpeechFallback {
       this.recognition = new SpeechRecognition();
       this.recognition.continuous = true;
       this.recognition.interimResults = true;
+      this.recognition.maxAlternatives = 1;
     }
 
     if (this.supported.speechSynthesis) {
@@ -240,30 +370,34 @@ export class WebSpeechFallback {
     return this.supported;
   }
 
-  startListening(onResult: (text: string, isFinal: boolean) => void, onError?: (error: string) => void) {
-    if (!this.recognition) {
-      onError?.('Speech recognition not supported');
+  startListening(
+    onResult: (transcript: string, isFinal: boolean) => void,
+    onError: (error: string) => void,
+    language: string = 'en-US'
+  ) {
+    if (!this.supported.speechRecognition || !this.recognition) {
+      onError('Speech recognition not supported');
       return;
     }
 
+    // For Kinyarwanda, use English as fallback for Web Speech API
+    const fallbackLanguage = language.startsWith('rw') ? 'en-US' : language;
+    
+    this.recognition.lang = fallbackLanguage;
+    
     this.recognition.onresult = (event: any) => {
-      let finalTranscript = '';
-      let interimTranscript = '';
-
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          finalTranscript += transcript;
-        } else {
-          interimTranscript += transcript;
-        }
+        const result = event.results[i];
+        onResult(result[0].transcript, result.isFinal);
       }
-
-      onResult(finalTranscript || interimTranscript, !!finalTranscript);
     };
 
     this.recognition.onerror = (event: any) => {
-      onError?.(event.error);
+      onError(event.error);
+    };
+
+    this.recognition.onend = () => {
+      // Auto-restart if needed
     };
 
     this.recognition.start();
@@ -275,22 +409,52 @@ export class WebSpeechFallback {
     }
   }
 
-  speak(text: string, options: { rate?: number; pitch?: number; volume?: number; lang?: string } = {}) {
-    if (!this.supported.speechSynthesis || !text.trim()) return;
+  speak(
+    text: string, 
+    options: {
+      rate?: number;
+      pitch?: number;
+      volume?: number;
+      lang?: string;
+    } = {}
+  ) {
+    if (!this.supported.speechSynthesis) {
+      console.error('Speech synthesis not supported');
+      return;
+    }
 
+    // Cancel any ongoing speech
     this.synth.cancel();
 
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = options.rate || 1;
-    utterance.pitch = options.pitch || 1;
-    utterance.volume = options.volume || 1;
-    utterance.lang = options.lang || 'en-US';
+    
+    // Set language - for Kinyarwanda, use English with slower rate
+    if (options.lang?.startsWith('rw')) {
+      utterance.lang = 'en-US';
+      utterance.rate = options.rate ? options.rate * 0.8 : 0.8; // Slower for Kinyarwanda content
+    } else {
+      utterance.lang = options.lang || 'en-US';
+      utterance.rate = options.rate || 1.0;
+    }
+    
+    utterance.pitch = options.pitch || 1.0;
+    utterance.volume = options.volume || 1.0;
+
+    // Try to select a suitable voice
+    const voices = this.synth.getVoices();
+    const preferredVoice = voices.find(voice => 
+      voice.lang === utterance.lang && voice.name.includes('Female')
+    ) || voices.find(voice => voice.lang === utterance.lang);
+    
+    if (preferredVoice) {
+      utterance.voice = preferredVoice;
+    }
 
     this.synth.speak(utterance);
   }
 
   stopSpeaking() {
-    if (this.supported.speechSynthesis) {
+    if (this.synth) {
       this.synth.cancel();
     }
   }

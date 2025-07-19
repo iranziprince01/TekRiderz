@@ -804,8 +804,8 @@ export const CourseAssessments: React.FC<CourseAssessmentsProps> = ({
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      {/* Enhanced Progress Header with Grades Overview */}
-      <Card className="p-6">
+        {/* Enhanced Progress Header with Grades Overview */}
+        <Card className="p-6">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
           {language === 'rw' ? 'Ibizamini n\'Amanota' : 'Assessments & Grades'}
         </h2>

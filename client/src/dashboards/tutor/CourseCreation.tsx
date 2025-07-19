@@ -127,7 +127,7 @@ const STEPS = [
 
 export const CourseCreation: React.FC = () => {
   const { user } = useAuth();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const navigate = useNavigate();
   const { id: courseId } = useParams();
   
@@ -361,7 +361,7 @@ export const CourseCreation: React.FC = () => {
   const createFinalAssessment = () => {
     const assessment: FinalAssessment = {
       id: `assessment_${Date.now()}`,
-      title: language === 'rw' ? 'Ikizamini cya Nyuma' : 'Final Assessment',
+      title: t('courseCreation.finalAssessment'),
       description: '',
       questions: [],
       settings: {
@@ -416,7 +416,7 @@ export const CourseCreation: React.FC = () => {
         // Navigate to courses list with success message for better reliability
         navigate('/dashboard/courses', {
           state: {
-            message: language === 'rw' ? 'Isomo ryakingwa neza!' : 'Course saved successfully!',
+            message: t('courseCreation.courseSaved'),
             type: 'success'
           }
         });
@@ -520,9 +520,7 @@ export const CourseCreation: React.FC = () => {
         console.log('Course submitted for approval successfully:', submitResponse);
         
         // Show success message and navigate to courses list
-        const successMessage = language === 'rw' 
-          ? 'Isomo ryawe ryohererejwe kugira ngo ryemezwe! Rizagaragara mu masomo yawe rikaba "Bitegereje".' 
-          : 'Course submitted for admin approval! It will appear in your courses list with "Pending" status.';
+        const successMessage = t('courseCreation.courseSubmitted');
         
         // Always navigate to courses list for reliable user experience
         navigate('/dashboard/courses', { 
@@ -554,8 +552,8 @@ export const CourseCreation: React.FC = () => {
           <LoadingSpinner />
           <p className="mt-4 text-gray-600">
             {isEditing 
-              ? (language === 'rw' ? 'Turimo gufungura isomo...' : 'Loading course for editing...') 
-              : (language === 'rw' ? 'Gukora...' : 'Loading...')
+              ? t('courseCreation.loadingEdit')
+              : t('courseCreation.loading')
             }
           </p>
         </div>
@@ -571,7 +569,7 @@ export const CourseCreation: React.FC = () => {
           <div className="bg-red-50 border border-red-200 rounded-lg p-6">
             <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-red-800 mb-2">
-              {language === 'rw' ? 'Ikosa ry\'aho gufungura isomo' : 'Error Loading Course'}
+              {t('courseCreation.errorLoadingCourse')}
             </h3>
             <p className="text-red-600 mb-4">{error}</p>
             <div className="space-x-3">
@@ -579,7 +577,7 @@ export const CourseCreation: React.FC = () => {
                 onClick={() => navigate('/dashboard/courses')}
                 variant="outline"
               >
-                {language === 'rw' ? 'Garuka' : 'Go Back'}
+                {t('courseCreation.goBack')}
               </Button>
               <Button 
                 onClick={() => {
@@ -587,7 +585,7 @@ export const CourseCreation: React.FC = () => {
                   loadCourseData();
                 }}
               >
-                {language === 'rw' ? 'Ongera ugerageze' : 'Try Again'}
+                {t('courseCreation.tryAgain')}
               </Button>
             </div>
           </div>
@@ -609,10 +607,10 @@ export const CourseCreation: React.FC = () => {
             </div>
             <div className="ml-4">
               <h2 className="text-2xl font-bold text-gray-900">
-                {language === 'rw' ? 'Amakuru y\'Ibanze' : 'Basic Information'}
+                {t('courseCreation.basicInfo')}
               </h2>
               <p className="text-gray-600">
-                {language === 'rw' ? 'Tanga amakuru y\'ibanze ku isomo ryawe' : 'Provide essential details about your course'}
+                {t('courseCreation.basicInfoDesc')}
               </p>
             </div>
           </div>
@@ -621,13 +619,13 @@ export const CourseCreation: React.FC = () => {
             {/* Course Title */}
             <div>
               <label className="block text-sm font-semibold text-gray-800 mb-3">
-                {language === 'rw' ? 'Izina ry\'Isomo' : 'Course Title'} *
+                {t('courseCreation.courseTitle')} *
               </label>
               <input
                 type="text"
                 value={courseData.title}
                 onChange={(e) => setCourseData(prev => ({ ...prev, title: e.target.value }))}
-                placeholder={language === 'rw' ? 'Andika izina ry\'isomo' : 'Enter course title'}
+                placeholder={t('courseCreation.courseTitlePlaceholder')}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-gray-50 focus:bg-white"
                 required
               />
@@ -636,12 +634,12 @@ export const CourseCreation: React.FC = () => {
             {/* Course Description */}
             <div>
               <label className="block text-sm font-semibold text-gray-800 mb-3">
-                {language === 'rw' ? 'Ibisobanuro' : 'Course Description'} *
+                {t('courseCreation.courseDescription')} *
               </label>
               <textarea
                 value={courseData.description}
                 onChange={(e) => setCourseData(prev => ({ ...prev, description: e.target.value }))}
-                placeholder={language === 'rw' ? 'Sobanura isomo ryawe mu buryo bwambitse' : 'Provide a detailed description of your course'}
+                placeholder={t('courseCreation.courseDescPlaceholder')}
                 rows={6}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-gray-50 focus:bg-white resize-none"
                 required

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { submitQuiz } from '../../utils/api';
@@ -7,17 +7,20 @@ import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { 
+  ArrowLeft,
+  ArrowRight, 
   CheckCircle,
   XCircle,
-  ArrowLeft,
-  ArrowRight,
+  Clock,
   Flag,
-  Send,
-  RotateCcw,
-  Trophy,
   Target,
+  AlertCircle,
+  Trophy,
+  Star,
+  TrendingUp,
+  RotateCcw,
   Lightbulb,
-  AlertCircle
+  Send
 } from 'lucide-react';
 
 interface QuizQuestion {
@@ -519,295 +522,300 @@ export const QuizTaker: React.FC<QuizTakerProps> = ({
     );
   };
 
-  if (showInstructions) {
-    return (
-      <div className="max-w-4xl mx-auto space-y-6">
-        <Card className="p-8">
-          <div className="text-center mb-6">
-            <Trophy className="w-16 h-16 text-blue-500 mx-auto mb-4" />
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-              {quiz.title}
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400">{quiz.description}</p>
-          </div>
+  // Handle quiz instructions view
+      if (showInstructions) {
+      return (
+        <div className="max-w-4xl mx-auto space-y-6">
+          <Card className="p-8">
+            <div className="text-center mb-6">
+              <Trophy className="w-16 h-16 text-blue-500 mx-auto mb-4" />
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                {quiz.title}
+              </h1>
+              <p className="text-gray-600 dark:text-gray-400">{quiz.description}</p>
+            </div>
 
-          {/* Quiz Info Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            <div className="text-center p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
-              <Target className="w-8 h-8 text-blue-600 mx-auto mb-2" />
-              <div className="text-2xl font-bold text-blue-600">{totalQuestions}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">
-                {language === 'rw' ? 'Ibibazo' : 'Questions'}
+            {/* Quiz Info Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+              <div className="text-center p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+                <Target className="w-8 h-8 text-blue-600 mx-auto mb-2" />
+                <div className="text-2xl font-bold text-blue-600">{totalQuestions}</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  {language === 'rw' ? 'Ibibazo' : 'Questions'}
+                </div>
+              </div>
+              
+              <div className="text-center p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+                <CheckCircle className="w-8 h-8 text-green-600 mx-auto mb-2" />
+                <div className="text-2xl font-bold text-green-600">{quiz.settings.passingScore}%</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  {language === 'rw' ? 'Ntagomba kurangiza' : 'To Pass'}
+                </div>
+              </div>
+              
+              <div className="text-center p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+                <RotateCcw className="w-8 h-8 text-purple-600 mx-auto mb-2" />
+                <div className="text-2xl font-bold text-purple-600">{quiz.settings.maxAttempts}</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  {language === 'rw' ? 'Ibigeragezo' : 'Attempts'}
+                </div>
               </div>
             </div>
-            
-            <div className="text-center p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
-              <CheckCircle className="w-8 h-8 text-green-600 mx-auto mb-2" />
-              <div className="text-2xl font-bold text-green-600">{quiz.settings.passingScore}%</div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">
-                {language === 'rw' ? 'Ntagomba kurangiza' : 'To Pass'}
+
+            {/* Instructions */}
+            <div className="mb-8 p-6 border border-gray-200 dark:border-gray-700 rounded-lg">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                {language === 'rw' ? 'Amabwiriza' : 'Instructions'}
+              </h3>
+              <ul className="space-y-2 text-gray-700 dark:text-gray-300">
+                <li>• {language === 'rw' ? 'Subiza ibibazo byose neza' : 'Answer all questions carefully'}</li>
+                <li>• {language === 'rw' ? 'Ntukurikirana igihe' : 'This quiz is untimed - take your time'}</li>
+                <li>• {language === 'rw' ? 'Ushobora gusubira inyuma no gukomeza' : 'You can navigate back and forth between questions'}</li>
+                <li>• {language === 'rw' ? 'Ushobora gufata' : 'You can flag questions for review'} {quiz.settings.maxAttempts} {language === 'rw' ? 'ibigeragezo' : 'attempts maximum'}</li>
+                <li>• {language === 'rw' ? 'Ukeneye' : 'You need'} {quiz.settings.passingScore}% {language === 'rw' ? 'kurangiza' : 'to pass'}</li>
+              </ul>
+            </div>
+
+            {/* Attempt Info */}
+            {currentAttempt > 1 && (
+              <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                <p className="text-yellow-800 dark:text-yellow-200">
+                  {language === 'rw' ? 'Iki ni igerageza' : 'This is attempt'} {currentAttempt} {language === 'rw' ? 'kuri' : 'of'} {quiz.settings.maxAttempts}
+                </p>
               </div>
-            </div>
-            
-            <div className="text-center p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
-              <RotateCcw className="w-8 h-8 text-purple-600 mx-auto mb-2" />
-              <div className="text-2xl font-bold text-purple-600">{quiz.settings.maxAttempts}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">
-                {language === 'rw' ? 'Ibigeragezo' : 'Attempts'}
-              </div>
-            </div>
-          </div>
+            )}
 
-          {/* Instructions */}
-          <div className="mb-8 p-6 border border-gray-200 dark:border-gray-700 rounded-lg">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              {language === 'rw' ? 'Amabwiriza' : 'Instructions'}
-            </h3>
-            <ul className="space-y-2 text-gray-700 dark:text-gray-300">
-              <li>• {language === 'rw' ? 'Subiza ibibazo byose neza' : 'Answer all questions carefully'}</li>
-              <li>• {language === 'rw' ? 'Ntukurikirana igihe' : 'This quiz is untimed - take your time'}</li>
-              <li>• {language === 'rw' ? 'Ushobora gusubira inyuma no gukomeza' : 'You can navigate back and forth between questions'}</li>
-              <li>• {language === 'rw' ? 'Ushobora gufata' : 'You can flag questions for review'} {quiz.settings.maxAttempts} {language === 'rw' ? 'ibigeragezo' : 'attempts maximum'}</li>
-              <li>• {language === 'rw' ? 'Ukeneye' : 'You need'} {quiz.settings.passingScore}% {language === 'rw' ? 'kurangiza' : 'to pass'}</li>
-            </ul>
-          </div>
-
-          {/* Attempt Info */}
-          {currentAttempt > 1 && (
-            <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-              <p className="text-yellow-800 dark:text-yellow-200">
-                {language === 'rw' ? 'Iki ni igerageza' : 'This is attempt'} {currentAttempt} {language === 'rw' ? 'kuri' : 'of'} {quiz.settings.maxAttempts}
-              </p>
-            </div>
-          )}
-
-          {/* Action Buttons */}
-          <div className="flex justify-center space-x-4">
-            <Button
-              onClick={() => setShowInstructions(false)}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3"
-            >
-              {language === 'rw' ? 'Tangira ikizamini' : 'Start Quiz'}
-              <ArrowRight className="w-5 h-5 ml-2" />
-            </Button>
-            
-            <Button
-              onClick={onCancel}
-              variant="outline"
-              className="px-8 py-3"
-            >
-              {language === 'rw' ? 'Guca' : 'Cancel'}
-            </Button>
-          </div>
-        </Card>
-      </div>
-    );
-  }
+            {/* Action Buttons */}
+            <div className="flex justify-center space-x-4">
+              <Button
+                onClick={() => setShowInstructions(false)}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3"
+              >
+                {language === 'rw' ? 'Tangira ikizamini' : 'Start Quiz'}
+                <ArrowRight className="w-5 h-5 ml-2" />
+              </Button>
+              
+              <Button
+                onClick={onCancel}
+                variant="outline"
+                className="px-8 py-3"
+              >
+                {language === 'rw' ? 'Guca' : 'Cancel'}
+              </Button>
+                         </div>
+           </Card>
+       </div>
+     );
+   }
 
   if (showResults) {
-    return renderResults();
+    return (
+      <div className="max-w-4xl mx-auto space-y-6">
+        {renderResults()}
+      </div>
+    );
   }
 
   // Main quiz interface
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      {/* Quiz Header */}
-      <Card className="p-6">
-        <div className="flex justify-between items-center mb-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              {quiz.title}
-            </h1>
-            {quiz.moduleTitle && (
-              <p className="text-gray-600 dark:text-gray-400">
-                {quiz.moduleTitle}
-              </p>
-            )}
-          </div>
-          
-          <div className="flex items-center space-x-4">
-            <div className="text-center">
-              <Target className="w-5 h-5 text-gray-400 mx-auto" />
-              <div className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                {answeredQuestions}/{totalQuestions}
+        {/* Quiz Header */}
+        <Card className="p-6">
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                {quiz.title}
+              </h1>
+              {quiz.moduleTitle && (
+                <p className="text-gray-600 dark:text-gray-400">
+                  {quiz.moduleTitle}
+                </p>
+              )}
+            </div>
+            
+            <div className="flex items-center space-x-4">
+              <div className="text-center">
+                <Target className="w-5 h-5 text-gray-400 mx-auto" />
+                <div className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                  {answeredQuestions}/{totalQuestions}
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Progress Bar */}
-        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-          <div 
-            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-            style={{ width: `${(currentQuestionIndex + 1) / totalQuestions * 100}%` }}
-          />
-        </div>
-      </Card>
-
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Question Navigation Sidebar */}
-        <Card className="p-4 lg:col-span-1">
-          <h3 className="font-semibold text-gray-900 dark:text-white mb-4">
-            {language === 'rw' ? 'Ibibazo' : 'Questions'}
-          </h3>
-          
-          <div className="grid grid-cols-5 lg:grid-cols-1 gap-2">
-            {quiz.questions.map((question, index) => (
-              <button
-                key={question.id}
-                onClick={() => handleQuestionNavigation(index)}
-                className={`p-2 text-sm font-medium rounded transition-colors relative ${
-                  index === currentQuestionIndex
-                    ? 'bg-blue-600 text-white'
-                    : answers[question.id] !== undefined
-                    ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
-                    : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-                }`}
-              >
-                {index + 1}
-                {flaggedQuestions.has(question.id) && (
-                  <Flag className="w-3 h-3 text-orange-500 absolute -top-1 -right-1" />
-                )}
-              </button>
-            ))}
-          </div>
-
-          <div className="mt-6 space-y-2 text-xs text-gray-500 dark:text-gray-400">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-blue-600 rounded"></div>
-              {language === 'rw' ? 'Ikibazo kirimo' : 'Current'}
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-green-100 dark:bg-green-900 rounded"></div>
-              {language === 'rw' ? 'Byasubijweho' : 'Answered'}
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-gray-100 dark:bg-gray-800 rounded"></div>
-              {language === 'rw' ? 'Bidasubijweho' : 'Not answered'}
-            </div>
+          {/* Progress Bar */}
+          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+            <div 
+              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${(currentQuestionIndex + 1) / totalQuestions * 100}%` }}
+            />
           </div>
         </Card>
 
-        {/* Main Question Area */}
-        <div className="lg:col-span-3 space-y-6">
-          {/* Current Question */}
-          <Card className="p-6">
-            <div className="flex justify-between items-start mb-4">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-4">
-                  <Badge variant="default">
-                    {language === 'rw' ? 'Ikibazo' : 'Question'} {currentQuestionIndex + 1}
-                  </Badge>
-                  
-                  {currentQuestion.points && (
-                    <Badge variant="info">
-                      {currentQuestion.points} {language === 'rw' ? 'utunguranye' : 'pts'}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Question Navigation Sidebar */}
+          <Card className="p-4 lg:col-span-1">
+            <h3 className="font-semibold text-gray-900 dark:text-white mb-4">
+              {language === 'rw' ? 'Ibibazo' : 'Questions'}
+            </h3>
+            
+            <div className="grid grid-cols-5 lg:grid-cols-1 gap-2">
+              {quiz.questions.map((question, index) => (
+                <button
+                  key={question.id}
+                  onClick={() => handleQuestionNavigation(index)}
+                  className={`p-2 text-sm font-medium rounded transition-colors relative ${
+                    index === currentQuestionIndex
+                      ? 'bg-blue-600 text-white'
+                      : answers[question.id] !== undefined
+                      ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
+                      : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  {index + 1}
+                  {flaggedQuestions.has(question.id) && (
+                    <Flag className="w-3 h-3 text-orange-500 absolute -top-1 -right-1" />
+                  )}
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-6 space-y-2 text-xs text-gray-500 dark:text-gray-400">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-blue-600 rounded"></div>
+                {language === 'rw' ? 'Ikibazo kirimo' : 'Current'}
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-green-100 dark:bg-green-900 rounded"></div>
+                {language === 'rw' ? 'Byasubijweho' : 'Answered'}
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-gray-100 dark:bg-gray-800 rounded"></div>
+                {language === 'rw' ? 'Bidasubijweho' : 'Not answered'}
+              </div>
+            </div>
+          </Card>
+
+          {/* Main Question Area */}
+          <div className="lg:col-span-3 space-y-6">
+            {/* Current Question */}
+            <Card className="p-6">
+              <div className="flex justify-between items-start mb-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-4">
+                    <Badge variant="default">
+                      {language === 'rw' ? 'Ikibazo' : 'Question'} {currentQuestionIndex + 1}
                     </Badge>
+                    
+                    {currentQuestion.points && (
+                      <Badge variant="info">
+                        {currentQuestion.points} {language === 'rw' ? 'utunguranye' : 'pts'}
+                      </Badge>
+                    )}
+                    
+                    <Badge variant={currentQuestion.type === 'essay' ? 'warning' : 'info'}>
+                      {currentQuestion.type.replace('-', ' ')}
+                    </Badge>
+                  </div>
+                  
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                    {currentQuestion.question}
+                  </h2>
+                  
+                  {currentQuestion.image && (
+                    <img 
+                      src={currentQuestion.image} 
+                      alt="Question" 
+                      className="mb-4 max-w-full h-auto rounded-lg"
+                    />
+                  )}
+                </div>
+                
+                <div className="flex items-center gap-2 ml-4">
+                  {currentQuestion.hints && currentQuestion.hints.length > 0 && (
+                    <Button
+                      onClick={() => useHint(currentQuestion.id)}
+                      variant="outline"
+                      size="sm"
+                      disabled={(usedHints[currentQuestion.id] || 0) >= currentQuestion.hints.length}
+                    >
+                      <Lightbulb className="w-4 h-4" />
+                    </Button>
                   )}
                   
-                  <Badge variant={currentQuestion.type === 'essay' ? 'warning' : 'info'}>
-                    {currentQuestion.type.replace('-', ' ')}
-                  </Badge>
-                </div>
-                
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                  {currentQuestion.question}
-                </h2>
-                
-                {currentQuestion.image && (
-                  <img 
-                    src={currentQuestion.image} 
-                    alt="Question" 
-                    className="mb-4 max-w-full h-auto rounded-lg"
-                  />
-                )}
-              </div>
-              
-              <div className="flex items-center gap-2 ml-4">
-                {currentQuestion.hints && currentQuestion.hints.length > 0 && (
                   <Button
-                    onClick={() => useHint(currentQuestion.id)}
+                    onClick={() => toggleQuestionFlag(currentQuestion.id)}
                     variant="outline"
                     size="sm"
-                    disabled={(usedHints[currentQuestion.id] || 0) >= currentQuestion.hints.length}
+                    className={flaggedQuestions.has(currentQuestion.id) ? 'text-orange-600 border-orange-600' : ''}
                   >
-                    <Lightbulb className="w-4 h-4" />
+                    <Flag className="w-4 h-4" />
                   </Button>
-                )}
-                
-                <Button
-                  onClick={() => toggleQuestionFlag(currentQuestion.id)}
-                  variant="outline"
-                  size="sm"
-                  className={flaggedQuestions.has(currentQuestion.id) ? 'text-orange-600 border-orange-600' : ''}
-                >
-                  <Flag className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-
-            {/* Show hint if used */}
-            {usedHints[currentQuestion.id] > 0 && currentQuestion.hints && (
-              <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                <div className="flex items-start gap-2">
-                  <Lightbulb className="w-4 h-4 text-yellow-600 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                      {language === 'rw' ? 'Ubufasha:' : 'Hint:'}
-                    </p>
-                    <p className="text-sm text-yellow-700 dark:text-yellow-300">
-                      {currentQuestion.hints[Math.min(usedHints[currentQuestion.id] - 1, currentQuestion.hints.length - 1)]}
-                    </p>
-                  </div>
                 </div>
               </div>
-            )}
-            
-            {renderQuestion(currentQuestion)}
-          </Card>
 
-          {/* Navigation Controls */}
-          <Card className="p-4">
-            <div className="flex justify-between items-center">
-              <Button
-                onClick={handlePreviousQuestion}
-                disabled={currentQuestionIndex === 0}
-                variant="outline"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                {language === 'rw' ? 'Inyuma' : 'Previous'}
-              </Button>
+              {/* Show hint if used */}
+              {usedHints[currentQuestion.id] > 0 && currentQuestion.hints && (
+                <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <Lightbulb className="w-4 h-4 text-yellow-600 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                        {language === 'rw' ? 'Ubufasha:' : 'Hint:'}
+                      </p>
+                      <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                        {currentQuestion.hints[Math.min(usedHints[currentQuestion.id] - 1, currentQuestion.hints.length - 1)]}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {renderQuestion(currentQuestion)}
+            </Card>
 
-              <div className="flex items-center space-x-3">
-                {isLastQuestion ? (
-                  <Button
-                    onClick={handleSubmitQuiz}
-                    disabled={isSubmitting}
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                  >
-                    {isSubmitting ? (
-                      <LoadingSpinner size="sm" />
-                    ) : (
-                      <>
-                        <Send className="w-4 h-4 mr-2" />
-                        {language === 'rw' ? 'Hera ikizamini' : 'Submit Quiz'}
-                      </>
-                    )}
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={handleNextQuestion}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
-                  >
-                    {language === 'rw' ? 'Komeza' : 'Next'}
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
-                )}
+            {/* Navigation Controls */}
+            <Card className="p-4">
+              <div className="flex justify-between items-center">
+                <Button
+                  onClick={handlePreviousQuestion}
+                  disabled={currentQuestionIndex === 0}
+                  variant="outline"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  {language === 'rw' ? 'Inyuma' : 'Previous'}
+                </Button>
+
+                <div className="flex items-center space-x-3">
+                  {isLastQuestion ? (
+                    <Button
+                      onClick={handleSubmitQuiz}
+                      disabled={isSubmitting}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      {isSubmitting ? (
+                        <LoadingSpinner size="sm" />
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4 mr-2" />
+                          {language === 'rw' ? 'Hera ikizamini' : 'Submit Quiz'}
+                        </>
+                      )}
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={handleNextQuestion}
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      {language === 'rw' ? 'Komeza' : 'Next'}
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  )}
+                </div>
               </div>
-            </div>
-          </Card>
+            </Card>
+          </div>
         </div>
-      </div>
     </div>
   );
 }; 

@@ -18,7 +18,7 @@ interface TextToSpeechRequest {
   voiceName?: string;
   speakingRate?: number;
   pitch?: number;
-  ssmlGender?: 'NEUTRAL' | 'FEMALE' | 'MALE';
+  ssmlGender?: string;
 }
 
 // Google Cloud API response types
@@ -33,7 +33,7 @@ interface GoogleSTTResponse {
 }
 
 interface GoogleTTSResponse {
-  audioContent?: string;
+  audioContent: string;
 }
 
 // Enhanced navigation commands for both languages
@@ -91,15 +91,22 @@ export const speechToText = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
+    // For Kinyarwanda, use English as primary with Swahili as alternative
+    const primaryLang = languageCode.startsWith('rw') ? 'en-US' : languageCode;
+    const alternativeLanguages = languageCode.startsWith('rw') 
+      ? ['en-US', 'sw-KE', 'fr-FR'] // English, Swahili, French - common in Rwanda
+      : enableLanguageDetection ? ['en-US', 'sw-KE'] : undefined;
+
     const requestBody = {
       config: {
         encoding: 'WEBM_OPUS',
         sampleRateHertz,
-        languageCode: enableLanguageDetection ? undefined : languageCode,
-        alternativeLanguageCodes: enableLanguageDetection ? ['en-US', 'rw-RW'] : undefined,
+        languageCode: enableLanguageDetection ? undefined : primaryLang,
+        alternativeLanguageCodes: alternativeLanguages,
         enableAutomaticPunctuation: true,
         enableLanguageDetection,
         model: 'command_and_search', // Better for navigation commands
+        useEnhanced: true, // Use enhanced models when available
       },
       audio: {
         content: audioData,
@@ -129,7 +136,7 @@ export const speechToText = async (req: Request, res: Response): Promise<void> =
         const alternative = result.alternatives[0];
         if (alternative) {
           const transcript = alternative.transcript;
-          const detectedLanguage = result.languageCode || languageCode;
+          const detectedLanguage = result.languageCode || primaryLang;
           
           // Process navigation command
           const navigationResult = processNavigationCommand(transcript, detectedLanguage);
@@ -160,7 +167,7 @@ export const speechToText = async (req: Request, res: Response): Promise<void> =
 // Process navigation commands
 const processNavigationCommand = (transcript: string, detectedLanguage: string) => {
   const text = transcript.toLowerCase();
-  const lang = detectedLanguage.startsWith('rw') ? 'rw' : 'en';
+  const lang = detectedLanguage.startsWith('rw') || detectedLanguage.startsWith('sw') ? 'rw' : 'en';
   const commands = NAVIGATION_COMMANDS[lang];
   
   // Check for navigation commands
@@ -188,19 +195,18 @@ const processNavigationCommand = (transcript: string, detectedLanguage: string) 
   };
 };
 
-// Get route mapping for navigation
+// Get route for action
 const getRouteForAction = (action: string): string | null => {
-  const routes: Record<string, string> = {
+  const routes: { [key: string]: string } = {
     home: '',
-    modules: '/modules', 
+    modules: '/modules',
     assessments: '/assessments',
-    grades: '/assessments' // Same as assessments for now
+    grades: '/assessments'
   };
-  
   return routes[action] || null;
 };
 
-// Enhanced TTS with language detection
+// Enhanced TTS with improved Kinyarwanda handling
 export const textToSpeech = async (req: Request, res: Response): Promise<void> => {
   try {
     const { 
@@ -220,17 +226,21 @@ export const textToSpeech = async (req: Request, res: Response): Promise<void> =
     // Auto-detect language if not specified
     const detectedLang = languageCode === 'auto' ? detectTextLanguage(text) : languageCode;
     
+    // Prepare text with SSML for better pronunciation
+    const enhancedText = prepareTextForTTS(text, detectedLang);
+    
     // Get appropriate voice for language
-    const voiceConfig = getVoiceConfig(detectedLang, ssmlGender);
+    const voiceConfig = getVoiceConfig(detectedLang, ssmlGender, voiceName);
 
     const requestBody = {
-      input: { text },
+      input: enhancedText.includes('<speak>') ? { ssml: enhancedText } : { text: enhancedText },
       voice: voiceConfig,
       audioConfig: {
         audioEncoding: 'MP3',
-        speakingRate,
-        pitch,
+        speakingRate: Math.max(0.25, Math.min(4.0, speakingRate)), // Ensure valid range
+        pitch: Math.max(-20.0, Math.min(20.0, pitch)), // Ensure valid range
         volumeGainDb: 0.0,
+        effectsProfileId: ['headphone-class-device'], // Optimize for headphones
       },
     };
 
@@ -255,7 +265,8 @@ export const textToSpeech = async (req: Request, res: Response): Promise<void> =
       res.json({ 
         success: true, 
         audioContent: data.audioContent,
-        languageUsed: detectedLang
+        languageUsed: detectedLang,
+        voiceUsed: voiceConfig
       });
     } else {
       res.json({ success: false, error: 'No audio generated' });
@@ -267,29 +278,110 @@ export const textToSpeech = async (req: Request, res: Response): Promise<void> =
   }
 };
 
-// Simple language detection for text
+// Enhanced language detection for text
 const detectTextLanguage = (text: string): string => {
-  // Simple heuristic - check for common Kinyarwanda words
-  const kinyarwandaWords = ['muri', 'jya', 'erekana', 'fungura', 'amanota', 'ibice', 'rugo', 'ndumva'];
-  const textLower = text.toLowerCase();
+  // Expanded Kinyarwanda word detection
+  const kinyarwandaWords = [
+    // Common words
+    'muri', 'jya', 'erekana', 'fungura', 'amanota', 'ibice', 'rugo', 'ndumva',
+    // Educational terms
+    'isomo', 'kwiga', 'amasomo', 'umwarimu', 'umunyeshuri', 'ikizamini',
+    'amateka', 'iterambere', 'ubumenyi', 'amahugurwa',
+    // Navigation terms
+    'garuka', 'komeza', 'tangira', 'reba', 'saba', 'emeza',
+    // Common verbs
+    'kora', 'gukora', 'gutangira', 'gukomeza', 'gusoma', 'kwandika'
+  ];
   
-  const hasKinyarwanda = kinyarwandaWords.some(word => textLower.includes(word));
-  return hasKinyarwanda ? 'rw-RW' : 'en-US';
+  const textLower = text.toLowerCase();
+  const words = textLower.split(/\s+/);
+  
+  // Count Kinyarwanda words
+  const kinyarwandaCount = words.filter(word => 
+    kinyarwandaWords.some(kw => word.includes(kw) || kw.includes(word))
+  ).length;
+  
+  // If more than 20% of words are Kinyarwanda, consider it Kinyarwanda
+  const isKinyarwanda = (kinyarwandaCount / words.length) > 0.2 || 
+                        kinyarwandaWords.some(word => textLower.includes(word));
+  
+  return isKinyarwanda ? 'rw-RW' : 'en-US';
 };
 
-// Get voice configuration for language
-const getVoiceConfig = (languageCode: string, gender: string) => {
+// Prepare text for better TTS pronunciation
+const prepareTextForTTS = (text: string, languageCode: string): string => {
+  if (!languageCode.startsWith('rw')) {
+    return text;
+  }
+
+  // For Kinyarwanda, add SSML to improve pronunciation
+  let enhancedText = text;
+
+  // Common Kinyarwanda pronunciation improvements
+  const pronunciationMap: { [key: string]: string } = {
+    'Kinyarwanda': '<phoneme alphabet="ipa" ph="kiˌɲaɾˈwanda">Kinyarwanda</phoneme>',
+    'Ubuntu': '<phoneme alphabet="ipa" ph="uˈbuntu">Ubuntu</phoneme>',
+    'Rwandan': '<phoneme alphabet="ipa" ph="ɾuˈanda">Rwandan</phoneme>',
+    'Kigali': '<phoneme alphabet="ipa" ph="kiˈɡali">Kigali</phoneme>',
+    'Nyanza': '<phoneme alphabet="ipa" ph="ɲaˈnza">Nyanza</phoneme>',
+    'Musanze': '<phoneme alphabet="ipa" ph="muˈsanze">Musanze</phoneme>'
+  };
+
+  // Apply pronunciation improvements
+  for (const [word, phoneme] of Object.entries(pronunciationMap)) {
+    const regex = new RegExp(`\\b${word}\\b`, 'gi');
+    enhancedText = enhancedText.replace(regex, phoneme);
+  }
+
+  // Add pauses for better clarity
+  enhancedText = enhancedText.replace(/[.!?]/g, '$&<break time="0.5s"/>');
+  enhancedText = enhancedText.replace(/[,;]/g, '$&<break time="0.3s"/>');
+
+  // Wrap in SSML if we made changes
+  if (enhancedText !== text) {
+    enhancedText = `<speak>${enhancedText}</speak>`;
+  }
+
+  return enhancedText;
+};
+
+// Improved voice configuration for better Kinyarwanda support
+const getVoiceConfig = (languageCode: string, gender: string, customVoiceName?: string) => {
+  if (customVoiceName) {
+    return {
+      languageCode: languageCode.startsWith('rw') ? 'en-US' : languageCode,
+      name: customVoiceName,
+      ssmlGender: gender
+    };
+  }
+
   if (languageCode.startsWith('rw')) {
-    // Use Swahili as closest available for Kinyarwanda
+    // For Kinyarwanda, use high-quality English voices with appropriate settings
+    // English voices handle mixed content better than Swahili for Kinyarwanda
+    return {
+      languageCode: 'en-US',
+      name: gender === 'FEMALE' ? 'en-US-Neural2-F' : 'en-US-Neural2-D', // High-quality neural voices
+      ssmlGender: gender
+    };
+  } else if (languageCode.startsWith('sw')) {
+    // For Swahili content
     return {
       languageCode: 'sw-KE',
       name: 'sw-KE-Standard-A',
       ssmlGender: gender
     };
+  } else if (languageCode.startsWith('fr')) {
+    // For French content (common in Rwanda)
+    return {
+      languageCode: 'fr-FR',
+      name: gender === 'FEMALE' ? 'fr-FR-Neural2-F' : 'fr-FR-Neural2-G',
+      ssmlGender: gender
+    };
   } else {
+    // For English and other languages
     return {
       languageCode: 'en-US',
-      name: 'en-US-Neural2-D',
+      name: gender === 'FEMALE' ? 'en-US-Neural2-F' : 'en-US-Neural2-D',
       ssmlGender: gender
     };
   }
@@ -304,6 +396,11 @@ export const checkHealth = async (req: Request, res: Response): Promise<void> =>
       success: true,
       googleCloudAvailable: hasApiKey,
       status: hasApiKey ? 'Ready' : 'Available',
+      supportedLanguages: {
+        tts: ['en-US', 'rw-RW', 'sw-KE', 'fr-FR'],
+        stt: ['en-US', 'sw-KE', 'fr-FR'],
+        note: 'Kinyarwanda (rw-RW) uses enhanced English voices for better pronunciation'
+      },
       timestamp: new Date().toISOString()
     });
   } catch (error) {
