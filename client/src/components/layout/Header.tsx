@@ -3,9 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { useSimpleImageLoader } from '../../hooks/useImageLoader';
 import { Button } from '../ui/Button';
-import { LoadingSpinner } from '../ui/LoadingSpinner';
+import Avatar from '../ui/Avatar';
 import NetworkStatusIndicator from '../common/NetworkStatusIndicator';
 import { 
   Moon, 
@@ -36,7 +35,7 @@ const Header: React.FC<HeaderProps> = ({
   const [showLangMenu, setShowLangMenu] = useState(false);
 
   // Use robust image loader for avatar
-  const avatar = useSimpleImageLoader(user?.avatar, 'avatar');
+  const avatar = user?.avatar ? { src: user.avatar, hasError: false } : null;
 
   const handleLogout = () => {
     logout();
@@ -144,26 +143,13 @@ const Header: React.FC<HeaderProps> = ({
                     className="flex items-center space-x-2 pr-1"
                     aria-label="Profile menu"
                   >
-                    <div className="relative">
-                      {avatar.src && !avatar.hasError ? (
-                        <img
-                          src={avatar.src}
-                          alt={user.name}
-                          className="h-8 w-8 rounded-full object-cover ring-2 ring-gray-200 dark:ring-gray-700"
-                          onLoad={avatar.onLoad}
-                          onError={avatar.onError}
-                        />
-                      ) : (
-                        <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold ring-2 ring-gray-200 dark:ring-gray-700">
-                          {user.name && user.name.trim() && user.name.trim() !== 'User' 
-                            ? user.name.trim().charAt(0).toUpperCase() 
-                            : user.email 
-                              ? user.email.charAt(0).toUpperCase() 
-                              : 'U'}
-                        </div>
-                      )}
-                      <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-900" />
-                    </div>
+                                         <Avatar 
+                       src={avatar?.src} 
+                       name={user.name} 
+                       size="sm" 
+                       showOnlineStatus={true}
+                       isOnline={true}
+                     />
                     <ChevronDown className="h-3 w-3 text-gray-500 dark:text-gray-400 hidden sm:block" />
                   </Button>
                   
@@ -172,23 +158,13 @@ const Header: React.FC<HeaderProps> = ({
                       {/* Profile Info */}
                       <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                         <div className="flex items-center space-x-3">
-                          {avatar.src && !avatar.hasError ? (
-                            <img
-                              src={avatar.src}
-                              alt={user.name}
-                              className="h-10 w-10 rounded-full object-cover ring-2 ring-gray-200 dark:ring-gray-700"
-                              onLoad={avatar.onLoad}
-                              onError={avatar.onError}
-                            />
-                          ) : (
-                            <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold ring-2 ring-gray-200 dark:ring-gray-700">
-                              {user.name && user.name.trim() && user.name.trim() !== 'User' 
-                                ? user.name.trim().charAt(0).toUpperCase() 
-                                : user.email 
-                                  ? user.email.charAt(0).toUpperCase() 
-                                  : 'U'}
-                            </div>
-                          )}
+                                                     <Avatar 
+                             src={avatar?.src} 
+                             name={user.name} 
+                             size="md" 
+                             showOnlineStatus={true}
+                             isOnline={true}
+                           />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{user.name}</p>
                             <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.email}</p>

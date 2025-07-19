@@ -7,12 +7,12 @@ import { Badge } from '../../components/ui/Badge';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { 
   BookOpen, 
-  Award, 
-  Clock, 
-  TrendingUp, 
   Search, 
   CheckCircle,
-  User
+  Clock,
+  Users,
+  Star,
+  Filter
 } from 'lucide-react';
 import { useComprehensiveDashboardData } from '../../hooks/useComprehensiveDashboardData';
 import EnhancedCourseCard from '../../components/course/EnhancedCourseCard';
@@ -21,7 +21,6 @@ const LearnerDashboard: React.FC = () => {
   const { t } = useLanguage();
   const {
     user,
-    stats,
     courses,
     enrolledCourses,
     isLoading,
@@ -31,27 +30,25 @@ const LearnerDashboard: React.FC = () => {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [levelFilter, setLevelFilter] = useState('all');
 
-  // Calculate statistics from loaded data
+  // Calculate simple dashboard statistics
   const dashboardStats = useMemo(() => {
+    const totalAvailable = courses?.length || 0;
     const totalEnrolled = enrolledCourses?.length || 0;
     const completed = enrolledCourses?.filter((course: any) => 
       course.enrollment?.status === 'completed' || 
-      course.progress?.completedLessons === course.totalLessons
+      course.progress?.percentage >= 100
     ).length || 0;
-    const inProgress = totalEnrolled - completed;
 
     return {
+      totalAvailable,
       totalEnrolled,
-      completed,
-      inProgress,
-      averageProgress: stats?.averageProgress || 0,
-      timeSpent: stats?.timeSpent || 0,
-      streak: stats?.streak?.currentStreak || 0
+      completed
     };
-  }, [enrolledCourses, stats]);
+  }, [courses, enrolledCourses]);
 
-  // Filter available courses for enrollment
+  // Filter available courses (all approved courses, showing both enrolled and non-enrolled)
   const availableCourses = useMemo(() => {
     if (!courses || !Array.isArray(courses)) {
       return [];
@@ -61,36 +58,50 @@ const LearnerDashboard: React.FC = () => {
       enrolledCourses?.map((course: any) => course.id || course._id) || []
     );
     
-    const filtered = courses
+    return courses
       .filter((course: any) => {
-        const isNotEnrolled = !enrolledCourseIds.has(course.id || course._id);
         const isPublished = course.status === 'published';
         const matchesSearch = !searchTerm || 
           course.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          course.description?.toLowerCase().includes(searchTerm.toLowerCase());
+          course.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          course.instructorName?.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesCategory = categoryFilter === 'all' || course.category === categoryFilter;
+        const matchesLevel = levelFilter === 'all' || course.level === levelFilter;
         
-        return isNotEnrolled && isPublished && matchesSearch && matchesCategory;
-      });
+        return isPublished && matchesSearch && matchesCategory && matchesLevel;
+      })
+      .map((course: any) => {
+        // Add enrollment info to each course
+        const isEnrolled = enrolledCourseIds.has(course.id || course._id);
+        const enrolledCourse = enrolledCourses?.find((ec: any) => (ec.id || ec._id) === (course.id || course._id));
+        
+        return {
+          ...course,
+          isEnrolled,
+          enrollment: enrolledCourse?.enrollment || null,
+          progress: enrolledCourse?.progress || null
+        };
+      })
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+  }, [courses, enrolledCourses, searchTerm, categoryFilter, levelFilter]);
 
+  // Get unique categories and levels for filtering
+  const { categories, levels } = useMemo(() => {
+    if (!courses) return { categories: [], levels: [] };
     
-    return filtered;
-  }, [courses, enrolledCourses, searchTerm, categoryFilter]);
-
-  // Get unique categories for filtering
-  const categories = useMemo(() => {
-    if (!courses) return [];
-    const uniqueCategories = [...new Set(courses.map((course: any) => course.category))];
-    return uniqueCategories.filter(Boolean);
+    const uniqueCategories = [...new Set(courses.map((course: any) => course.category))].filter(Boolean);
+    const uniqueLevels = [...new Set(courses.map((course: any) => course.level))].filter(Boolean);
+    
+    return { categories: uniqueCategories, levels: uniqueLevels };
   }, [courses]);
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex items-center justify-center min-h-[500px]">
         <div className="text-center">
-          <LoadingSpinner className="mx-auto mb-4" />
-          <p className="text-gray-600">
-            {t('Loading your learning dashboard...')}
+          <LoadingSpinner size="lg" className="text-blue-600" />
+          <p className="text-gray-600 mt-4 text-lg">
+            {t('Loading available courses...')}
           </p>
         </div>
       </div>
@@ -100,14 +111,20 @@ const LearnerDashboard: React.FC = () => {
   if (error) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Card className="p-8 text-center">
-          <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            {t('Unable to load dashboard')}
+        <Card className="p-8 text-center max-w-md border-gray-200">
+          <BookOpen className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">
+            {t('Unable to load courses')}
           </h3>
-          <p className="text-gray-600">
+          <p className="text-gray-600 mb-6">
             {error}
           </p>
+          <Button 
+            onClick={refreshData}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            {t('Try Again')}
+          </Button>
         </Card>
       </div>
     );
@@ -115,100 +132,153 @@ const LearnerDashboard: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      {/* Welcome Header - Clean and Simple */}
-      <div className="bg-white border border-gray-200 rounded-xl p-8 shadow-sm">
-        <div className="flex items-center gap-4">
-          <div className="bg-blue-50 p-3 rounded-full">
-            <User className="w-8 h-8 text-blue-600" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-900 mb-1">
-              {t('Welcome back')}, {user?.name || 'Learner'}
-            </h1>
-            <p className="text-gray-600">
-              {t('Continue your learning journey and achieve your goals')}
-            </p>
+      {/* Welcome Header - Clean and Professional */}
+      <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-2xl p-8">
+        <div className="max-w-4xl">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            {t('Welcome back')}, {user?.name || 'Learner'}!
+          </h1>
+          <p className="text-gray-700 text-lg mb-6">
+            {t('Explore all courses, continue your learning, and discover new skills')}
+          </p>
+          
+          {/* Quick Stats - Simplified */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-blue-100">
+              <div className="flex items-center gap-3">
+                <div className="bg-blue-100 p-2 rounded-lg">
+                  <BookOpen className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-gray-900">{dashboardStats.totalAvailable}</div>
+                  <div className="text-sm text-gray-600">{t('Available Courses')}</div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-green-100">
+              <div className="flex items-center gap-3">
+                <div className="bg-green-100 p-2 rounded-lg">
+                  <Users className="w-5 h-5 text-green-600" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-gray-900">{dashboardStats.totalEnrolled}</div>
+                  <div className="text-sm text-gray-600">{t('Enrolled Courses')}</div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-purple-100">
+              <div className="flex items-center gap-3">
+                <div className="bg-purple-100 p-2 rounded-lg">
+                  <CheckCircle className="w-5 h-5 text-purple-600" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-gray-900">{dashboardStats.completed}</div>
+                  <div className="text-sm text-gray-600">{t('Completed')}</div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Statistics Cards - Clean Design */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="p-6 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-2xl font-semibold text-gray-900">{dashboardStats.totalEnrolled}</div>
-              <div className="text-gray-600 text-sm mt-1">{t('Enrolled Courses')}</div>
-            </div>
-            <div className="bg-blue-50 p-3 rounded-lg">
-              <BookOpen className="w-6 h-6 text-blue-600" />
-            </div>
+      {/* Search and Filters - Clean Design */}
+      <Card className="p-6 border-gray-200 shadow-sm">
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 mb-4">
+            <Filter className="w-5 h-5 text-gray-500" />
+            <h3 className="text-lg font-semibold text-gray-900">{t('Find Courses')}</h3>
           </div>
-        </Card>
-
-        <Card className="p-6 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
+          
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Search Input */}
+            <div className="md:col-span-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <Input
+                  type="text"
+                  placeholder={t('Search courses, instructors, or topics...')}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-11 h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg"
+                />
+              </div>
+            </div>
+            
+            {/* Category Filter */}
             <div>
-              <div className="text-2xl font-semibold text-gray-900">{dashboardStats.completed}</div>
-              <div className="text-gray-600 text-sm mt-1">{t('Completed')}</div>
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="w-full h-12 px-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+              >
+                <option value="all">{t('All Categories')}</option>
+                {categories.map((category) => (
+                  <option key={category} value={category}>
+                    {t(category)}
+                  </option>
+                ))}
+              </select>
             </div>
-            <div className="bg-green-50 p-3 rounded-lg">
-              <CheckCircle className="w-6 h-6 text-green-600" />
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
+            
+            {/* Level Filter */}
             <div>
-              <div className="text-2xl font-semibold text-gray-900">{dashboardStats.inProgress}</div>
-              <div className="text-gray-600 text-sm mt-1">{t('In Progress')}</div>
-            </div>
-            <div className="bg-orange-50 p-3 rounded-lg">
-              <Clock className="w-6 h-6 text-orange-600" />
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Search and Filter - Simplified */}
-      <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <Input
-                type="text"
-                placeholder={t('Search courses...')}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-11 h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-              />
+              <select
+                value={levelFilter}
+                onChange={(e) => setLevelFilter(e.target.value)}
+                className="w-full h-12 px-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+              >
+                <option value="all">{t('All Levels')}</option>
+                {levels.map((level) => (
+                  <option key={level} value={level}>
+                    {t(level)}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
           
-          <div className="sm:w-56">
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="w-full h-12 px-4 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-            >
-              <option value="all">{t('All Categories')}</option>
-              {categories.map((category) => (
-                <option key={category} value={category}>
-                  {t(category)}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Active Filters Display */}
+          {(searchTerm || categoryFilter !== 'all' || levelFilter !== 'all') && (
+            <div className="flex flex-wrap gap-2 pt-2">
+              {searchTerm && (
+                <Badge variant="default" className="bg-blue-100 text-blue-800 px-3 py-1">
+                  {t('Search')}: {searchTerm}
+                </Badge>
+              )}
+              {categoryFilter !== 'all' && (
+                <Badge variant="default" className="bg-green-100 text-green-800 px-3 py-1">
+                  {t('Category')}: {t(categoryFilter)}
+                </Badge>
+              )}
+              {levelFilter !== 'all' && (
+                <Badge variant="default" className="bg-purple-100 text-purple-800 px-3 py-1">
+                  {t('Level')}: {t(levelFilter)}
+                </Badge>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSearchTerm('');
+                  setCategoryFilter('all');
+                  setLevelFilter('all');
+                }}
+                className="text-gray-500 hover:text-gray-700 px-2 py-1 h-auto"
+              >
+                {t('Clear all')}
+              </Button>
+            </div>
+          )}
         </div>
-      </div>
+      </Card>
 
-      {/* Available Courses - Clean Layout */}
+      {/* Available Courses Section */}
       <div>
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold text-gray-900">{t('Available Courses')}</h2>
-          <Badge variant="default" className="bg-gray-100 text-gray-700">
+          <h2 className="text-2xl font-bold text-gray-900">{t('All Courses')}</h2>
+          <Badge variant="default" className="bg-gray-100 text-gray-700 px-3 py-1 text-sm">
             {availableCourses.length} {t('courses')}
           </Badge>
         </div>
@@ -224,27 +294,31 @@ const LearnerDashboard: React.FC = () => {
             ))}
           </div>
         ) : (
-          <Card className="p-12 text-center border border-gray-200 shadow-sm">
-            <div className="bg-gray-50 p-4 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center">
-              <BookOpen className="w-10 h-10 text-gray-400" />
+          <Card className="p-12 text-center border-gray-200 shadow-sm">
+            <div className="bg-gray-50 p-6 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center">
+              <BookOpen className="w-12 h-12 text-gray-400" />
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              {t('No courses found')}
+            <h3 className="text-xl font-semibold text-gray-900 mb-3">
+              {searchTerm || categoryFilter !== 'all' || levelFilter !== 'all'
+                ? t('No courses match your criteria')
+                : t('No courses available yet')
+              }
             </h3>
-            <p className="text-gray-600 mb-6 max-w-md mx-auto">
-              {searchTerm || categoryFilter !== 'all' 
-                ? t('Try adjusting your search or filter criteria')
-                : t('No courses are available at the moment')
+            <p className="text-gray-600 mb-6 max-w-md mx-auto leading-relaxed">
+              {searchTerm || categoryFilter !== 'all' || levelFilter !== 'all'
+                ? t('Try adjusting your search terms or filters to find courses')
+                : t('Courses are being added regularly. Check back soon for new learning opportunities!')
               }
             </p>
-            {(searchTerm || categoryFilter !== 'all') && (
+            {(searchTerm || categoryFilter !== 'all' || levelFilter !== 'all') && (
               <Button
                 variant="outline"
                 onClick={() => {
                   setSearchTerm('');
                   setCategoryFilter('all');
+                  setLevelFilter('all');
                 }}
-                className="border-gray-200 text-gray-700 hover:bg-gray-50"
+                className="border-blue-200 text-blue-600 hover:bg-blue-50"
               >
                 {t('Clear Filters')}
               </Button>

@@ -221,6 +221,8 @@ router.put('/profile', authenticate, async (req: Request, res: Response) => {
       experience,
       preferences,
       socialMedia,
+      avatar,
+      profile,
     } = req.body;
 
     // Validate and sanitize input
@@ -230,8 +232,35 @@ router.put('/profile', authenticate, async (req: Request, res: Response) => {
       updateData.name = name.trim();
     }
 
+    // Handle avatar URL
+    if (avatar !== undefined) {
+      // Allow empty string to remove avatar, or valid URL to set avatar
+      if (avatar === '' || avatar === null) {
+        updateData.avatar = null;
+      } else if (typeof avatar === 'string' && avatar.trim() !== '') {
+        updateData.avatar = avatar.trim();
+      }
+    }
+
     // Update profile fields - handle all user types
     const profileFields: any = {};
+    
+    // Handle profile object from request body
+    if (profile && typeof profile === 'object') {
+      if (profile.bio && typeof profile.bio === 'string') profileFields.bio = profile.bio.trim();
+      if (profile.location && typeof profile.location === 'string') profileFields.location = profile.location.trim();
+      if (profile.phone && typeof profile.phone === 'string') profileFields.phone = profile.phone.trim();
+      if (profile.avatar !== undefined) {
+        // Avatar can also be set through profile.avatar
+        if (profile.avatar === '' || profile.avatar === null) {
+          updateData.avatar = null;
+        } else if (typeof profile.avatar === 'string' && profile.avatar.trim() !== '') {
+          updateData.avatar = profile.avatar.trim();
+        }
+      }
+    }
+    
+    // Handle individual profile fields for backward compatibility
     if (bio && typeof bio === 'string') profileFields.bio = bio.trim();
     if (location && typeof location === 'string') profileFields.location = location.trim();
     if (website && typeof website === 'string') profileFields.website = website.trim();

@@ -6,6 +6,38 @@ import FormData from 'form-data';
 import fetch from 'node-fetch';
 import crypto from 'crypto';
 
+// Cloudinary configuration - using import instead of require
+import { v2 as cloudinary } from 'cloudinary';
+
+// Configure Cloudinary with credentials from environment
+if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  });
+} else {
+  console.error('Cloudinary configuration missing. Please check your environment variables.');
+}
+
+// Upload preset mapping - use different presets for different content types
+const UPLOAD_PRESET_MAP = {
+  'course-thumbnail': process.env.CLOUDINARY_UPLOAD_PRESET, // tekriders-uploads (has default folder)
+  'profile-picture': process.env.CLOUDINARY_UPLOAD_PRESET, // We'll override folder for this
+  'user-avatar': process.env.CLOUDINARY_UPLOAD_PRESET,
+  'course-material': process.env.CLOUDINARY_UPLOAD_PRESET,
+  'general': process.env.CLOUDINARY_UPLOAD_PRESET
+};
+
+// Folder mapping for different content types
+const folderMap = {
+  'course-thumbnail': 'tekriders/course-thumbnails',
+  'profile-picture': 'tekriders/profile-pictures',
+  'user-avatar': 'tekriders/user-avatars',
+  'course-material': 'tekriders/course-materials',
+  'general': 'tekriders/general'
+};
+
 const router = Router();
 
 // Configure multer for memory storage
@@ -200,14 +232,20 @@ async function uploadToCloudinary(file: Express.Multer.File, config: any, type: 
   });
 
   // Determine folder based on type
-  const folderMap: { [key: string]: string } = {
-    'course-thumbnail': 'tekriders/course-thumbnails',
-    'user-avatar': 'tekriders/user-avatars',
-    'course-material': 'tekriders/course-materials',
-    'general': 'tekriders/general'
-  };
-
-  const folder = folderMap[type] || folderMap['general'];
+  const folder = folderMap[type as keyof typeof folderMap] || folderMap['general'];
+  
+  // Special handling for profile pictures to ensure correct folder routing
+  if (type === 'profile-picture') {
+    console.log('Profile picture upload detected - Ensuring correct folder routing');
+    console.log('Profile picture upload - Type:', type);
+    console.log('Profile picture upload - Mapped folder:', folder);
+    console.log('Profile picture upload - Expected folder: tekriders/profile-pictures');
+    
+    // Double-check the folder mapping
+    if (folder !== 'tekriders/profile-pictures') {
+      console.error('Profile picture folder mapping error! Expected: tekriders/profile-pictures, Got:', folder);
+    }
+  }
 
   // Add Cloudinary parameters
   formData.append('timestamp', Math.round(Date.now() / 1000));
@@ -219,8 +257,41 @@ async function uploadToCloudinary(file: Express.Multer.File, config: any, type: 
 
   // Generate signature for authenticated upload
   const timestamp = Math.round(Date.now() / 1000);
-  const stringToSign = `folder=${folder}&quality=auto&resource_type=image&timestamp=${timestamp}${config.api_secret}`;
+  
+  // For signed uploads, only include essential parameters in signature
+  // Cloudinary signature should only include parameters that affect the upload
+  const signatureParams = {
+    folder: folder,
+    timestamp: timestamp
+  };
+  
+  // Sort parameters alphabetically for consistent signature
+  const sortedParams = Object.keys(signatureParams)
+    .sort()
+    .map(key => `${key}=${signatureParams[key as keyof typeof signatureParams]}`)
+    .join('&');
+  
+  const stringToSign = `${sortedParams}${config.api_secret}`;
   const signature = crypto.createHash('sha1').update(stringToSign).digest('hex');
+
+  console.log('Backend upload - Profile picture folder routing:', {
+    type,
+    folder,
+    targetFolder: folder,
+    usingSignedUpload: true,
+    timestamp,
+    signatureLength: signature.length
+  });
+
+  console.log('Backend upload signature generation:', {
+    type,
+    folder,
+    timestamp,
+    signatureParams: Object.keys(signatureParams),
+    sortedParams,
+    stringToSign: `${sortedParams}[API_SECRET]`,
+    signature
+  });
 
   formData.append('api_key', config.api_key);
   formData.append('signature', signature);
