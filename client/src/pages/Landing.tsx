@@ -14,101 +14,125 @@ import {
   PlayCircle,
   Zap,
   Shield,
-  Globe
+  Globe,
+  MessageCircle,
+  Mail,
+  MapPin
 } from 'lucide-react';
 
 const Landing: React.FC = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
   const featuredCourses = [
     {
       id: 1,
-      title: t('hero.card.title') || 'Introduction to Programming',
-      description: 'Learn the fundamentals of programming with modern languages and best practices.',
-      instructor: 'John Smith',
+      title: t('landing.courses.programming.title'),
+      description: t('landing.courses.programming.description'),
+      instructor: t('landing.courses.instructor.john'),
       students: 1250,
       rating: 4.8,
-      category: 'Programming'
+      category: t('landing.courses.category.programming'),
+      thumbnail: 'https://images.unsplash.com/photo-1517077304055-6e89abbf09b0?w=400&h=225&fit=crop&crop=center'
     },
     {
       id: 2,
-      title: 'Web Development Basics',
-      description: 'Build your first website with HTML, CSS, and JavaScript fundamentals.',
-      instructor: 'Sarah Johnson',
+      title: t('landing.courses.webDev.title'),
+      description: t('landing.courses.webDev.description'),
+      instructor: t('landing.courses.instructor.sarah'),
       students: 890,
       rating: 4.9,
-      category: 'Web Development'
+      category: t('landing.courses.category.webDevelopment'),
+      thumbnail: 'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=400&h=225&fit=crop&crop=center'
     },
     {
       id: 3,
-      title: 'Digital Marketing Fundamentals',
-      description: 'Learn essential digital marketing strategies for modern businesses.',
-      instructor: 'Mike Davis',
+      title: t('landing.courses.marketing.title'),
+      description: t('landing.courses.marketing.description'),
+      instructor: t('landing.courses.instructor.mike'),
       students: 650,
       rating: 4.7,
-      category: 'Marketing'
+      category: t('landing.courses.category.marketing'),
+      thumbnail: 'https://images.unsplash.com/photo-1557838923-2985c318be48?w=400&h=225&fit=crop&crop=center'
     }
   ];
 
   const stats = [
     { 
-      label: t('stats.learners') || 'Active Learners', 
+      label: t('stats.learners'), 
       value: '10,000+', 
       icon: Users,
-      description: 'Growing community'
+      description: language === 'rw' ? 'Umuryango urimo gukura' : 'Growing community'
     },
     { 
-      label: t('stats.courses') || 'Courses Available', 
+      label: t('stats.courses'), 
       value: '500+', 
       icon: BookOpen,
-      description: 'Expert-led content'
+      description: language === 'rw' ? 'Ibirimo by\'abahanga' : 'Expert-led content'
     },
     { 
-      label: t('stats.tutors') || 'Expert Instructors', 
+      label: t('stats.tutors'), 
       value: '150+', 
       icon: Award,
-      description: 'Industry professionals'
+      description: language === 'rw' ? 'Abahanga mu bucuruzi' : 'Industry professionals'
     },
     { 
-      label: t('stats.success') || 'Certificates Issued', 
+      label: t('stats.success'), 
       value: '5,000+', 
       icon: CheckCircle,
-      description: 'Career advancement'
+      description: language === 'rw' ? 'Iterambere ry\'akazi' : 'Career advancement'
     }
   ];
 
   const features = [
     {
       icon: BookOpen,
-      title: t('features.learn.title') || 'Quality Content',
-      description: t('features.learn.description') || 'Learn from industry experts with practical, up-to-date content that matters in today\'s job market.'
+      title: t('features.learn.title'),
+      description: t('features.learn.description')
     },
     {
       icon: Users,
-      title: t('features.community.title') || 'Community Support',
-      description: t('features.community.description') || 'Connect with fellow learners, get help when you need it, and build lasting professional relationships.'
+      title: t('features.community.title'),
+      description: t('features.community.description')
     },
     {
       icon: Award,
-      title: 'Certificates',
-      description: 'Earn recognized certificates to showcase your achievements and advance your career prospects.'
+      title: t('features.certificates.title'),
+      description: t('features.certificates.description')
     },
     {
       icon: Zap,
-      title: 'Fast & Interactive',
-      description: 'Engage with hands-on projects and interactive content designed for modern learning experiences.'
+      title: t('features.interactive.title'),
+      description: t('features.interactive.description')
     },
     {
       icon: Shield,
-      title: 'Secure & Reliable',
-      description: 'Your data and progress are protected with secure authentication and reliable infrastructure.'
+      title: t('features.secure.title'),
+      description: t('features.secure.description')
     },
     {
       icon: Globe,
-      title: 'Global Access',
-      description: 'Learn from anywhere in the world with our responsive platform that works on any device.'
+      title: t('features.global.title'),
+      description: t('features.global.description')
     }
   ];
+
+  // Hero title with conditional blue text
+  const getHeroTitle = () => {
+    if (language === 'rw') {
+      return (
+        <>
+          Iga Ikoranabuhanga Rigezweho<br />
+          <span className="text-blue-600 dark:text-blue-400">Rigira Agaciro</span>
+        </>
+      );
+    }
+    return (
+      <>
+        {t('landing.hero.title') || 'Learn Skills'}<br />
+        <span className="text-blue-600 dark:text-blue-400">That Matter</span>
+      </>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors duration-200">
@@ -133,8 +157,7 @@ const Landing: React.FC = () => {
                 </div>
                 
                 <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-white leading-tight">
-                  {t('landing.hero.title') || 'Learn Skills'}<br />
-                  <span className="text-blue-600 dark:text-blue-400">That Matter</span>
+                  {getHeroTitle()}
                 </h1>
                 
                 <p className="text-lg sm:text-xl text-gray-600 dark:text-gray-300 leading-relaxed max-w-2xl">
@@ -159,18 +182,18 @@ const Landing: React.FC = () => {
 
               {/* Trust Indicators */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
-                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                  <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-                  <span>Free courses available</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                  <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-                  <span>Industry certificates</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                  <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-                  <span>Expert instructors</span>
-                </div>
+                                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                    <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+                    <span>{t('landing.trust.freeCourses')}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                    <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+                    <span>{t('landing.trust.certificates')}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                    <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+                    <span>{t('landing.trust.instructors')}</span>
+                  </div>
               </div>
             </div>
 
@@ -179,41 +202,42 @@ const Landing: React.FC = () => {
               <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6 lg:p-8 backdrop-blur-sm">
                 <div className="space-y-6">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Featured Course</h3>
-                    <span className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 text-sm font-medium rounded-full">
-                      {t('common.free') || 'Free'}
-                    </span>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{t('landing.featuredCourse.title') || 'Featured Course'}</h3>
+                                          <span className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 text-sm font-medium rounded-full">
+                        {t('landing.featuredCourse.free')}
+                      </span>
                   </div>
                   
-                  <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-xl flex items-center justify-center group cursor-pointer transition-all hover:scale-105">
-                    <div className="text-center">
-                      <PlayCircle className="w-16 h-16 text-gray-400 dark:text-gray-500 mx-auto mb-2 group-hover:text-blue-500 transition-colors" />
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Click to preview</p>
-                    </div>
+                  <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-xl overflow-hidden">
+                    <img 
+                      src="https://images.unsplash.com/photo-1517077304055-6e89abbf09b0?w=400&h=225&fit=crop&crop=center" 
+                      alt="Web Development Course"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                    />
                   </div>
                   
                   <div className="space-y-4">
                     <div>
-                      <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Introduction to Web Development</h4>
-                      <p className="text-sm text-gray-600 dark:text-gray-300">
-                        Learn the basics of HTML, CSS, and JavaScript to build your first website
-                      </p>
+                                              <h4 className="font-semibold text-gray-900 dark:text-white mb-2">{t('landing.featuredCourse.webDev.title')}</h4>
+                        <p className="text-sm text-gray-600 dark:text-gray-300">
+                          {t('landing.featuredCourse.webDev.description')}
+                        </p>
                     </div>
                     
                     <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
-                      <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
-                        <div className="flex items-center gap-1">
-                          <Users className="w-4 h-4" />
-                          <span>1,250</span>
+                                              <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+                          <div className="flex items-center gap-1">
+                            <Users className="w-4 h-4" />
+                            <span>1,250</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Star className="w-4 h-4 text-yellow-500" />
+                            <span>4.8</span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <Star className="w-4 h-4 text-yellow-500" />
-                          <span>4.8</span>
-                        </div>
-                      </div>
-                      <Button size="sm" variant="outline">
-                        {t('common.learnMore') || 'Learn More'}
-                      </Button>
+                                              <Button size="sm" variant="outline">
+                          {t('landing.featuredCourse.learnMore')}
+                        </Button>
                     </div>
                   </div>
                 </div>
@@ -221,7 +245,7 @@ const Landing: React.FC = () => {
               
               {/* Floating elements */}
               <div className="absolute -top-3 -right-3 bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-medium shadow-lg animate-bounce">
-                {t('common.new') || 'New'}
+                {t('landing.featuredCourse.new')}
               </div>
             </div>
           </div>
@@ -242,7 +266,7 @@ const Landing: React.FC = () => {
           
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
             {stats.map((stat, index) => (
-              <div key={index} className="text-center group">
+              <div key={index} className="text-center group p-6 rounded-2xl bg-blue-50/70 dark:bg-blue-900/40 hover:bg-blue-50/85 dark:hover:bg-blue-900/50 transition-all">
                 <div className="inline-flex items-center justify-center w-16 h-16 lg:w-20 lg:h-20 bg-blue-50 dark:bg-blue-900/30 rounded-2xl mb-4 group-hover:scale-110 transition-transform">
                   <stat.icon className="w-8 h-8 lg:w-10 lg:h-10 text-blue-600 dark:text-blue-400" />
                 </div>
@@ -270,8 +294,12 @@ const Landing: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
             {featuredCourses.map((course) => (
               <Card key={course.id} className="group overflow-hidden hover:shadow-xl dark:hover:shadow-2xl transition-all duration-300 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
-                <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <PlayCircle className="w-12 h-12 text-gray-400 dark:text-gray-500 group-hover:text-blue-500 transition-colors" />
+                <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 overflow-hidden">
+                  <img 
+                    src={course.thumbnail} 
+                    alt={course.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                  />
                 </div>
                 
                 <div className="p-6">
@@ -280,7 +308,7 @@ const Landing: React.FC = () => {
                       {course.category}
                     </span>
                     <span className="text-xs text-green-600 dark:text-green-400 font-medium bg-green-50 dark:bg-green-900/30 px-2 py-1 rounded-full">
-                      Free
+                      {t('landing.featuredCourse.free')}
                     </span>
                   </div>
                   
@@ -291,9 +319,9 @@ const Landing: React.FC = () => {
                     {course.description}
                   </p>
                   
-                  <div className="flex items-center gap-2 mb-4 text-sm text-gray-500 dark:text-gray-400">
-                    <span>by {course.instructor}</span>
-                  </div>
+                                      <div className="flex items-center gap-2 mb-4 text-sm text-gray-500 dark:text-gray-400">
+                      <span>{t('landing.courses.by')} {course.instructor}</span>
+                    </div>
                   
                   <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
                     <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
@@ -309,7 +337,7 @@ const Landing: React.FC = () => {
                     
                     <Link to={`/course/${course.id}`}>
                       <Button size="sm" variant="outline" className="group-hover:bg-blue-50 dark:group-hover:bg-blue-900/30 transition-colors">
-                        {t('common.viewAll') || 'View Course'}
+                        {t('landing.courses.viewCourse')}
                       </Button>
                     </Link>
                   </div>
@@ -321,7 +349,7 @@ const Landing: React.FC = () => {
           <div className="text-center mt-12">
             <Link to="/signup">
               <Button size="lg" variant="outline" className="border-2 hover:bg-blue-50 dark:hover:bg-blue-900/30">
-                {t('common.viewAll') || 'View All Courses'}
+                {t('landing.courses.viewAll')}
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
@@ -343,7 +371,7 @@ const Landing: React.FC = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {features.map((feature, index) => (
-              <div key={index} className="text-center group p-6 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-all">
+              <div key={index} className="text-center group p-6 rounded-2xl bg-blue-50/70 dark:bg-blue-900/40 hover:bg-blue-50/85 dark:hover:bg-blue-900/50 transition-all">
                 <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-50 dark:bg-blue-900/30 rounded-2xl mb-6 group-hover:scale-110 transition-transform">
                   <feature.icon className="w-8 h-8 text-blue-600 dark:text-blue-400" />
                 </div>
@@ -380,10 +408,6 @@ const Landing: React.FC = () => {
                 </Button>
               </Link>
             </div>
-            
-            <p className="text-sm opacity-75">
-              No credit card required • Free forever • Start in 30 seconds
-            </p>
           </div>
         </div>
       </section>
@@ -411,12 +435,24 @@ const Landing: React.FC = () => {
             </div>
             
             <div>
-              <h4 className="font-semibold mb-4 text-white">{t('footer.support.title') || 'Support'}</h4>
+              <h4 className="font-semibold mb-4 text-white">Support</h4>
               <ul className="space-y-3 text-sm text-gray-400">
-                <li className="hover:text-white transition-colors cursor-pointer">{t('footer.support.helpCenter') || 'Help Center'}</li>
-                <li className="hover:text-white transition-colors cursor-pointer">{t('footer.support.contactUs') || 'Contact Us'}</li>
-                <li className="hover:text-white transition-colors cursor-pointer">{t('footer.support.community') || 'Community'}</li>
-                <li className="hover:text-white transition-colors cursor-pointer">System Status</li>
+                <li className="hover:text-white transition-colors cursor-pointer flex items-center gap-2">
+                  <MessageCircle className="w-4 h-4" />
+                  <a href="https://wa.me/250785961427" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">
+                    +250 785 961 427
+                  </a>
+                </li>
+                <li className="hover:text-white transition-colors cursor-pointer flex items-center gap-2">
+                  <Mail className="w-4 h-4" />
+                  <a href="mailto:info.tekriders@gmail.com" className="hover:text-white transition-colors">
+                    info.tekriders@gmail.com
+                  </a>
+                </li>
+                <li className="hover:text-white transition-colors cursor-pointer flex items-center gap-2">
+                  <MapPin className="w-4 h-4" />
+                  <span>Kigali, Rwanda</span>
+                </li>
               </ul>
             </div>
             
@@ -426,7 +462,6 @@ const Landing: React.FC = () => {
                 <li className="hover:text-white transition-colors cursor-pointer">{t('footer.company.aboutUs') || 'About Us'}</li>
                 <li className="hover:text-white transition-colors cursor-pointer">{t('footer.company.careers') || 'Careers'}</li>
                 <li className="hover:text-white transition-colors cursor-pointer">{t('footer.company.privacy') || 'Privacy Policy'}</li>
-                <li className="hover:text-white transition-colors cursor-pointer">Terms of Service</li>
               </ul>
             </div>
           </div>

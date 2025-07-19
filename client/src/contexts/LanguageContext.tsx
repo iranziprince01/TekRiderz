@@ -42,6 +42,36 @@ const translations = {
     'landing.hero.cta': 'Start Learning Today',
     'landing.hero.demo': 'Watch Demo',
     
+    // Landing Page - Featured Course
+    'landing.featuredCourse.title': 'Featured Course',
+    'landing.featuredCourse.free': 'Free',
+    'landing.featuredCourse.webDev.title': 'Introduction to Web Development',
+    'landing.featuredCourse.webDev.description': 'Learn the basics of HTML, CSS, and JavaScript to build your first website',
+    'landing.featuredCourse.learnMore': 'Learn More',
+    'landing.featuredCourse.new': 'New',
+    
+    // Landing Page - Trust Indicators
+    'landing.trust.freeCourses': 'Free courses available',
+    'landing.trust.certificates': 'Industry certificates',
+    'landing.trust.instructors': 'Expert instructors',
+    
+    // Landing Page - Sample Courses
+    'landing.courses.programming.title': 'Introduction to Programming',
+    'landing.courses.programming.description': 'Learn the fundamentals of programming with modern languages and best practices.',
+    'landing.courses.webDev.title': 'Web Development Basics',
+    'landing.courses.webDev.description': 'Build your first website with HTML, CSS, and JavaScript fundamentals.',
+    'landing.courses.marketing.title': 'Digital Marketing Fundamentals',
+    'landing.courses.marketing.description': 'Learn essential digital marketing strategies for modern businesses.',
+    'landing.courses.category.programming': 'Programming',
+    'landing.courses.category.webDevelopment': 'Web Development',
+    'landing.courses.category.marketing': 'Marketing',
+    'landing.courses.instructor.john': 'John Smith',
+    'landing.courses.instructor.sarah': 'Sarah Johnson',
+    'landing.courses.instructor.mike': 'Mike Davis',
+    'landing.courses.viewCourse': 'View Course',
+    'landing.courses.viewAll': 'View All Courses',
+    'landing.courses.by': 'by',
+    
     // Stats
     'stats.learners': 'Young Learners',
     'stats.tutors': 'Community Mentors',
@@ -59,6 +89,12 @@ const translations = {
     'features.interactive.description': 'Work on real projects that solve problems in your community while building valuable skills.',
     'features.community.title': 'Ubuntu Learning',
     'features.community.description': 'Connect with fellow young learners across Rwanda and East Africa in our supportive community.',
+    'features.certificates.title': 'Certificates',
+    'features.certificates.description': 'Earn recognized certificates to showcase your achievements and advance your career prospects.',
+    'features.secure.title': 'Secure & Reliable',
+    'features.secure.description': 'Your data and progress are protected with secure authentication and reliable infrastructure.',
+    'features.global.title': 'Global Access',
+    'features.global.description': 'Learn from anywhere in the world with our responsive platform that works on any device.',
     
     // Testimonials
     'testimonials.title': 'Stories from Our Community',
@@ -526,6 +562,36 @@ const translations = {
     'landing.hero.cta': 'Tangira Kwiga Uyu Munsi',
     'landing.hero.demo': 'Reba Icyitegererezo',
     
+    // Landing Page - Featured Course
+    'landing.featuredCourse.title': 'Isomo Rihariwe',
+    'landing.featuredCourse.free': 'Ku Ubuntu',
+    'landing.featuredCourse.webDev.title': 'Intangiriro yo Gukora Urubuga',
+    'landing.featuredCourse.webDev.description': 'Wige ibisanzwe bya HTML, CSS, na JavaScript kugira ngo ukore urubuga rwawe rwa mbere',
+    'landing.featuredCourse.learnMore': 'Menya Byinshi',
+    'landing.featuredCourse.new': 'Gishya',
+    
+    // Landing Page - Trust Indicators
+    'landing.trust.freeCourses': 'Amasomo y\'ubuntu aboneka',
+    'landing.trust.certificates': 'Impamyabumenyi z\'ubucuruzi',
+    'landing.trust.instructors': 'Abarimu b\'ubuhanga',
+    
+    // Landing Page - Sample Courses
+    'landing.courses.programming.title': 'Intangiriro yo Gukora Porogaramu',
+    'landing.courses.programming.description': 'Wige ibisanzwe byo gukora porogaramu ukoresheje indimi z\'iki gihe n\'uburyo bwiza.',
+    'landing.courses.webDev.title': 'Ibisanzwe byo Gukora Urubuga',
+    'landing.courses.webDev.description': 'Kora urubuga rwawe rwa mbere ukoresheje HTML, CSS, na JavaScript.',
+    'landing.courses.marketing.title': 'Ibisanzwe by\'Ubwamamaza bwa Digitale',
+    'landing.courses.marketing.description': 'Wige uburyo bw\'ibanze bwo kwamamaza mu bucuruzi bw\'iki gihe.',
+    'landing.courses.category.programming': 'Gukora Porogaramu',
+    'landing.courses.category.webDevelopment': 'Gukora Urubuga',
+    'landing.courses.category.marketing': 'Ubwamamaza',
+    'landing.courses.instructor.john': 'John Smith',
+    'landing.courses.instructor.sarah': 'Sarah Johnson',
+    'landing.courses.instructor.mike': 'Mike Davis',
+    'landing.courses.viewCourse': 'Reba Isomo',
+    'landing.courses.viewAll': 'Reba Amasomo Yose',
+    'landing.courses.by': 'na',
+    
     // Stats
     'stats.learners': 'Urubyiruko Rwiga',
     'stats.tutors': 'Abarimu b\'Umuryango',
@@ -539,10 +605,16 @@ const translations = {
     'features.learn.description': 'Bona amasomo y\'abacuruzi b\'u Rwanda batsinze n\'abahanga ba tekinoroji bazi urugendo rwawe.',
     'features.track.title': 'Genzura Iterambere Ryawe',
     'features.track.description': 'Koresha ibikoresho byakozwe kugira ngo ugufashe kubaka portfolio ifungura inzira z\'amahirwe.',
-    'features.interactive.title': 'Imishinga Ifatika',
-    'features.interactive.description': 'Kora ku mishinga nyayo ikemura ibibazo mu muryango wawe mu gihe wubaka ubuhanga bw\'agaciro.',
+    'features.interactive.title': 'Vuba & Bifatika',
+    'features.interactive.description': 'Kora ku mishinga ifatika n\'ibirimo bifatika byakozwe ku buryo bwo kwiga bw\'iki gihe.',
     'features.community.title': 'Kwiga Ubuntu',
     'features.community.description': 'Huza n\'urubyiruko rundi rwiga mu Rwanda no mu Burasirazuba bw\'Afurika mu muryango wacu ushyigikira.',
+    'features.certificates.title': 'Impamyabumenyi',
+    'features.certificates.description': 'Bona impamyabumenyi zemejwe kugira ngo werekane ibyagezweho kandi ugufashe iterambere ry\'akazi.',
+    'features.secure.title': 'Umutekano & Kwizera',
+    'features.secure.description': 'Amakuru yawe n\'iterambere byarindiriwe n\'ubwishingizi bw\'umutekano n\'uburyo bwizewe.',
+    'features.global.title': 'Kwinjira ku Isi Yose',
+    'features.global.description': 'Wiga uhereye aho aho hose ku isi ukoresheje urubuga rwacu rwumvikana rukora kuri buri gikoresho.',
     
     // Testimonials
     'testimonials.title': 'Inkuru z\'Umuryango Wacu',
@@ -554,7 +626,7 @@ const translations = {
     // CTA Section
     'cta.title': 'Witeguye Guhindura Ejo Hazaza Hawe?',
     'cta.subtitle': 'Jya mu rubyiruko rw\'u Rwanda rurenga 5,000 rubaka ubuzima bwiza binyuze mu buhanga.',
-    'cta.start': 'Tangira Ubuntu Uyu Munsi',
+    'cta.start': 'Tangira Uyu Munsi',
     'cta.browse': 'Shakisha Amasomo',
     
     // Footer
