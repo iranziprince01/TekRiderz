@@ -44,6 +44,7 @@ interface Module {
   estimatedDuration: number;
   videoUrl: string;
   videoProvider: 'youtube';
+  pdfUrl?: string; // PDF lecture notes URL
   order: number;
   isCompleted: boolean;
   isUnlocked: boolean;
@@ -227,6 +228,17 @@ const Course: React.FC = () => {
             if (section && section.lessons && Array.isArray(section.lessons)) {
               section.lessons.forEach((lesson: any, lessonIndex: number) => {
                 if (lesson && lesson.type === 'video' && lesson.content?.videoUrl) {
+                  // Debug logging for PDF URL
+                  console.log('Processing lesson:', {
+                    lessonId: lesson.id,
+                    lessonTitle: lesson.title,
+                    content: lesson.content,
+                    hasDocumentUrl: !!lesson.content.documentUrl,
+                    hasPdfUrl: !!lesson.content.pdfUrl,
+                    documentUrl: lesson.content.documentUrl,
+                    pdfUrl: lesson.content.pdfUrl,
+                    finalPdfUrl: lesson.content.documentUrl || lesson.content.pdfUrl
+                  });
                   const moduleOrder = sectionIndex * 10 + lessonIndex + 1;
                   
                   // Safe check for lesson completion
@@ -248,12 +260,13 @@ const Course: React.FC = () => {
                     estimatedDuration: lesson.estimatedDuration || 15,
                     videoUrl: lesson.content.videoUrl,
                     videoProvider: 'youtube',
+                    pdfUrl: lesson.content.documentUrl || lesson.content.pdfUrl, // Include PDF URL if available (check both documentUrl and pdfUrl)
                     order: moduleOrder,
-                isCompleted,
+                    isCompleted,
                     isUnlocked: isFirstModule || prevModuleCompleted,
                     nextModuleId: undefined, // Will be set below
                     hasQuiz: !!(lesson.quiz || section.moduleQuiz)
-              });
+                  });
             }
           });
             }
@@ -273,6 +286,17 @@ const Course: React.FC = () => {
         if (index > 0) {
           module.isUnlocked = modules[index - 1].isCompleted;
         }
+      });
+
+      // Debug summary for PDF URLs
+      console.log('PDF URL Summary:', {
+        totalModules: modules.length,
+        modulesWithPdf: modules.filter(m => m.pdfUrl).length,
+        pdfUrls: modules.filter(m => m.pdfUrl).map(m => ({
+          moduleId: m.id,
+          moduleTitle: m.title,
+          pdfUrl: m.pdfUrl
+        }))
       });
 
       // Transform quizzes with real data - fetch all quizzes and make them all unlocked

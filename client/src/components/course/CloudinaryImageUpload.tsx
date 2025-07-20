@@ -70,36 +70,12 @@ export const CloudinaryImageUpload: React.FC<CloudinaryImageUploadProps> = ({
         throw new Error(validationError);
       }
 
-      // Try multiple upload strategies for maximum reliability
+      // Use backend proxy upload for proper folder control
       const uploadStrategies = [
-        // Strategy 1: Direct Cloudinary upload with proper configuration
+        // Strategy 1: Backend proxy upload (primary option)
         async () => {
-          if (!isCloudinaryConfigured) {
-            throw new Error('Cloudinary not configured');
-          }
-
-          const formData = new FormData();
-          formData.append('file', file);
-          formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-          formData.append('folder', 'tekriders/course-thumbnails');
-          formData.append('resource_type', 'image');
-          formData.append('quality', 'auto');
-          formData.append('fetch_format', 'auto');
+          console.log('Using backend proxy upload for proper folder control...');
           
-          const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
-            method: 'POST',
-            body: formData,
-          });
-
-          if (!response.ok) {
-            const errorData = await response.text();
-            throw new Error(`Cloudinary upload failed: ${response.status} - ${errorData}`);
-          }
-
-          return response;
-        },
-        // Strategy 2: Backend proxy upload (if available)
-        async () => {
           const formData = new FormData();
           formData.append('file', file);
           formData.append('type', 'course-thumbnail');
@@ -130,6 +106,32 @@ export const CloudinaryImageUpload: React.FC<CloudinaryImageUploadProps> = ({
           } else {
             throw new Error(result.error || 'Backend upload failed');
           }
+        },
+        // Strategy 2: Direct Cloudinary upload (fallback only)
+        async () => {
+          if (!isCloudinaryConfigured) {
+            throw new Error('Cloudinary not configured');
+          }
+
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+          formData.append('folder', 'tekriders/course-thumbnails');
+          formData.append('resource_type', 'image');
+          formData.append('quality', 'auto');
+          formData.append('fetch_format', 'auto');
+          
+          const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (!response.ok) {
+            const errorData = await response.text();
+            throw new Error(`Cloudinary upload failed: ${response.status} - ${errorData}`);
+          }
+
+          return response;
         },
         // Strategy 3: Local storage fallback with File API
         async () => {

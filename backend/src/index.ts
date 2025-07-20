@@ -16,7 +16,8 @@ import { userRoutes } from './routes/users';
 import courseRoutes from './routes/courses';
 import { adminRoutes } from './routes/admin';
 import uploadRoutes from './routes/upload';
-// Certificate and file upload routes removed
+import firebasePdfRoutes from './routes/firebasePdf';
+
 import syncRoutes from './routes/sync';
 import speechRoutes from './routes/speech';
 import { globalRateLimiter, getRateLimitStatus, clearRateLimit } from './middleware/rateLimiter';
@@ -75,8 +76,9 @@ app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/courses', courseRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/upload', uploadRoutes);
+app.use('/api/v1/firebase-pdf', firebasePdfRoutes);
 app.use('/api/v1/speech', speechRoutes);
-// Certificate and upload routes removed
+
 app.use('/api/v1/sync', syncRoutes);
 
 // Rate limiting status endpoint

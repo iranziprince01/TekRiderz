@@ -610,6 +610,12 @@ class ApiClient {
     });
   }
 
+  async publishCourse(courseId: string): Promise<ApiResponse> {
+    return this.makeRequest(`/courses/${courseId}/publish`, {
+      method: 'POST',
+    });
+  }
+
   async enrollInCourse(courseId: string): Promise<ApiResponse> {
     return this.makeRequest(`/courses/${courseId}/enroll`, {
       method: 'POST',
@@ -858,7 +864,7 @@ class ApiClient {
 
 
 
-  // Certificate methods removed for academic project simplification
+  
 
   // Enhanced course navigation methods
   async getCourseHome(courseId: string): Promise<ApiResponse> {
@@ -1055,7 +1061,7 @@ export const uploadAvatar = (file: File) => apiClient.uploadAvatar(file);
 // File upload exports
 
 
-// Certificate exports removed
+
 
 // Quiz exports
 export const submitQuizAttempt = (courseId: string, attemptData: any) => apiClient.submitQuizAttempt(courseId, attemptData);

@@ -253,6 +253,7 @@ export class CourseController {
 
       logger.info('Course created successfully:', {
         courseId: course._id,
+        courseIdField: course.id,
         title: course.title,
         instructorId: req.user.id,
         hasThumbnail: !!course.thumbnail,
@@ -309,6 +310,151 @@ export class CourseController {
     return 'relative';
   }
 
+  // Update course (tutors only)
+  async updateCourse(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id: courseId } = req.params;
+      
+      console.log('Update course request:', {
+        courseId,
+        userId: req.user?.id,
+        userRole: req.user?.role,
+        bodyKeys: Object.keys(req.body || {})
+      });
+      
+      if (!courseId) {
+        res.status(400).json({
+          success: false,
+          error: 'Course ID is required'
+        });
+        return;
+      }
+
+      if (!req.user) {
+        res.status(401).json({
+          success: false,
+          error: 'Authentication required'
+        });
+        return;
+      }
+
+      // Check if course exists and user owns it
+      console.log('Looking for course with ID:', courseId);
+      const existingCourse = await courseModel.findById(courseId);
+      console.log('Course lookup result:', {
+        found: !!existingCourse,
+        courseId: existingCourse?._id,
+        courseTitle: existingCourse?.title,
+        instructorId: existingCourse?.instructorId
+      });
+      
+      if (!existingCourse) {
+        res.status(404).json({
+          success: false,
+          error: 'Course not found'
+        });
+        return;
+      }
+
+      // Ensure user can only update their own courses (unless admin)
+      if (req.user.role !== 'admin' && existingCourse.instructorId !== req.user.id) {
+        res.status(403).json({
+          success: false,
+          error: 'You can only update your own courses'
+        });
+        return;
+      }
+
+      // Prepare update data
+      const updateData = {
+        ...req.body,
+        updatedAt: new Date().toISOString()
+      };
+
+      // If course is published/approved, create a new version
+      if (existingCourse.status === 'published' || existingCourse.status === 'approved') {
+        console.log('Updating published course - creating new version');
+        
+        // Increment version number
+        const currentVersion = existingCourse.version || '1.0.0';
+        const versionParts = currentVersion.split('.');
+        const majorVersion = parseInt(versionParts[0] || '1') || 1;
+        const minorVersion = parseInt(versionParts[1] || '0') || 0;
+        const patchVersion = parseInt(versionParts[2] || '0') || 0;
+        
+        updateData.version = `${majorVersion}.${minorVersion + 1}.${patchVersion}`;
+        updateData.isCurrentVersion = true;
+        
+        // Add to workflow history
+        const workflowEntry = {
+          id: `workflow_${Date.now()}`,
+          action: 'update',
+          fromStatus: existingCourse.status,
+          toStatus: existingCourse.status, // Status remains the same
+          performedBy: req.user.id,
+          performedByRole: req.user.role,
+          timestamp: new Date().toISOString(),
+          reason: 'Course content updated',
+          notes: 'New version created with updated content'
+        };
+        
+        updateData.workflowHistory = [
+          ...(existingCourse.workflowHistory || []),
+          workflowEntry
+        ];
+        
+        console.log('Created new version:', updateData.version);
+      }
+
+      // Update the course
+      const updatedCourse = await courseModel.update(courseId, updateData);
+
+      logger.info('Course updated:', {
+        courseId,
+        title: updatedCourse.title,
+        instructorId: req.user.id,
+        newVersion: updateData.version,
+        wasPublished: existingCourse.status === 'published' || existingCourse.status === 'approved'
+      });
+
+      // If course was published, notify enrolled learners about the update
+      if (existingCourse.status === 'published' || existingCourse.status === 'approved') {
+        try {
+          const { enrollmentModel } = await import('../models/Enrollment');
+          const enrollments = await enrollmentModel.getCourseEnrollments(courseId, { limit: 1000 });
+          
+          if (enrollments.enrollments && enrollments.enrollments.length > 0) {
+            console.log(`Notifying ${enrollments.enrollments.length} enrolled learners about course update`);
+            
+            // In a real implementation, you would send notifications/emails here
+            // For now, we'll just log it
+            enrollments.enrollments.forEach(enrollment => {
+              console.log(`Learner ${enrollment.userId} will be notified about course update to version ${updateData.version}`);
+            });
+          }
+        } catch (notificationError) {
+          console.warn('Failed to notify learners about course update:', notificationError);
+        }
+      }
+
+      const response: ApiResponse = {
+        success: true,
+        data: { 
+          course: updatedCourse,
+          message: 'Course updated successfully'
+        }
+      };
+
+      res.json(response);
+    } catch (error) {
+      logger.error('Failed to update course:', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to update course'
+      });
+    }
+  }
+
   // Submit course for approval
   async submitCourseForApproval(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -357,6 +503,86 @@ export class CourseController {
       res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : 'Failed to submit course'
+      });
+    }
+  }
+
+  // Publish approved course (tutors only)
+  async publishApprovedCourse(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id: courseId } = req.params;
+      
+      if (!courseId) {
+        res.status(400).json({
+          success: false,
+          error: 'Course ID is required'
+        });
+        return;
+      }
+
+      if (!req.user) {
+        res.status(401).json({
+          success: false,
+          error: 'Authentication required'
+        });
+        return;
+      }
+
+      // Get the course and verify ownership
+      const course = await courseModel.findById(courseId);
+      if (!course) {
+        res.status(404).json({
+          success: false,
+          error: 'Course not found'
+        });
+        return;
+      }
+
+      // Verify the course belongs to the requesting tutor
+      if (course.instructorId !== req.user.id) {
+        res.status(403).json({
+          success: false,
+          error: 'You can only publish your own courses'
+        });
+        return;
+      }
+
+      // Verify the course is approved
+      if (course.status !== 'approved') {
+        res.status(400).json({
+          success: false,
+          error: 'Only approved courses can be published. Current status: ' + course.status
+        });
+        return;
+      }
+
+      // Update course status to published
+      const updatedCourse = await courseModel.update(courseId, {
+        status: 'published',
+        publishedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+
+      logger.info('Course published by tutor:', {
+        courseId,
+        title: course.title,
+        instructorId: req.user.id
+      });
+
+      const response: ApiResponse = {
+        success: true,
+        data: { 
+          course: updatedCourse,
+          message: 'Course published successfully and is now available to learners'
+        }
+      };
+
+      res.json(response);
+    } catch (error) {
+      logger.error('Failed to publish course:', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to publish course'
       });
     }
   }
@@ -1807,7 +2033,7 @@ export class CourseController {
         hasVideo: course.contentFlags?.hasVideo || totalLessons > 0,
         hasQuizzes: course.contentFlags?.hasQuizzes || totalQuizzes > 0,
         hasAssignments: course.contentFlags?.hasAssignments || totalAssignments > 0,
-        hasCertificate: course.contentFlags?.hasCertificate || false,
+
         hasDiscussions: false, // Placeholder
         downloadableContent: false, // Placeholder
         offlineAccess: false // Placeholder

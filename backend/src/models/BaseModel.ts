@@ -24,18 +24,28 @@ export abstract class BaseModel<T extends BaseDocument & MaybeDocument> {
   async create(data: Omit<T, '_id' | '_rev' | 'createdAt' | 'updatedAt'>): Promise<T> {
     try {
       const now = new Date().toISOString();
+      const generatedId = this.generateId();
+      
+      console.log(`Creating ${this.docType} with generated ID:`, generatedId);
+      
       const doc = {
         ...data,
-        _id: this.generateId(),
+        _id: generatedId,
         createdAt: now,
         updatedAt: now,
       } as T;
 
       const result = await this.db.insert(doc);
       
+      console.log(`CouchDB result for ${this.docType}:`, {
+        generatedId,
+        couchDbId: result.id,
+        success: result.ok
+      });
+      
       return {
         ...doc,
-        _id: result.id,
+        _id: result.id || generatedId, // Use CouchDB ID if available, fallback to generated
         _rev: result.rev,
       } as T;
     } catch (error) {
@@ -47,10 +57,17 @@ export abstract class BaseModel<T extends BaseDocument & MaybeDocument> {
   // Find document by ID
   async findById(id: string): Promise<T | null> {
     try {
+      console.log(`Looking for ${this.docType} with ID:`, id);
       const doc = await this.db.get(id);
+      console.log(`Found ${this.docType}:`, {
+        id: doc._id,
+        type: doc.type,
+        title: doc.title || 'No title'
+      });
       return doc as T;
     } catch (error: any) {
       if (error.statusCode === 404) {
+        console.log(`${this.docType} not found with ID:`, id);
         return null;
       }
       logger.error(`Failed to find ${this.docType} by ID:`, error);

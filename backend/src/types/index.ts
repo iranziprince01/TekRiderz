@@ -161,7 +161,7 @@ export interface CourseMetrics {
   performance: {
     avgQuizScore: number;
     assignmentSubmissionRate: number;
-    certificateEarnedRate: number;
+
   };
 }
 
@@ -580,7 +580,7 @@ export interface Course extends BaseDocument {
     hasVideo: boolean;
     hasQuizzes: boolean;
     hasAssignments: boolean;
-    hasCertificate: boolean;
+
     hasPrerequisites: boolean;
     isAccessible: boolean;
   };
@@ -650,18 +650,14 @@ export interface Enrollment extends BaseDocument {
   lastAccessedAt?: string;
   paymentId?: string;
   refundId?: string;
-  certificate?: {
-    id: string;
-    issuedAt: string;
-    url: string;
-  };
+
   isReadOnly?: boolean; // For completed courses
   completionMetadata?: {
     completedAt: string;
     finalProgress: number;
     completionType: 'automatic' | 'manual';
     canRetake: boolean;
-    certificateEligible: boolean;
+
     completionMethod: 'progress_based' | 'exam_based';
   };
 }
@@ -743,7 +739,7 @@ export interface Progress extends BaseDocument {
       bestPercentage: number;
       totalAttempts: number;
       passed: boolean;
-      certificationEligible: boolean;
+  
     };
   };
   
@@ -868,7 +864,7 @@ export type NotificationType =
   | 'system_update'
   | 'welcome_email'
   | 'achievement_unlocked'
-  | 'certificate_earned'
+
   | 'payment_received'
   | 'grade_posted'
   | 'message_received'
@@ -1478,7 +1474,7 @@ export interface AdvancedAssessment extends BaseDocument {
     showResults: boolean;
     showCorrectAnswers: boolean;
     allowReview: boolean;
-    certificateEligible: boolean;
+
     requireSequential: boolean;
     lockdownBrowser: boolean;
     preventCopyPaste: boolean;
@@ -1601,62 +1597,7 @@ export interface Message extends BaseDocument {
   };
 }
 
-// Certificate interface removed for academic project simplification
 
-// Certificate template configuration
-export interface CertificateTemplate {
-  id: string;
-  name: string;
-  type: 'completion' | 'achievement' | 'excellence';
-  description: string;
-  
-  // Design elements
-  layout: {
-    width: number; // PDF width in points
-    height: number; // PDF height in points
-    orientation: 'portrait' | 'landscape';
-    margins: { top: number; bottom: number; left: number; right: number };
-  };
-  
-  // Colors and styling
-  colors: {
-    primary: string; // Main color
-    secondary: string; // Accent color
-    text: string; // Text color
-    background: string; // Background color
-  };
-  
-  // Logo and branding
-  branding: {
-    logoUrl?: string;
-    organizationName: string;
-    organizationAddress?: string;
-    website?: string;
-  };
-  
-  // Text elements
-  title: {
-    en: string;
-    rw: string;
-  };
-  subtitle: {
-    en: string;
-    rw: string;
-  };
-  content: {
-    en: string; // Template with placeholders like {{learnerName}}, {{courseName}}
-    rw: string;
-  };
-  
-  // Requirements for this template
-  requirements: {
-    minGrade?: number; // Minimum grade percentage
-    minDuration?: number; // Minimum course duration
-    requiredCompletions?: string[]; // Required sections/modules
-  };
-}
-
-// Certificate verification interface removed
 
 // Express Request extensions
 declare global {

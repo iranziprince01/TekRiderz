@@ -17,7 +17,7 @@ TekRiders is a full-stack e-learning platform that enables seamless knowledge sh
 - Interactive course creation with multimedia support
 - Real-time progress tracking and analytics
 - Comprehensive quiz and assessment system
-- Automated certificate generation upon completion
+
 
 ### **User Management**
 - Multi-role system (Admin, Tutor, Learner)
@@ -113,7 +113,7 @@ The application will be available at:
 - Browse and enroll in courses
 - Complete lessons and assessments
 - Track learning progress
-- Earn certificates
+
 
 ## Project Structure
 
@@ -164,6 +164,8 @@ npm run start               # Start production servers
 - Structured lessons and modules
 - Interactive quizzes and assessments
 - Progress tracking and analytics
+- **Quality Control**: Admin approval workflow for all courses
+- **Tutor Publishing**: Tutors can publish approved courses directly
 
 ### **User Experience**
 - Intuitive dashboard interfaces

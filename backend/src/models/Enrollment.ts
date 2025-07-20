@@ -264,7 +264,7 @@ export class EnrollmentModel extends BaseModel<Enrollment> {
           finalProgress: progress,
           completionType: 'automatic', // automatic vs manual
           canRetake: false, // Standard e-learning platform behavior
-          certificateEligible: progress >= 100,
+  
           completionMethod: 'progress_based' // progress_based vs exam_based
         };
         
@@ -278,12 +278,9 @@ export class EnrollmentModel extends BaseModel<Enrollment> {
           completedAt: updateData.completedAt
         });
 
-        // Certificate generation removed for academic project simplification
       }
 
       const updatedEnrollment = await this.update(enrollmentId, updateData);
-
-      // Certificate generation removed for academic project simplification
 
       return updatedEnrollment;
     } catch (error) {

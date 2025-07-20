@@ -94,11 +94,7 @@ const Landing: React.FC = () => {
       title: t('features.community.title'),
       description: t('features.community.description')
     },
-    {
-      icon: Award,
-      title: t('features.certificates.title'),
-      description: t('features.certificates.description')
-    },
+
     {
       icon: Zap,
       title: t('features.interactive.title'),
@@ -188,7 +184,7 @@ const Landing: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                     <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-                    <span>{t('landing.trust.certificates')}</span>
+    
                   </div>
                   <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                     <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />

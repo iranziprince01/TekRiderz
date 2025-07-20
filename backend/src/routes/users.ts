@@ -1090,62 +1090,7 @@ router.get('/recommendations', authenticate, async (req: Request, res: Response)
   }
 });
 
-// Get user certificates (enhanced version)
-router.get('/certificates', authenticate, async (req: Request, res: Response) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: 'Authentication required',
-      });
-    }
 
-    // Get completed enrollments
-    const completedEnrollments = await enrollmentModel.getUserCompletedCourses(req.user.id);
-
-    // Get certificate details for each completed course
-    const certificates = await Promise.all(
-      completedEnrollments.map(async (enrollment) => {
-        try {
-          const course = await courseModel.findById(enrollment.courseId);
-          return {
-            id: enrollment._id,
-            courseId: enrollment.courseId,
-            courseName: course?.title || 'Unknown Course',
-            courseDescription: course?.description || '',
-            completedAt: enrollment.completedAt,
-            certificate: enrollment.certificate,
-            instructor: course?.instructorName || 'Unknown Instructor',
-            category: course?.category || 'General',
-            level: course?.level || 'beginner',
-            duration: course?.totalDuration || 0,
-            rating: course?.rating?.average || 0,
-            thumbnailUrl: course?.thumbnail || '',
-          };
-        } catch (error) {
-          logger.error('Failed to get certificate details:', { enrollmentId: enrollment._id, error });
-          return null;
-        }
-      })
-    );
-
-    const validCertificates = certificates.filter(cert => cert !== null);
-
-    return res.json({
-      success: true,
-      data: { 
-        certificates: validCertificates,
-        totalCertificates: validCertificates.length,
-      },
-    });
-  } catch (error) {
-    logger.error('Failed to get user certificates:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to retrieve user certificates',
-    });
-  }
-});
 
 // Get leaderboard
 router.get('/leaderboard', authenticate, async (req: Request, res: Response) => {
@@ -1302,8 +1247,7 @@ router.get('/dashboard-stats', authenticate, async (req: Request, res: Response)
     recentActivity.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     const limitedActivity = recentActivity.slice(0, 5);
 
-    // Get certificates count
-    const certificatesCount = completedCourses; // Each completed course gets a certificate
+
 
     // Calculate weekly progress
     const weeklyProgress = {
@@ -1358,7 +1302,7 @@ router.get('/dashboard-stats', authenticate, async (req: Request, res: Response)
         completionRate,
         totalTimeSpent: Math.round(totalTimeSpent / 60), // in hours
         totalLessonsCompleted,
-        certificatesEarned: certificatesCount,
+
         currentStreak: streak.currentStreak,
         longestStreak: streak.longestStreak,
       },

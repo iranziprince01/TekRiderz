@@ -272,7 +272,7 @@ export class UserModel extends BaseModel<User> {
     }
   }
 
-  // Note: Achievement, certificate, and stats methods removed as these properties
+  
   // are not defined in the User type. These would be handled in separate models/services.
 
   // Update password

@@ -24,7 +24,6 @@ export interface CoursePermissions {
   canTakeQuizzes: boolean;
   canWatchVideos: boolean;
   canViewGrades: boolean;
-  canDownloadCertificate: boolean;
 }
 
 export const getCoursePermissions = (user: User | null, course: Course): CoursePermissions => {
@@ -43,7 +42,6 @@ export const getCoursePermissions = (user: User | null, course: Course): CourseP
       canTakeQuizzes: false,
       canWatchVideos: false,
       canViewGrades: false,
-      canDownloadCertificate: false,
     };
   }
 
@@ -68,7 +66,6 @@ export const getCoursePermissions = (user: User | null, course: Course): CourseP
       canTakeQuizzes: false, // Admins don't take quizzes
       canWatchVideos: canAccessCourse,
       canViewGrades: canAccessCourse,
-      canDownloadCertificate: false,
     };
   }
 
@@ -77,18 +74,17 @@ export const getCoursePermissions = (user: User | null, course: Course): CourseP
     if (isCourseOwner) {
       return {
         canView: true,
-        canEdit: ['draft', 'rejected'].includes(course.status),
+        canEdit: ['draft', 'rejected', 'approved', 'published'].includes(course.status), // ✅ Allow editing approved/published courses
         canDelete: course.status === 'draft',
-        canSubmitForReview: course.status === 'draft',
+        canSubmitForReview: ['draft', 'rejected'].includes(course.status),
         canApprove: false,
         canReject: false,
-        canPublish: false,
+        canPublish: false, // ✅ No longer needed - courses auto-publish after admin approval
         canViewAnalytics: ['submitted', 'approved', 'published'].includes(course.status),
-        canManageContent: ['draft', 'rejected'].includes(course.status),
+        canManageContent: ['draft', 'rejected', 'approved', 'published'].includes(course.status), // ✅ Allow content management
         canTakeQuizzes: true, // Course owners can always access their quizzes for testing/management
         canWatchVideos: true,
         canViewGrades: true,
-        canDownloadCertificate: false,
       };
     } else {
       // Tutor accessing other courses - same as learner
@@ -105,7 +101,6 @@ export const getCoursePermissions = (user: User | null, course: Course): CourseP
         canTakeQuizzes: course.status === 'published',
         canWatchVideos: course.status === 'published',
         canViewGrades: course.status === 'published',
-        canDownloadCertificate: course.status === 'published',
       };
     }
   }
@@ -125,7 +120,6 @@ export const getCoursePermissions = (user: User | null, course: Course): CourseP
       canTakeQuizzes: course.status === 'published',
       canWatchVideos: course.status === 'published',
       canViewGrades: course.status === 'published',
-      canDownloadCertificate: course.status === 'published',
     };
   }
 
@@ -143,7 +137,6 @@ export const getCoursePermissions = (user: User | null, course: Course): CourseP
     canTakeQuizzes: false,
     canWatchVideos: false,
     canViewGrades: false,
-    canDownloadCertificate: false,
   };
 };
 

@@ -1090,13 +1090,13 @@ const TutorCourses: React.FC = () => {
                   </div>
                 )}
 
-                {selectedCourse.status === 'approved' && (
+                {selectedCourse.status === 'published' && (
                   <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
                     <h4 className="font-semibold text-green-900 dark:text-green-300 mb-2">
                       {t('tutor.courses.courseApproved')}
                     </h4>
                     <p className="text-green-800 dark:text-green-200 text-sm">
-                      {t('tutor.courses.approvedMessage')}
+                      Your course has been approved and published! Students can now access it.
                     </p>
                   </div>
                 )}
@@ -1113,7 +1113,7 @@ const TutorCourses: React.FC = () => {
                   {t('tutor.courses.close')}
                 </Button>
                 
-                {selectedCourse.status === 'approved' && (
+                {selectedCourse.status === 'published' && (
                   <Button
                     onClick={() => {
                       setShowDetailsModal(false);
@@ -1154,6 +1154,8 @@ const TutorCourses: React.FC = () => {
                     {t('tutor.courses.submitForReview')}
                   </Button>
                 )}
+
+
               </div>
             </div>
           </div>

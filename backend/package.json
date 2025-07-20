@@ -10,6 +10,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:api": "node test-api-v1.js",
+    "test:firebase": "node scripts/test-firebase-config.js",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix"
   },
@@ -42,6 +43,7 @@
     "express": "^4.19.2",
     "express-rate-limit": "^7.3.1",
     "express-validator": "^7.0.1",
+    "firebase-admin": "^13.4.0",
     "form-data": "^4.0.4",
     "helmet": "^7.1.0",
     "joi": "^17.9.2",

@@ -33,25 +33,41 @@ const UPLOAD_PRESET_MAP = {
 const folderMap = {
   'course-thumbnail': 'tekriders/course-thumbnails',
   'profile-picture': 'tekriders/profile-pictures',
-  'user-avatar': 'tekriders/user-avatars',
-  'course-material': 'tekriders/course-materials',
+  'user-avatar': 'tekriders/profile-pictures',
+  'course-material': 'tekriders/course-thumbnails',
   'general': 'tekriders/general'
 };
 
 const router = Router();
 
-// Configure multer for memory storage
+// Configure multer for memory storage (images and PDFs)
 const upload = multer({ 
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
+    fileSize: 25 * 1024 * 1024, // 25MB limit for PDFs
+  },
+  fileFilter: (req: Request, file: Express.Multer.File, cb: FileFilterCallback) => {
+    // Check file type - allow both images and PDFs
+    if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image and PDF files are allowed'));
+    }
+  }
+});
+
+// Configure multer for PDF uploads
+const pdfUpload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 25 * 1024 * 1024, // 25MB limit for PDFs
   },
   fileFilter: (req: Request, file: Express.Multer.File, cb: FileFilterCallback) => {
     // Check file type
-    if (file.mimetype.startsWith('image/')) {
+    if (file.mimetype === 'application/pdf') {
       cb(null, true);
     } else {
-      cb(new Error('Only image files are allowed'));
+      cb(new Error('Only PDF files are allowed'));
     }
   }
 });
@@ -67,7 +83,15 @@ router.post('/cloudinary', authenticate, upload.single('file'), async (req: Requ
       return;
     }
 
-    const { type = 'course-thumbnail' } = req.body;
+    // Determine type based on file type if not provided
+    let { type } = req.body;
+    if (!type) {
+      if (req.file.mimetype === 'application/pdf') {
+        type = 'pdf-document';
+      } else {
+        type = 'course-thumbnail';
+      }
+    }
 
     // Check if Cloudinary is configured
     const cloudinaryUrl = process.env.CLOUDINARY_URL;
@@ -91,7 +115,16 @@ router.post('/cloudinary', authenticate, upload.single('file'), async (req: Requ
       return;
     }
 
-    // Upload to Cloudinary
+    // Debug logging for type and folder mapping
+    console.log('Cloudinary upload debug:', {
+      originalType: req.body.type,
+      determinedType: type,
+      fileMimeType: req.file.mimetype,
+      isPdf: req.file.mimetype === 'application/pdf',
+      expectedFolder: folderMap[type as keyof typeof folderMap]
+    });
+
+    // Upload to Cloudinary - use regular upload function for all files
     const result = await uploadToCloudinary(req.file, cloudinaryConfig, type);
 
     logger.info('File uploaded to Cloudinary successfully', {
@@ -122,6 +155,10 @@ router.post('/cloudinary', authenticate, upload.single('file'), async (req: Requ
     });
   }
 });
+
+
+
+
 
 // Local file upload fallback endpoint
 router.post('/local', authenticate, upload.single('file'), async (req: Request, res: Response) => {
@@ -218,9 +255,10 @@ interface CloudinaryResponse {
   secure_url: string;
   url: string;
   format: string;
-  width: number;
-  height: number;
+  width?: number;
+  height?: number;
   bytes: number;
+  access_mode?: string;
 }
 
 // Helper function to upload to Cloudinary
@@ -308,5 +346,166 @@ async function uploadToCloudinary(file: Express.Multer.File, config: any, type: 
 
   return await response.json() as CloudinaryResponse;
 }
+
+
+
+
+
+// Direct PDF download endpoint that bypasses permission issues
+router.get('/download-pdf', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { url, filename } = req.query;
+    
+    if (!url || typeof url !== 'string') {
+      res.status(400).json({ error: 'URL parameter is required' });
+      return;
+    }
+
+    console.log('Direct PDF download request:', { url, filename });
+
+    // Extract public_id from the URL for authenticated access
+    const urlParts = url.split('/');
+    const publicIdIndex = urlParts.findIndex(part => part === 'upload') + 1;
+    const publicId = urlParts.slice(publicIdIndex).join('/').replace(/\.[^/.]+$/, ''); // Remove file extension
+
+    console.log('Extracted public_id for download:', publicId);
+
+    // Use Cloudinary Admin API to get the file with authentication
+    const timestamp = Math.round(Date.now() / 1000);
+    const signatureParams = {
+      public_id: publicId,
+      resource_type: 'raw',
+      timestamp: timestamp
+    };
+
+    const sortedParams = Object.keys(signatureParams)
+      .sort()
+      .map(key => `${key}=${signatureParams[key as keyof typeof signatureParams]}`)
+      .join('&');
+
+    const stringToSign = `${sortedParams}${process.env.CLOUDINARY_API_SECRET}`;
+    const signature = crypto.createHash('sha1').update(stringToSign).digest('hex');
+
+    // Construct authenticated download URL
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+    const apiKey = process.env.CLOUDINARY_API_KEY;
+    const downloadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/raw/download?public_id=${encodeURIComponent(publicId)}&timestamp=${timestamp}&api_key=${apiKey}&signature=${signature}`;
+
+    console.log('Authenticated download URL:', downloadUrl);
+
+    // Fetch the PDF using authenticated URL
+    const response = await fetch(downloadUrl);
+    
+    if (!response.ok) {
+      console.error('Authenticated PDF download failed:', response.status, response.statusText);
+      
+      // Fallback: try to fix permissions and then download
+      console.log('Attempting to fix permissions and retry download...');
+      try {
+        // First fix permissions
+        const fixResponse = await fetch(`${req.protocol}://${req.get('host')}/api/v1/upload/fix-pdf-permissions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': req.headers.authorization || ''
+          },
+          body: JSON.stringify({ pdfUrl: url })
+        });
+
+        if (fixResponse.ok) {
+          console.log('Permissions fixed, retrying download...');
+          // Retry the original URL after fixing permissions
+          const retryResponse = await fetch(url);
+          if (retryResponse.ok) {
+            const pdfBuffer = await retryResponse.arrayBuffer();
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="${filename || 'lecture-notes.pdf'}"`);
+            res.setHeader('Content-Length', pdfBuffer.byteLength);
+            res.setHeader('Cache-Control', 'no-cache');
+            res.send(Buffer.from(pdfBuffer));
+            console.log('PDF download successful after permission fix');
+            return;
+          }
+        }
+      } catch (fixError) {
+        console.error('Permission fix failed:', fixError);
+      }
+
+      res.status(response.status).json({ 
+        error: `Failed to download PDF: ${response.status} ${response.statusText}` 
+      });
+      return;
+    }
+
+    // Get the PDF content
+    const pdfBuffer = await response.arrayBuffer();
+    
+    // Set appropriate headers for PDF download
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename || 'lecture-notes.pdf'}"`);
+    res.setHeader('Content-Length', pdfBuffer.byteLength);
+    res.setHeader('Cache-Control', 'no-cache');
+    
+    // Send the PDF
+    res.send(Buffer.from(pdfBuffer));
+    
+    console.log('Direct PDF download successful:', { url, filename, size: pdfBuffer.byteLength });
+    
+  } catch (error) {
+    console.error('Direct PDF download error:', error);
+    res.status(500).json({ 
+      error: 'Failed to download PDF',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Proxy download endpoint for PDFs that can't be accessed directly (fallback)
+router.get('/proxy-download', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { url, filename } = req.query;
+    
+    if (!url || typeof url !== 'string') {
+      res.status(400).json({ error: 'URL parameter is required' });
+      return;
+    }
+
+    console.log('Proxy download request:', { url, filename });
+
+    // Fetch the PDF from Cloudinary
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      console.error('Proxy download failed:', response.status, response.statusText);
+      res.status(response.status).json({ 
+        error: `Failed to fetch PDF: ${response.status} ${response.statusText}` 
+      });
+      return;
+    }
+
+    // Get the PDF content
+    const pdfBuffer = await response.arrayBuffer();
+    
+    // Set appropriate headers for PDF download
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename || 'lecture-notes.pdf'}"`);
+    res.setHeader('Content-Length', pdfBuffer.byteLength);
+    res.setHeader('Cache-Control', 'no-cache');
+    
+    // Send the PDF
+    res.send(Buffer.from(pdfBuffer));
+    
+    console.log('Proxy download successful:', { url, filename, size: pdfBuffer.byteLength });
+    
+  } catch (error) {
+    console.error('Proxy download error:', error);
+    res.status(500).json({ 
+      error: 'Failed to download PDF',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+
 
 export default router; 

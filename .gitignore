@@ -99,14 +99,11 @@ backend/uploads/lessons/materials/
 backend/uploads/lessons/videos/
 backend/uploads/documents/
 backend/uploads/images/
-backend/uploads/certificates/
+
 backend/uploads/temp/
 backend/uploads/archive/
 
-# Certificate files (HIGHLY SENSITIVE - contains personal information)
-*.pdf
-certificate_*
-certificates/
+
 cert_*
 diploma_*
 

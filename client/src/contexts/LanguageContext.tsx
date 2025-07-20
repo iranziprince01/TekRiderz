@@ -52,7 +52,7 @@ const translations = {
     
     // Landing Page - Trust Indicators
     'landing.trust.freeCourses': 'Free courses available',
-    'landing.trust.certificates': 'Industry certificates',
+
     'landing.trust.instructors': 'Expert instructors',
     
     // Landing Page - Sample Courses
@@ -89,8 +89,7 @@ const translations = {
     'features.interactive.description': 'Work on real projects that solve problems in your community while building valuable skills.',
     'features.community.title': 'Ubuntu Learning',
     'features.community.description': 'Connect with fellow young learners across Rwanda and East Africa in our supportive community.',
-    'features.certificates.title': 'Certificates',
-    'features.certificates.description': 'Earn recognized certificates to showcase your achievements and advance your career prospects.',
+
     'features.secure.title': 'Secure & Reliable',
     'features.secure.description': 'Your data and progress are protected with secure authentication and reliable infrastructure.',
     'features.global.title': 'Global Access',
@@ -166,7 +165,7 @@ const translations = {
     'dashboard.subtitle': 'Ready to continue building your future? Let\'s pick up where you left off.',
     'dashboard.coursesEnrolled': 'Courses Enrolled',
     'dashboard.hoursLearned': 'Hours Learned',
-    'dashboard.certificates': 'Certificates',
+
     'dashboard.streakDays': 'Streak Days',
     'dashboard.continueLearning': 'Continue Learning',
     'dashboard.quickActions': 'Quick Actions',
@@ -422,6 +421,8 @@ const translations = {
     'courseCreation.moduleDescPlaceholder': 'Describe this module',
     'courseCreation.estimatedDuration': 'Estimated Duration (minutes)',
     'courseCreation.youtubeVideo': 'YouTube Video',
+    'courseCreation.lectureNotes': 'Lecture Notes (PDF)',
+    'courseCreation.lectureNotesDesc': 'Upload PDF lecture notes for students to download',
     'courseCreation.moduleQuiz': 'Module Quiz',
     'courseCreation.quizDesc': 'Create a quiz to assess learning from this module',
     'courseCreation.finalAssessment': 'Final Assessment',
@@ -572,7 +573,7 @@ const translations = {
     
     // Landing Page - Trust Indicators
     'landing.trust.freeCourses': 'Amasomo y\'ubuntu aboneka',
-    'landing.trust.certificates': 'Impamyabumenyi z\'ubucuruzi',
+
     'landing.trust.instructors': 'Abarimu b\'ubuhanga',
     
     // Landing Page - Sample Courses
@@ -609,8 +610,7 @@ const translations = {
     'features.interactive.description': 'Kora ku mishinga ifatika n\'ibirimo bifatika byakozwe ku buryo bwo kwiga bw\'iki gihe.',
     'features.community.title': 'Kwiga Ubuntu',
     'features.community.description': 'Huza n\'urubyiruko rundi rwiga mu Rwanda no mu Burasirazuba bw\'Afurika mu muryango wacu ushyigikira.',
-    'features.certificates.title': 'Impamyabumenyi',
-    'features.certificates.description': 'Bona impamyabumenyi zemejwe kugira ngo werekane ibyagezweho kandi ugufashe iterambere ry\'akazi.',
+
     'features.secure.title': 'Umutekano & Kwizera',
     'features.secure.description': 'Amakuru yawe n\'iterambere byarindiriwe n\'ubwishingizi bw\'umutekano n\'uburyo bwizewe.',
     'features.global.title': 'Kwinjira ku Isi Yose',
@@ -686,7 +686,7 @@ const translations = {
     'dashboard.subtitle': 'Witeguye gukomeza kubaka ejo hazaza hawe? Reka dukomeze aho twari.',
     'dashboard.coursesEnrolled': 'Amasomo Wanditsemo',
     'dashboard.hoursLearned': 'Amasaha Wize',
-    'dashboard.certificates': 'Impamyabumenyi',
+
     'dashboard.streakDays': 'Iminsi Ikurikirana',
     'dashboard.continueLearning': 'Komeza Kwiga',
     'dashboard.quickActions': 'Ibikorwa Byihuse',
@@ -942,6 +942,8 @@ const translations = {
     'courseCreation.moduleDescPlaceholder': 'Sobanura iki gice',
     'courseCreation.estimatedDuration': 'Igihe Giteganijwe (mu minota)',
     'courseCreation.youtubeVideo': 'Amashusho ya YouTube',
+    'courseCreation.lectureNotes': 'Inyandiko z\'Isomo (PDF)',
+    'courseCreation.lectureNotesDesc': 'Shyiramo inyandiko z\'isomo za PDF kugira ngo abanyeshuri bazifashe',
     'courseCreation.moduleQuiz': 'Ikizamini cy\'Igice',
     'courseCreation.quizDesc': 'Kora ikizamini gisuzuma ibyigishijwe muri iki gice',
     'courseCreation.finalAssessment': 'Ikizamini cya Nyuma',

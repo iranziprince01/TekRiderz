@@ -1055,7 +1055,9 @@ router.put('/courses/:courseId/status', async (req: Request, res: Response): Pro
     // Set status-specific timestamps
     if (status === 'approved') {
       updateData.approvedAt = new Date().toISOString();
-      updateData.publishedAt = new Date().toISOString(); // Auto-publish approved courses
+      updateData.publishedAt = new Date().toISOString(); // Auto-publish after approval
+      updateData.status = 'published'; // Set status to published
+      // Note: Courses are auto-published when approved by admin
     } else if (status === 'rejected') {
       updateData.rejectedAt = new Date().toISOString();
       updateData.rejectionReason = reason || 'No reason provided';
@@ -1300,19 +1302,26 @@ router.put('/courses/:courseId/status', async (req: Request, res: Response): Pro
       return;
     }
 
-    // Auto-publish when admin approves
+    // Admin approves courses and auto-publishes them
     const finalStatus = status === 'approved' ? 'published' : status;
     
-    await courseModel.update(courseId, { 
+    const updateData: any = { 
       status: finalStatus,
       rejectionReason: status === 'rejected' ? reason : undefined,
-    });
+    };
+    
+    // Auto-publish when approved
+    if (status === 'approved') {
+      updateData.publishedAt = new Date().toISOString();
+    }
+    
+    await courseModel.update(courseId, updateData);
 
     // Send email notification to instructor
     try {
       const instructor = await userModel.findById(course.instructorId);
       if (instructor) {
-        if (finalStatus === 'published') {
+        if (finalStatus === 'approved') {
           await emailService.sendCourseApprovalEmail(instructor.email, course.title, true);
         } else if (status === 'rejected') {
           await emailService.sendCourseApprovalEmail(instructor.email, course.title, false, reason);
@@ -2110,7 +2119,7 @@ router.post('/courses', async (req: Request, res: Response) => {
         hasVideo: false,
         hasQuizzes: false,
         hasAssignments: false,
-        hasCertificate: false,
+
         hasPrerequisites: (prerequisites && prerequisites.length > 0),
         isAccessible: false
       },
@@ -2129,7 +2138,7 @@ router.post('/courses', async (req: Request, res: Response) => {
         performance: {
           avgQuizScore: 0,
           assignmentSubmissionRate: 0,
-          certificateEarnedRate: 0
+  
         }
       },
       

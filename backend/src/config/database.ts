@@ -46,7 +46,7 @@ export const connectToDatabases = async (): Promise<void> => {
     
     // Required databases for basic e-learning platform
     const requiredDatabases = [
-      'users', 'courses', 'enrollments', 'certificates', 
+      'users', 'courses', 'enrollments', 
       'analytics', 'assessments', 'grades', 'otp', 'files'
     ];
 
@@ -97,7 +97,7 @@ export const connectToDatabases = async (): Promise<void> => {
 const createDatabaseIndexes = async (): Promise<void> => {
   try {
     await createUserIndexes();
-    // Certificate indexes removed
+
     await createOTPIndexes();
     
     logger.info('Database indexes created successfully');
@@ -113,7 +113,7 @@ const createDesignDocuments = async (): Promise<void> => {
     await createCourseDesignDocuments();
     await createUserDesignDocuments();
     await createEnrollmentDesignDocuments();
-    // Certificate design documents removed
+
     await createAnalyticsDesignDocuments();
     await createAssessmentDesignDocuments();
     await createGradeDesignDocuments();
@@ -275,7 +275,7 @@ const createEnrollmentDesignDocuments = async (): Promise<void> => {
   }
 };
 
-// Certificate design documents removed
+
 
 // Create analytics design documents
 const createAnalyticsDesignDocuments = async (): Promise<void> => {
@@ -436,7 +436,7 @@ const createUserIndexes = async (): Promise<void> => {
   }
 };
 
-// Certificate indexes removed
+
 
 // Create OTP-specific indexes
 const createOTPIndexes = async (): Promise<void> => {

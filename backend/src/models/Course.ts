@@ -137,7 +137,6 @@ export class CourseModel extends BaseModel<Course> {
           hasVideo: false,
           hasQuizzes: false,
           hasAssignments: false,
-          hasCertificate: false,
           hasPrerequisites: false,
           isAccessible: false
         },
@@ -155,8 +154,7 @@ export class CourseModel extends BaseModel<Course> {
           },
           performance: {
             avgQuizScore: 0,
-            assignmentSubmissionRate: 0,
-            certificateEarnedRate: 0
+            assignmentSubmissionRate: 0
           }
         },
         
@@ -222,7 +220,6 @@ export class CourseModel extends BaseModel<Course> {
       hasVideo: false,
       hasQuizzes: false,
       hasAssignments: false,
-      hasCertificate: false,
       hasPrerequisites: false,
       isAccessible: false
     };
@@ -256,10 +253,7 @@ export class CourseModel extends BaseModel<Course> {
       flags.hasPrerequisites = true;
     }
 
-    // Assume certificate is available for published courses
-    if (course.status === 'published') {
-      flags.hasCertificate = true;
-    }
+
 
     course.contentFlags = flags;
   }
@@ -1258,8 +1252,7 @@ export class CourseModel extends BaseModel<Course> {
         },
         performance: {
           avgQuizScore: 0,
-          assignmentSubmissionRate: 0,
-          certificateEarnedRate: 0
+          assignmentSubmissionRate: 0
         }
       };
 
@@ -1276,7 +1269,7 @@ export class CourseModel extends BaseModel<Course> {
       const performanceMetrics = {
         averageQuizScore: metrics.performance?.avgQuizScore || 0,
         passRate: completionRate,
-        certificatesIssued: Math.round(completionCount * (metrics.performance?.certificateEarnedRate || 0.8)),
+        certificatesIssued: 0,
       };
 
       return {

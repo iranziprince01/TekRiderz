@@ -14,6 +14,35 @@ router.get('/', optionalAuth, normalizeCourseResponse, courseController.getAllCo
 // Get single course by ID
 router.get('/:id', optionalAuth, courseController.getCourseById);
 
+// Debug endpoint to check course existence
+router.get('/:id/exists', optionalAuth, async (req: any, res: any) => {
+  try {
+    const { id: courseId } = req.params;
+    const { courseModel } = await import('../models/Course');
+    
+    console.log('Checking if course exists:', courseId);
+    const course = await courseModel.findById(courseId);
+    
+    res.json({
+      success: true,
+      exists: !!course,
+      courseId,
+      course: course ? {
+        _id: course._id,
+        id: course.id,
+        title: course.title,
+        type: course.type
+      } : null
+    });
+  } catch (error) {
+    console.error('Error checking course existence:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to check course existence'
+    });
+  }
+});
+
 // Create new course (tutors only)
 router.post('/', 
   authenticate, 
@@ -23,8 +52,20 @@ router.post('/',
   courseController.createCourse
 );
 
+// Update course (tutors only)
+router.put('/:id', 
+  authenticate, 
+  authorize('tutor', 'admin'), 
+  handleCourseFormData, 
+  normalizeCourseResponse,
+  courseController.updateCourse
+);
+
 // Submit course for approval
 router.post('/:id/submit', authenticate, authorize('tutor'), courseController.submitCourseForApproval);
+
+// Publish approved course (tutors only)
+router.post('/:id/publish', authenticate, authorize('tutor'), courseController.publishApprovedCourse);
 
 // Get instructor courses
 router.get('/instructor/my-courses', 

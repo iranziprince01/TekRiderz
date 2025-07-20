@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -7,8 +7,10 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import CloudinaryImageUpload from '../../components/course/CloudinaryImageUpload';
+import { FirebasePdfUpload } from '../../components/course/FirebasePdfUpload';
 import YouTubeVideoInput from '../../components/course/YouTubeVideoInput';
 import JsonQuizCreator from '../../components/course/JsonQuizCreator';
+import { QuizQuestion } from '../../types/quiz';
 import { 
   Plus, 
   Trash2, 
@@ -25,14 +27,15 @@ import {
   Award,
   Eye,
   Clock,
-  Target
+  Target,
+  CheckCircle
 } from 'lucide-react';
 
 interface ModuleQuiz {
   id: string;
   title: string;
   description: string;
-  questions: any[];
+  questions: QuizQuestion[];
   settings: {
     maxAttempts: number;
     passingScore: number;
@@ -49,6 +52,7 @@ interface CourseModule {
     videoProvider: 'youtube';
     videoUrl: string;
     videoId?: string;
+    pdfUrl?: string; // PDF lecture notes URL
   };
   quiz: ModuleQuiz;
   estimatedDuration: number;
@@ -58,7 +62,7 @@ interface FinalAssessment {
   id: string;
   title: string;
   description: string;
-  questions: any[];
+  questions: QuizQuestion[];
   settings: {
     maxAttempts: number;
     passingScore: number;
@@ -146,10 +150,14 @@ export const CourseCreation: React.FC = () => {
   });
 
   // Helper function to safely convert errors to strings
-  const safeErrorMessage = (error: any): string => {
+  const safeErrorMessage = (error: unknown): string => {
     if (typeof error === 'string') return error;
-    if (error?.message) return error.message;
-    if (error?.toString) return error.toString();
+    if (error && typeof error === 'object' && 'message' in error) {
+      return String(error.message);
+    }
+    if (error && typeof error === 'object' && 'toString' in error && typeof error.toString === 'function') {
+      return error.toString();
+    }
     return 'An unexpected error occurred';
   };
 
@@ -166,6 +174,9 @@ export const CourseCreation: React.FC = () => {
     learningObjectives: [],
     targetAudience: ''
   });
+
+  // Track course status for editing
+  const [courseStatus, setCourseStatus] = useState<string>('draft');
 
 
 
@@ -201,7 +212,7 @@ export const CourseCreation: React.FC = () => {
     }
   }, [isEditing, loading, error, courseData.title]);
 
-  const loadCourseData = async () => {
+  const loadCourseData = useCallback(async () => {
     setLoading(true);
     setError('');
     
@@ -222,16 +233,16 @@ export const CourseCreation: React.FC = () => {
         console.log('Processing course data:', course);
         
         // Convert existing course structure to course creation format
-        const modules = course.sections?.flatMap((section: any) => 
-            section.lessons?.filter((lesson: any) => lesson.type === 'video').map((lesson: any, index: number) => ({
+        const modules = course.sections?.flatMap((section: Record<string, unknown>) => 
+            (section.lessons as Array<Record<string, unknown>>)?.filter((lesson: Record<string, unknown>) => lesson.type === 'video').map((lesson: Record<string, unknown>, index: number) => ({
             id: lesson.id || `lesson_${index}`,
             title: lesson.title || 'Untitled Lesson',
               description: lesson.description || '',
               order: index,
             content: {
-              videoProvider: lesson.content?.videoProvider || 'youtube',
-              videoUrl: lesson.content?.videoUrl || '',
-              videoId: lesson.content?.videoId || ''
+              videoProvider: (lesson.content as Record<string, unknown>)?.videoProvider as string || 'youtube',
+              videoUrl: (lesson.content as Record<string, unknown>)?.videoUrl as string || '',
+              videoId: (lesson.content as Record<string, unknown>)?.videoId as string || ''
             },
               quiz: lesson.quiz || {
               id: `quiz_${lesson.id || index}`,
@@ -264,18 +275,21 @@ export const CourseCreation: React.FC = () => {
           targetAudience: course.targetAudience || '',
           finalAssessment: course.finalAssessment
         });
+
+        // Set course status
+        setCourseStatus(course.status || 'draft');
         
         console.log('Course data set successfully for editing');
       } else {
         throw new Error(response.error || 'Failed to load course data');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error loading course data:', error);
       setError(`Failed to load course data: ${safeErrorMessage(error)}`);
     } finally {
       setLoading(false);
     }
-  };
+  }, [courseId, safeErrorMessage]);
 
   // Validation functions
   const validateStep1 = () => {
@@ -298,7 +312,7 @@ export const CourseCreation: React.FC = () => {
     return !courseData.finalAssessment || 
            (courseData.finalAssessment.title.trim() !== '' && 
             courseData.finalAssessment.description.trim() !== '' &&
-            courseData.finalAssessment.questions.length >= 5);
+            courseData.finalAssessment.questions.length >= 1); // Changed from 5 to 1
   };
 
   const canProceed = () => {
@@ -319,7 +333,8 @@ export const CourseCreation: React.FC = () => {
       order: courseData.modules.length,
       content: {
         videoProvider: 'youtube',
-        videoUrl: ''
+        videoUrl: '',
+        pdfUrl: '' // Initialize PDF URL
       },
       quiz: {
         id: `quiz_${Date.now()}`,
@@ -411,7 +426,6 @@ export const CourseCreation: React.FC = () => {
 
       if (response.success) {
         console.log('Course draft saved successfully:', response);
-        const savedCourseId = response.data?.course?._id || response.data?.course?.id || response.data?._id || response.data?.id || courseId;
         
         // Navigate to courses list with success message for better reliability
         navigate('/dashboard/courses', {
@@ -424,9 +438,9 @@ export const CourseCreation: React.FC = () => {
         console.error('Failed to save course draft:', response.error);
         setError(response.error || 'Failed to save course');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Course draft save error:', error);
-      setError(error.message || 'An error occurred while saving');
+      setError(safeErrorMessage(error));
     } finally {
       setSaving(false);
     }
@@ -444,7 +458,7 @@ export const CourseCreation: React.FC = () => {
       let validationResult;
       try {
         validationResult = validateCourseSubmission(courseData);
-      } catch (validationError: any) {
+      } catch (validationError: unknown) {
         console.error('Validation function error:', validationError);
         setError(`Validation error: ${safeErrorMessage(validationError)}`);
         return;
@@ -464,8 +478,8 @@ export const CourseCreation: React.FC = () => {
       // Create properly structured course payload as draft first
       let coursePayload;
       try {
-        coursePayload = createCoursePayload(courseData, user, 'draft');
-      } catch (payloadError: any) {
+        coursePayload = createCoursePayload(courseData, user, 'submitted');
+      } catch (payloadError: unknown) {
         console.error('Payload creation error:', payloadError);
         setError(`Payload error: ${safeErrorMessage(payloadError)}`);
         return;
@@ -510,7 +524,7 @@ export const CourseCreation: React.FC = () => {
       let submitResponse;
       try {
         submitResponse = await apiClient.submitCourse(newCourseId);
-      } catch (submitError: any) {
+      } catch (submitError: unknown) {
         console.error('Failed to call submit API:', submitError);
         setError(`Failed to submit course: ${safeErrorMessage(submitError)}`);
         return;
@@ -533,10 +547,10 @@ export const CourseCreation: React.FC = () => {
         console.error('Failed to submit course for approval:', submitResponse.error);
         setError(safeErrorMessage(submitResponse.error) || 'Course was created but failed to submit for approval. Please try submitting from your courses page.');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Course submission error:', error);
       // Provide more detailed error information
-      if (error.stack) {
+      if (error && typeof error === 'object' && 'stack' in error) {
         console.error('Error stack:', error.stack);
       }
       setError(`Submission failed: ${safeErrorMessage(error)}`);
@@ -544,6 +558,89 @@ export const CourseCreation: React.FC = () => {
       setSaving(false);
     }
   };
+
+  // Function to publish approved courses directly
+  const publishCourse = async () => {
+    setSaving(true);
+    setError('');
+    
+    try {
+      if (!courseId) {
+        setError('Course ID is required for publishing');
+        return;
+      }
+
+      // Import validation utilities
+      const { validateCourseSubmission, createCoursePayload, formatValidationErrors } = await import('../../utils/courseValidation');
+      
+      // Validate course data for publishing
+      let validationResult;
+      try {
+        validationResult = validateCourseSubmission(courseData);
+      } catch (validationError: unknown) {
+        console.error('Validation function error:', validationError);
+        setError(`Validation error: ${safeErrorMessage(validationError)}`);
+        return;
+      }
+      
+      if (!validationResult.isValid) {
+        const formattedErrors = formatValidationErrors(validationResult);
+        setError(formattedErrors || 'Validation failed');
+        return;
+      }
+
+      // Show warnings to user but allow publishing
+      if (validationResult.warnings.length > 0) {
+        console.warn('Course publishing warnings:', validationResult.warnings);
+      }
+
+      // Create properly structured course payload
+      let coursePayload;
+      try {
+        coursePayload = createCoursePayload(courseData, user, 'submitted');
+      } catch (payloadError: unknown) {
+        console.error('Payload creation error:', payloadError);
+        setError(`Payload error: ${safeErrorMessage(payloadError)}`);
+        return;
+      }
+
+      console.log('Publishing approved course:', courseId);
+
+      // Update course with published status
+      const response = await apiClient.updateCourse(courseId, {
+        ...coursePayload,
+        status: 'published',
+        publishedAt: new Date().toISOString()
+      });
+
+      if (response.success) {
+        console.log('Course published successfully:', response);
+        
+        // Show success message and navigate to courses list
+        const successMessage = t('courseCreation.coursePublished') || 'Course updated and published successfully!';
+        
+        navigate('/dashboard/courses', { 
+          state: { 
+            message: successMessage,
+            type: 'success'
+          }
+        });
+      } else {
+        console.error('Failed to publish course:', response.error);
+        setError(safeErrorMessage(response.error) || 'Failed to publish course');
+      }
+    } catch (error: unknown) {
+      console.error('Course publishing error:', error);
+      if (error && typeof error === 'object' && 'stack' in error) {
+        console.error('Error stack:', error.stack);
+      }
+      setError(`Publishing failed: ${safeErrorMessage(error)}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+
 
   if (loading) {
     return (
@@ -677,7 +774,7 @@ export const CourseCreation: React.FC = () => {
                 <div className="relative">
                   <select
                     value={courseData.level}
-                    onChange={(e) => setCourseData(prev => ({ ...prev, level: e.target.value as any }))}
+                    onChange={(e) => setCourseData(prev => ({ ...prev, level: e.target.value as 'beginner' | 'intermediate' | 'advanced' }))}
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-gray-50 focus:bg-white appearance-none"
                   >
                     <option value="beginner">
@@ -867,21 +964,42 @@ export const CourseCreation: React.FC = () => {
                       <Video className="inline h-4 w-4 mr-2" />
                       {language === 'rw' ? 'Amashusho ya YouTube' : 'YouTube Video'} *
                     </label>
-                                         <div className="bg-gray-50 rounded-xl p-4">
-                       <YouTubeVideoInput
-                         onVideoAdded={(videoData) => updateModule(module.id, {
-                           content: {
-                             videoProvider: 'youtube',
-                             videoUrl: videoData.videoUrl,
-                             videoId: videoData.videoId
-                           }
-                         })}
-                         currentVideoUrl={module.content.videoUrl}
-                       />
+                    <div className="bg-gray-50 rounded-xl p-4">
+                      <YouTubeVideoInput
+                        onVideoAdded={(videoData) => updateModule(module.id, {
+                          content: {
+                            ...module.content,
+                            videoProvider: 'youtube',
+                            videoUrl: videoData.videoUrl,
+                            videoId: videoData.videoId
+                          }
+                        })}
+                        currentVideoUrl={module.content.videoUrl}
+                      />
                     </div>
                   </div>
-                     </div>
+
+                  {/* PDF Lecture Notes Section */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-800 mb-3">
+                      <FileText className="inline h-4 w-4 mr-2" />
+                      {language === 'rw' ? 'Inyandiko z\'Isomo (PDF)' : 'Lecture Notes (PDF)'}
+                    </label>
+                    <div className="bg-gray-50 rounded-xl p-4">
+                      <FirebasePdfUpload
+                        onPdfUploaded={(pdfUrl, filePath) => updateModule(module.id, {
+                          content: {
+                            ...module.content,
+                            pdfUrl: pdfUrl
+                          }
+                        })}
+                        currentPdfUrl={module.content.pdfUrl}
+                        courseId={courseId}
+                      />
+                    </div>
                   </div>
+                </div>
+              </div>
 
               {/* Quiz Section - Full Width */}
               <div className="mt-8 pt-8 border-t border-gray-200">
@@ -1311,26 +1429,54 @@ export const CourseCreation: React.FC = () => {
                     (language === 'rw' ? 'Bika Nk\'Urutonde' : 'Save as Draft')}
                 </Button>
 
-                <Button
-                  onClick={submitForApproval}
-                  disabled={saving || !validateStep1() || !validateStep2() || !validateStep3()}
-                  className="w-full bg-green-600 hover:bg-green-700"
-                >
-                  <Send className="h-4 w-4 mr-2" />
-                  {saving ? (language === 'rw' ? 'Urohereza...' : 'Submitting...') : 
-                    (language === 'rw' ? 'Ohereza Umuyobozi Gusuzuma' : 'Submit to Admin for Approval')}
-                </Button>
+                {/* Show different buttons based on course status */}
+                {courseStatus === 'published' ? (
+                  // Publish button for approved/published courses
+                  <Button
+                    onClick={publishCourse}
+                    disabled={saving || !validateStep1() || !validateStep2() || !validateStep3()}
+                    className="w-full bg-blue-600 hover:bg-blue-700"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    {saving ? (language === 'rw' ? 'Urabika...' : 'Publishing...') : 
+                      (language === 'rw' ? 'Bika Nk\'Urutonde' : 'Publish Course')}
+                  </Button>
+                ) : (
+                  // Submit for approval button for other statuses
+                  <Button
+                    onClick={submitForApproval}
+                    disabled={saving || !validateStep1() || !validateStep2() || !validateStep3()}
+                    className="w-full bg-green-600 hover:bg-green-700"
+                  >
+                    <Send className="h-4 w-4 mr-2" />
+                    {saving ? (language === 'rw' ? 'Urohereza...' : 'Submitting...') : 
+                      (language === 'rw' ? 'Ohereza Umuyobozi Gusuzuma' : 'Submit to Admin for Approval')}
+                  </Button>
+                )}
               </div>
 
-              <div className="bg-blue-50 rounded-lg p-4">
-                <p className="text-sm text-blue-800">
-                  <strong>{language === 'rw' ? 'Icyitonderwa:' : 'Note:'}</strong>
-                  {language === 'rw' 
-                    ? ' Nyuma yo kohereza, isomo ryawe rizagaragara mu masomo yawe rikaba \'Bitegereje\' kugeza umuyobozi aryemeje.'
-                    : ' After submission, your course will appear in your courses page with \'Pending\' status until admin approves it.'
-                  }
-                </p>
-              </div>
+              {/* Status-specific notes */}
+              {courseStatus === 'published' ? (
+                <div className="bg-green-50 rounded-lg p-4">
+                  <p className="text-sm text-green-800">
+                    <strong>{language === 'rw' ? 'Icyitonderwa:' : 'Note:'}</strong>
+                    {language === 'rw' 
+                      ? ' Isomo ryawe ryemejwe! Ushobora kuryo hindura kandi ubike ibintu bishya.'
+                      : ' Your course is approved! You can edit it and publish the changes directly.'
+                    }
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <p className="text-sm text-blue-800">
+                    <strong>{language === 'rw' ? 'Icyitonderwa:' : 'Note:'}</strong>
+                    {language === 'rw' 
+                      ? ' Nyuma yo kohereza, isomo ryawe rizagaragara mu masomo yawe rikaba \'Bitegereje\' kugeza umuyobozi aryemeje kandi aryo tangaze.'
+                      : ' After submission, your course will appear in your courses page with \'Pending\' status until admin approves and publishes it.'
+                    }
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>

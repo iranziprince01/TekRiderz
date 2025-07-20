@@ -49,7 +49,7 @@ interface CourseDraft extends BaseDocument {
       hasVideo: boolean;
       hasQuizzes: boolean;
       hasAssignments: boolean;
-      hasCertificate: boolean;
+  
       hasPrerequisites: boolean;
       isAccessible: boolean;
     };
@@ -180,7 +180,6 @@ export class CourseDraftModel extends BaseModel<CourseDraft> {
             hasVideo: false,
             hasQuizzes: false,
             hasAssignments: false,
-            hasCertificate: false,
             hasPrerequisites: false,
             isAccessible: false
           },
@@ -598,7 +597,6 @@ export class CourseDraftModel extends BaseModel<CourseDraft> {
           hasVideo: false,
           hasQuizzes: false,
           hasAssignments: false,
-          hasCertificate: false,
           hasPrerequisites: false,
           isAccessible: true
         },
@@ -616,8 +614,7 @@ export class CourseDraftModel extends BaseModel<CourseDraft> {
           },
           performance: {
             avgQuizScore: 0,
-            assignmentSubmissionRate: 0,
-            certificateEarnedRate: 0
+            assignmentSubmissionRate: 0
           }
         },
         rating: {

@@ -165,7 +165,7 @@ const CourseCanvasLayout: React.FC<CourseCanvasLayoutProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                   <Award className="w-4 h-4" />
-                  <span>Certificate</span>
+          
                 </div>
               </div>
             )}

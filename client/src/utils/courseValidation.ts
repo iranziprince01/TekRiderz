@@ -23,6 +23,7 @@ export interface CourseModule {
   content: {
     videoProvider: string;
     videoUrl: string;
+    pdfUrl?: string; // PDF lecture notes URL
   };
   quiz?: any;
   estimatedDuration: number;
@@ -358,6 +359,8 @@ export function createCoursePayload(courseData: CourseData, user: any, status: '
         content: {
           videoProvider: module.content?.videoProvider || 'youtube',
           videoUrl: module.content?.videoUrl || '',
+          documentUrl: module.content?.pdfUrl || '', // Map PDF URL to documentUrl for backend
+          documentType: module.content?.pdfUrl ? 'pdf' : undefined, // Set document type
           duration: module.estimatedDuration || 0
         },
         quiz: module.quiz ? {

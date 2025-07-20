@@ -91,64 +91,7 @@ export class CourseWorkflowService {
         throw new Error(`Course validation failed: ${validationResult.errors.map(e => e.message).join(', ')}`);
       }
 
-      // DEV ENVIRONMENT: Auto-approve and publish for faster testing
-      if (config.server.isDevelopment) {
-        logger.info('Development mode: Auto-approving and publishing course', {
-          courseId,
-          title: course.title,
-          submittedBy: submittedBy.id
-        });
-
-        // Create mock approval feedback for development
-        const devApprovalFeedback: CourseApprovalFeedback = {
-          id: 'dev-auto-approval',
-          reviewerId: 'system',
-          reviewerName: 'Auto-Approval System',
-          status: 'approved',
-          overallScore: 90,
-          criteria: {
-            contentQuality: 90,
-            technicalQuality: 90,
-            marketability: 90,
-            accessibility: 90,
-            engagement: 90
-          },
-          feedback: {
-            strengths: ['Auto-approved for development testing'],
-            improvements: [],
-            requirements: []
-          },
-          detailedComments: [],
-          reviewedAt: new Date().toISOString(),
-          estimatedRevisionTime: 'N/A'
-        };
-
-        // Update course to approved status
-        await courseModel.update(courseId, {
-          status: 'approved',
-          submittedAt: new Date().toISOString(),
-          approvedAt: new Date().toISOString(),
-          approvalFeedback: devApprovalFeedback,
-          qualityScore: devApprovalFeedback.overallScore
-        });
-
-        // Log workflow actions
-        await this.logWorkflowAction(course, 'submit', 'draft', 'submitted', submittedBy, 'Course submitted for approval');
-        await this.logWorkflowAction(course, 'approve', 'submitted', 'approved', submittedBy, 'Auto-approved in development mode');
-
-        // Auto-publish the course
-        const publishedCourse = await this.publishCourse(courseId, submittedBy);
-
-        logger.info('Course auto-approved and published in development mode', {
-          courseId,
-          title: course.title,
-          submittedBy: submittedBy.id
-        });
-
-        return publishedCourse;
-      }
-
-      // PRODUCTION ENVIRONMENT: Normal approval workflow
+      // NORMAL APPROVAL WORKFLOW: All courses require manual admin approval
       // Update course status
       const updatedCourse = await this.transitionCourseStatus(
         courseId,
@@ -216,7 +159,7 @@ export class CourseWorkflowService {
   }
 
   /**
-   * Approve course (admin only)
+   * Approve course (admin only) - with auto-publish
    */
   async approveCourse(
     courseId: string,
@@ -261,37 +204,45 @@ export class CourseWorkflowService {
         estimatedRevisionTime: feedback.estimatedRevisionTime || '1 week'
       };
 
-      // Update course with approval
+      // Update course with approval and auto-publish
       const updatedCourse = await courseModel.update(courseId, {
-        status: 'approved',
+        status: 'published', // Auto-publish after approval
         approvedAt: new Date().toISOString(),
+        publishedAt: new Date().toISOString(), // Set published timestamp
         approvalFeedback,
         qualityScore: approvalFeedback.overallScore
       });
 
-      // Log workflow action
+      // Log workflow action for approval
       await this.logWorkflowAction(
         updatedCourse,
         'approve',
         course.status,
         'approved',
         approvedBy,
-        'Course approved'
+        'Course approved and auto-published'
       );
 
-      // Auto-publish approved course
-      const publishedCourse = await this.publishCourse(courseId, approvedBy);
+      // Log workflow action for publishing
+      await this.logWorkflowAction(
+        updatedCourse,
+        'publish',
+        'approved',
+        'published',
+        approvedBy,
+        'Course auto-published after approval'
+      );
 
-      // Notify instructor of approval
-      await this.notifyInstructorOfApproval(publishedCourse, approvalFeedback);
+      // Notify instructor of approval and auto-publishing
+      await this.notifyInstructorOfApproval(updatedCourse, approvalFeedback);
 
-      logger.info('Course approved and published', {
+      logger.info('Course approved and auto-published', {
         courseId,
         approvedBy: approvedBy.id,
         overallScore: approvalFeedback.overallScore
       });
 
-      return publishedCourse;
+      return updatedCourse;
     } catch (error) {
       logger.error('Failed to approve course:', error);
       throw error;
@@ -683,7 +634,7 @@ export class CourseWorkflowService {
         hasVideo: false,
         hasQuizzes: false,
         hasAssignments: false,
-        hasCertificate: false,
+
         hasPrerequisites: false,
         isAccessible: false
       },
@@ -700,7 +651,7 @@ export class CourseWorkflowService {
         performance: {
           avgQuizScore: 0,
           assignmentSubmissionRate: 0,
-          certificateEarnedRate: 0
+  
         }
       },
       rating: {
