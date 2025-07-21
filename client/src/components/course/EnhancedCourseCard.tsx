@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { useNetworkStatus } from '../../hooks/useNetworkStatus';
+
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -20,12 +21,12 @@ import {
   Award,
   TrendingUp
 } from 'lucide-react';
-import { apiClient, getFileUrl } from '../../utils/api';
+import { apiClient, getFileUrl, cleanInstructorName } from '../../utils/api';
 
 interface EnhancedCourseCardProps {
   course: any;
   showProgress?: boolean;
-  onEnrollmentChange?: () => void;
+  onEnrollmentChange?: (updatedCourse?: any) => void;
   onDataRefresh?: () => void;
 }
 
@@ -36,16 +37,47 @@ const EnhancedCourseCard: React.FC<EnhancedCourseCardProps> = ({
   onDataRefresh
 }) => {
   const { user } = useAuth();
-  const { isOnline } = useNetworkStatus();
+
   const { t } = useLanguage();
+  const { theme } = useTheme();
   const [isEnrolling, setIsEnrolling] = useState(false);
   const [enrollmentStatus, setEnrollmentStatus] = useState<'none' | 'enrolled' | 'pending'>('none');
   const [enrollmentMessage, setEnrollmentMessage] = useState<string>('');
 
-  // Check if user is already enrolled
-  const isEnrolled = course.enrollment || course.isEnrolled;
-  const isInProgress = course.progress?.percentage > 0 && course.progress?.percentage < 100;
-  const isCompleted = course.progress?.percentage >= 100;
+  // Determine enrollment status with debugging - prioritize course data over local state
+  const isEnrolled = course.enrollment || course.isEnrolled || enrollmentStatus === 'enrolled';
+  
+  // Update local enrollment status when course data changes
+  useEffect(() => {
+    if (course.enrollment || course.isEnrolled) {
+      setEnrollmentStatus('enrolled');
+    } else {
+      setEnrollmentStatus('none');
+    }
+  }, [course.enrollment, course.isEnrolled]);
+
+  // Listen for enrollment updates
+  useEffect(() => {
+    const handleEnrollmentUpdate = (event: CustomEvent) => {
+      if (event.detail.courseId === (course.id || course._id)) {
+        console.log('Course card: Enrollment update detected');
+        setEnrollmentStatus('enrolled');
+        setEnrollmentMessage('');
+      }
+    };
+
+    window.addEventListener('courseEnrollmentUpdated', handleEnrollmentUpdate as EventListener);
+    
+    return () => {
+      window.removeEventListener('courseEnrollmentUpdated', handleEnrollmentUpdate as EventListener);
+    };
+  }, [course.id, course._id]);
+  
+  const progressPercentage = course.progress?.overallProgress || 
+                            course.progress?.percentage || 
+                            course.enrollment?.progress || 0;
+  const isInProgress = progressPercentage > 0 && progressPercentage < 100;
+  const isCompleted = progressPercentage >= 100;
 
   // Format duration helper
   const formatDuration = (minutes: number) => {
@@ -63,45 +95,70 @@ const EnhancedCourseCard: React.FC<EnhancedCourseCardProps> = ({
     setEnrollmentMessage('');
     
     try {
-      if (isOnline) {
-        // Online enrollment with proper error handling
-        const response = await apiClient.enrollInCourse(course.id || course._id);
+      // Online enrollment with proper error handling
+      const response = await apiClient.enrollInCourse(course.id || course._id);
+      
+      if (response.success) {
+        // Immediately update local state to show enrolled status
+        setEnrollmentStatus('enrolled');
+        setEnrollmentMessage(t('Successfully enrolled! Redirecting to course...'));
         
-        if (response.success) {
-          setEnrollmentStatus('enrolled');
-          setEnrollmentMessage(t('Successfully enrolled! Redirecting to course...'));
-          
-          // Trigger data refresh to update the parent component
-          onEnrollmentChange?.();
-          onDataRefresh?.();
-          
-          // Small delay before navigation to show success message
-          setTimeout(() => {
-            window.location.href = `/course/${course.id || course._id}`;
-          }, 1000);
-          
-        } else {
-          throw new Error(response.error || t('Enrollment failed. Please try again.'));
-        }
+        // Update the course object to reflect enrollment
+        const updatedCourse = {
+          ...course,
+          isEnrolled: true,
+          enrollment: {
+            id: response.data.enrollment?._id || response.data.enrollment?.id,
+            enrolledAt: response.data.enrollment?.enrolledAt || new Date().toISOString(),
+            progress: 0,
+            status: 'active'
+          }
+        };
+        
+        // Trigger data refresh to update the parent component
+        onEnrollmentChange?.(updatedCourse);
+        onDataRefresh?.();
+        
+        // Dispatch global event to notify other components
+        window.dispatchEvent(new CustomEvent('courseEnrollmentUpdated', {
+          detail: { courseId: course.id || course._id, enrollment: response.data.enrollment }
+        }));
+        
+        // Navigate to course page after a short delay to show success message
+        setTimeout(() => {
+          window.location.href = `/course/${course.id || course._id}`;
+        }, 1500);
+        
       } else {
-        // Offline mode - queue enrollment for later
-        setEnrollmentStatus('pending');
-        setEnrollmentMessage(t('Enrollment will be processed when you\'re back online'));
-        onEnrollmentChange?.();
+        console.error('❌ Enrollment failed:', response.error);
+        throw new Error(response.error || t('Enrollment failed. Please try again.'));
       }
     } catch (error: any) {
-      console.error('Failed to enroll in course:', error);
+      console.error('💥 Failed to enroll in course:', error);
       setEnrollmentMessage(error.message || t('Failed to enroll. Please check your connection and try again.'));
     } finally {
       setIsEnrolling(false);
     }
   };
 
+  // Handle course access with progress sync
+  const handleCourseAccess = async () => {
+    if (isEnrolled) {
+      // Trigger progress sync before navigating
+      try {
+        await apiClient.syncCourseProgress(course.id || course._id);
+        console.log('🔄 Progress synced before course access');
+      } catch (error) {
+        console.warn('Failed to sync progress before course access:', error);
+      }
+    }
+  };
+
   // Get enrollment button based on current state
   const getEnrollmentButton = () => {
-    if (isEnrolled || enrollmentStatus === 'enrolled') {
+    if (isEnrolled) {
       return (
-        <Link to={`/course/${course.id || course._id}`}>
+        <Link to={`/course/${course.id || course._id}`} onClick={handleCourseAccess}>
           <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white transition-colors duration-200">
             {isCompleted ? (
               <>
@@ -199,104 +256,78 @@ const EnhancedCourseCard: React.FC<EnhancedCourseCardProps> = ({
         {course.rating && (
           <div className="absolute top-3 right-3 bg-white bg-opacity-90 rounded-full px-2 py-1 flex items-center gap-1">
             <Star className="w-3 h-3 text-yellow-500 fill-current" />
-            <span className="text-xs font-medium text-gray-900">{course.rating}</span>
+            <span className="text-xs font-medium text-gray-900 dark:text-white">{course.rating}</span>
           </div>
         )}
         
         {/* Progress indicator for enrolled courses */}
-        {showProgress && course.progress && (
-          <div className="absolute bottom-0 left-0 right-0 bg-white bg-opacity-90 p-2">
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-xs text-gray-600">{t('Progress')}</span>
-              <span className="text-xs font-medium text-blue-600">{course.progress.percentage}%</span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div 
-                className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
-                style={{ width: `${course.progress.percentage}%` }}
-              />
+        {showProgress && isEnrolled && (
+          <div className="absolute bottom-3 left-3 right-3">
+            <div className="bg-white bg-opacity-90 rounded-lg p-2">
+              <div className="flex justify-between text-xs mb-1">
+                <span className="text-gray-600 dark:text-gray-400">{t('Progress')}</span>
+                <span className="font-medium dark:text-white">{Math.round(progressPercentage)}%</span>
+              </div>
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+                <div
+                  className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
+                  style={{ width: `${progressPercentage}%` }}
+                />
+              </div>
             </div>
           </div>
         )}
       </div>
 
       {/* Course Content */}
-      <div className="p-6">
-        {/* Category and Status Badges */}
-        <div className="flex items-center gap-2 mb-3">
-          {course.category && (
-            <Badge className="bg-gray-100 text-gray-700 text-xs px-2 py-1">
-              {t(course.category)}
-            </Badge>
-          )}
-          {showProgress && (
-            <>
-              {isCompleted && (
-                <Badge className="bg-green-100 text-green-800 text-xs px-2 py-1">
-                  <CheckCircle className="w-3 h-3 mr-1" />
-                  {t('Completed')}
-                </Badge>
-              )}
-              {isInProgress && (
-                <Badge className="bg-blue-100 text-blue-800 text-xs px-2 py-1">
-                  <TrendingUp className="w-3 h-3 mr-1" />
-                  {t('In Progress')}
-                </Badge>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* Course Title */}
-        <h3 className="font-bold text-lg text-gray-900 mb-2 line-clamp-2 leading-tight">
+      <div className="p-4">
+        <h3 className="font-semibold text-gray-900 dark:text-white mb-2 line-clamp-2">
           {course.title}
         </h3>
-
-        {/* Course Description */}
-        <p className="text-gray-600 text-sm mb-4 line-clamp-3 leading-relaxed">
+        
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
           {course.description}
         </p>
 
         {/* Instructor */}
-        {course.instructorName && (
-          <div className="flex items-center gap-2 mb-4">
-            <Avatar name={course.instructorName} />
-            <span className="text-sm text-gray-600">
-              {t('by')} <span className="font-medium">{course.instructorName}</span>
-            </span>
+        <div className="flex items-center mb-3">
+          <Avatar
+            src={getFileUrl(course.instructorId, 'avatar')}
+            name={cleanInstructorName(course.instructorName)}
+            size="sm"
+          />
+          <div className="ml-2">
+            <p className="text-sm font-medium text-gray-900 dark:text-white">
+              {cleanInstructorName(course.instructorName)}
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {t('Instructor')}
+            </p>
           </div>
-        )}
+        </div>
 
-        {/* Course Info */}
-        <div className="flex items-center justify-between mb-4 text-sm text-gray-500">
-          <div className="flex items-center gap-4">
-            {course.duration && (
-              <div className="flex items-center gap-1">
-                <Clock className="w-4 h-4" />
-                <span>{formatDuration(course.duration)}</span>
-              </div>
-            )}
-            {course.enrolledCount !== undefined && (
-              <div className="flex items-center gap-1">
-                <Users className="w-4 h-4" />
-                <span>{course.enrolledCount} {t('students')}</span>
-              </div>
-            )}
+        {/* Course Stats */}
+        <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 mb-4">
+          <div className="flex items-center">
+            <Clock className="h-4 w-4 mr-1" />
+            <span>{course.totalDuration ? formatDuration(Math.round(course.totalDuration / 60)) : t('N/A')}</span>
           </div>
-          
-          {course.price !== undefined && (
-            <div className="font-bold text-lg text-gray-900">
-              {course.price === 0 ? t('Free') : `$${course.price}`}
-            </div>
-          )}
+          <div className="flex items-center">
+            <Users className="h-4 w-4 mr-1" />
+            <span>{course.enrollmentCount || 0} {t('students')}</span>
+          </div>
+          <div className="flex items-center">
+            <BookOpen className="h-4 w-4 mr-1" />
+            <span>{course.totalModules || course.sections?.length || 0} {t('modules')}</span>
+          </div>
         </div>
 
         {/* Enrollment Message */}
         {enrollmentMessage && (
-          <div className={`mb-4 p-3 rounded-lg text-sm ${
+          <div className={`mb-3 p-2 rounded text-sm ${
             enrollmentStatus === 'enrolled' 
-              ? 'bg-green-50 text-green-800 border border-green-200' 
-              : 'bg-red-50 text-red-800 border border-red-200'
+              ? 'bg-green-100 text-green-700 border border-green-200' 
+              : 'bg-red-100 text-red-700 border border-red-200'
           }`}>
             {enrollmentMessage}
           </div>

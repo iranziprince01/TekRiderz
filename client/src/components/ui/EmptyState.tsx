@@ -1,5 +1,6 @@
 import React from 'react';
 import { LucideIcon } from 'lucide-react';
+import { useTheme } from '../../contexts/ThemeContext';
 import { Button } from './Button';
 
 interface EmptyStateProps {
@@ -20,13 +21,15 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   action,
   className = ''
 }) => {
+  const { theme } = useTheme();
+  
   return (
     <div className={`text-center py-12 ${className}`}>
-      <Icon className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-      <h3 className="text-lg font-medium text-gray-900 mb-2">
+      <Icon className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+      <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
         {title}
       </h3>
-      <p className="text-gray-600 mb-4 max-w-md mx-auto">
+      <p className="text-gray-600 dark:text-gray-400 mb-4 max-w-md mx-auto">
         {description}
       </p>
       {action && (

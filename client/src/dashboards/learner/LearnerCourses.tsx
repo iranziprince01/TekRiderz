@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { useNetworkStatus } from '../../hooks/useNetworkStatus';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -20,686 +19,502 @@ import {
   Calendar,
   Target,
   RefreshCw,
-  WifiOff,
   RotateCcw
 } from 'lucide-react';
-import { useComprehensiveDashboardData } from '../../hooks/useComprehensiveDashboardData';
-import { apiClient, getFileUrl } from '../../utils/api';
+import { apiClient, getFileUrl, cleanInstructorName } from '../../utils/api';
 
 const LearnerCourses: React.FC = () => {
   const { t } = useLanguage();
-  const { isOnline } = useNetworkStatus();
-  const {
-    user,
-    enrolledCourses,
-    isLoading,
-    error,
-    refreshData
-  } = useComprehensiveDashboardData();
-
+  const [user, setUser] = useState<any>(null);
+  const [enrolledCourses, setEnrolledCourses] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
-  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'error' | 'success'>('idle');
 
-  // Auto-refresh progress data when component mounts and periodically
-  useEffect(() => {
-    const refreshInterval = setInterval(() => {
-      if (isOnline && !isLoading) {
-        handleProgressRefresh();
+  // Load user and enrolled courses
+  const loadData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const [userResponse, coursesResponse] = await Promise.all([
+        apiClient.getCurrentUser(),
+        apiClient.getEnrolledCourses({ sync: 'true' }) // Request progress sync
+      ]);
+
+      if (userResponse.success) {
+        setUser(userResponse.data);
       }
-    }, 30000); // Refresh every 30 seconds
 
-    return () => clearInterval(refreshInterval);
-  }, [isOnline, isLoading]);
-
-  // Listen for storage events to refresh when returning from course pages
-  useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'courseProgressUpdated') {
-        handleProgressRefresh();
+      if (coursesResponse.success) {
+        const courses = coursesResponse.data.courses || [];
+        console.log('Loaded enrolled courses with synced progress:', courses);
+        setEnrolledCourses(courses);
+      } else {
+        console.error('Failed to load courses:', coursesResponse.error);
+        setError(coursesResponse.error || 'Failed to load courses');
       }
-    };
+    } catch (err: any) {
+      console.error('Error loading data:', err);
+      setError(err.message || 'Failed to load data');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
-    window.addEventListener('storage', handleStorageChange);
+  // Load data on mount
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Handle refresh
+  const handleRefresh = useCallback(async () => {
+    if (isRefreshing) return;
     
-    // Also listen for focus events (when user returns to tab)
-    const handleFocus = () => {
-      if (isOnline) {
-        handleProgressRefresh();
-      }
-    };
-
-    window.addEventListener('focus', handleFocus);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('focus', handleFocus);
-    };
-  }, [isOnline]);
-
-  // Enhanced progress refresh with sync status
-  const handleProgressRefresh = useCallback(async () => {
-    if (isRefreshing || !isOnline) return;
-
     try {
       setIsRefreshing(true);
-      setSyncStatus('syncing');
+      console.log('🔄 Manual refresh with progress sync...');
       
-      await refreshData();
+      const coursesResponse = await apiClient.getEnrolledCourses({ sync: 'true' });
       
-      setSyncStatus('success');
-      setLastSyncTime(new Date());
-      
-      // Clear success status after 2 seconds
-      setTimeout(() => setSyncStatus('idle'), 2000);
-      
+      if (coursesResponse.success) {
+        const courses = coursesResponse.data.courses || [];
+        console.log('🔄 Refreshed courses with synced progress:', courses);
+        setEnrolledCourses(courses);
+      } else {
+        console.error('Failed to refresh courses:', coursesResponse.error);
+      }
     } catch (error) {
-      console.error('Failed to refresh progress:', error);
-      setSyncStatus('error');
-      setTimeout(() => setSyncStatus('idle'), 3000);
+      console.error('Failed to refresh:', error);
     } finally {
       setIsRefreshing(false);
     }
-  }, [isRefreshing, isOnline, refreshData]);
+  }, [isRefreshing]);
 
-  // Sync individual course progress
-  const syncCourseProgress = useCallback(async (courseId: string) => {
-    if (!isOnline) return null;
-
-    try {
-      const response = await apiClient.getUserCourseProgress(courseId);
-      if (response.success) {
-        return response.data.progress;
+  // Refresh progress data when user returns to the page
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('🔄 Page became visible, refreshing progress data');
+        loadData();
       }
-      return null;
-    } catch (error) {
-      console.error('Failed to sync course progress:', error);
-      return null;
-    }
-  }, [isOnline]);
+    };
 
-  // Process enrolled courses with enhanced progress data and real-time sync
-  const processedCourses = useMemo(() => {
-    if (!enrolledCourses) return [];
+    const handleFocus = () => {
+      console.log('🔄 Window focused, refreshing progress data');
+      loadData();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [loadData]);
+
+  // Periodic progress refresh (every 30 seconds)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log('🔄 Periodic progress refresh...');
+      handleRefresh();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, [handleRefresh]);
+
+  // Listen for global enrollment events
+  useEffect(() => {
+    const handleEnrollmentEvent = () => {
+      console.log('Global enrollment event detected, refreshing My Courses data');
+      loadData();
+    };
+
+    // Listen for enrollment events from other components
+    window.addEventListener('courseEnrollmentUpdated', handleEnrollmentEvent);
     
-    return enrolledCourses.map((course: any) => {
-      // Get progress from multiple sources for accuracy
+    // Listen for course progress updates
+    window.addEventListener('courseProgressUpdated', handleEnrollmentEvent);
+
+    return () => {
+      window.removeEventListener('courseEnrollmentUpdated', handleEnrollmentEvent);
+      window.removeEventListener('courseProgressUpdated', handleEnrollmentEvent);
+    };
+  }, [loadData]);
+
+  // Process enrolled courses with proper progress calculation
+  const processedCourses = useMemo(() => {
+    return enrolledCourses.map(course => {
+      // Get progress from multiple possible sources with priority order
+      const progressData = course.progress;
       const enrollmentProgress = course.enrollment?.progress || 0;
-      const courseProgress = course.progress || {};
-      const directProgress = course.progressPercentage || 0;
       
-      // Use the highest progress value from available sources
-      const progressPercentage = Math.max(
-        enrollmentProgress,
-        directProgress,
-        courseProgress.percentage || 0
-      );
+      // Use the most accurate progress source
+      let finalProgress = 0;
+      let completedLessons = 0;
+      let totalLessons = 0;
       
-      // Calculate lesson-based progress if available
-      const totalLessons = course.totalLessons || 
-        course.sections?.reduce((total: number, section: any) => 
-        total + (section.lessons?.length || 0), 0) || 0;
-      
-      const completedLessons = courseProgress?.completedLessons?.length || 
-        Math.floor((progressPercentage / 100) * totalLessons);
-      
-      // Determine status based on progress
-      let status = 'not_started';
-      if (progressPercentage >= 100) {
-        status = 'completed';
-      } else if (progressPercentage > 0) {
-        status = 'in_progress';
+      if (progressData) {
+        // Use detailed progress data from CouchDB
+        finalProgress = progressData.overallProgress || progressData.percentage || 0;
+        completedLessons = progressData.completedLessons || 0;
+        totalLessons = progressData.totalLessons || course.totalModules || course.totalLessons || 0;
+      } else {
+        // Fallback to enrollment progress
+        finalProgress = enrollmentProgress;
+        completedLessons = 0;
+        totalLessons = course.totalModules || course.totalLessons || 0;
       }
       
-      // Enhanced time tracking
-      const timeSpentMinutes = courseProgress?.timeSpent || 
-        course.enrollment?.timeSpent || 0;
-      const timeSpentFormatted = timeSpentMinutes > 60 
-        ? `${Math.floor(timeSpentMinutes / 60)}h ${timeSpentMinutes % 60}m`
-        : `${timeSpentMinutes}m`;
+      // Ensure progress is a valid number between 0-100
+      finalProgress = Math.min(100, Math.max(0, finalProgress));
+      
+      // Calculate progress percentage if we have lesson data
+      if (totalLessons > 0 && completedLessons > 0) {
+        const calculatedProgress = Math.round((completedLessons / totalLessons) * 100);
+        // Use the higher of calculated or stored progress
+        finalProgress = Math.max(finalProgress, calculatedProgress);
+      }
+      
+      console.log(`📊 Course "${course.title}" progress:`, {
+        courseId: course.id || course._id,
+        finalProgress,
+        completedLessons,
+        totalLessons,
+        hasProgressData: !!progressData,
+        enrollmentProgress,
+        overallProgress: progressData?.overallProgress,
+        percentage: progressData?.percentage
+      });
       
       return {
         ...course,
-        progress: {
-          percentage: Math.round(progressPercentage),
-          completedLessons,
-          totalLessons,
-          timeSpent: timeSpentMinutes,
-          timeSpentFormatted,
-          lastWatched: courseProgress?.lastWatched || course.enrollment?.lastAccessedAt,
-          currentLesson: courseProgress?.currentLesson,
-          lastSynced: courseProgress?.lastSynced || course.enrollment?.updatedAt
-        },
-        status,
-        enrollmentDate: course.enrollment?.enrolledAt || course.enrolledAt,
-        enrollmentId: course.enrollment?.id || course.enrollmentId
+        progress: finalProgress,
+        completedModules: completedLessons,
+        totalModules: totalLessons,
+        thumbnail: getFileUrl(course.thumbnail, 'thumbnail'),
+        instructorAvatar: getFileUrl(course.instructorId, 'avatar')
       };
     });
   }, [enrolledCourses]);
 
-  // Update course progress in CouchDB
-  const updateCourseProgress = useCallback(async (courseId: string, progress: number) => {
-    if (!isOnline) return;
-
-    try {
-      await apiClient.updateCourseProgress(courseId, { progress });
-      localStorage.setItem('courseProgressUpdated', Date.now().toString());
-    } catch (error) {
-      console.error('Failed to update course progress:', error);
-    }
-  }, [isOnline]);
-
-  // Offline progress persistence
-  const saveProgressOffline = useCallback((courseId: string, progressData: any) => {
-    try {
-      const offlineProgress = JSON.parse(localStorage.getItem('offlineProgress') || '{}');
-      offlineProgress[courseId] = {
-        ...progressData,
-        timestamp: Date.now(),
-        needsSync: true
-      };
-      localStorage.setItem('offlineProgress', JSON.stringify(offlineProgress));
-    } catch (error) {
-      console.error('Failed to save progress offline:', error);
-    }
-  }, []);
-
-  // Sync offline progress when back online
-  useEffect(() => {
-    const syncOfflineProgress = async () => {
-      if (!isOnline) return;
-
-      try {
-        const offlineProgress = JSON.parse(localStorage.getItem('offlineProgress') || '{}');
-        const coursesToSync = Object.keys(offlineProgress).filter(
-          courseId => offlineProgress[courseId].needsSync
-        );
-
-        if (coursesToSync.length === 0) return;
-
-        setSyncStatus('syncing');
-        
-        for (const courseId of coursesToSync) {
-          try {
-            await apiClient.updateCourseProgress(courseId, offlineProgress[courseId]);
-            offlineProgress[courseId].needsSync = false;
-          } catch (error) {
-            console.warn(`Failed to sync progress for course ${courseId}:`, error);
-          }
-        }
-
-        localStorage.setItem('offlineProgress', JSON.stringify(offlineProgress));
-        setSyncStatus('success');
-        setTimeout(() => setSyncStatus('idle'), 2000);
-        
-        // Refresh data to show updated progress
-        await refreshData();
-        
-      } catch (error) {
-        console.error('Failed to sync offline progress:', error);
-        setSyncStatus('error');
-        setTimeout(() => setSyncStatus('idle'), 3000);
-      }
-    };
-
-    if (isOnline) {
-      syncOfflineProgress();
-    }
-  }, [isOnline, refreshData]);
-
   // Filter courses based on search and status
   const filteredCourses = useMemo(() => {
-    return processedCourses.filter((course: any) => {
-      const matchesSearch = !searchTerm || 
-        course.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        course.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        course.instructorName?.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchesStatus = statusFilter === 'all' || course.status === statusFilter;
-      
-      return matchesSearch && matchesStatus;
-    });
+    let filtered = processedCourses;
+
+    // Apply search filter
+    if (searchTerm) {
+      filtered = filtered.filter(course =>
+        course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        course.instructorName?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(course => {
+        const progress = course.progress || 0;
+        switch (statusFilter) {
+          case 'in-progress':
+            return progress > 0 && progress < 100;
+          case 'completed':
+            return progress >= 100;
+          case 'not-started':
+            return progress === 0;
+          default:
+            return true;
+        }
+      });
+    }
+
+    return filtered;
   }, [processedCourses, searchTerm, statusFilter]);
 
-  // Enhanced summary statistics
-  const summaryStats = useMemo(() => {
-    const totalCourses = processedCourses.length;
-    const completedCourses = processedCourses.filter((course: any) => course.status === 'completed').length;
-    const inProgressCourses = processedCourses.filter((course: any) => course.status === 'in_progress').length;
-    const totalTimeSpent = processedCourses.reduce((total, course) => total + (course.progress?.timeSpent || 0), 0);
-    
-    return {
-      totalCourses,
-      completedCourses,
-      inProgressCourses,
-      totalTimeSpent
-    };
+  // Calculate statistics
+  const statistics = useMemo(() => {
+    const total = processedCourses.length;
+    const inProgress = processedCourses.filter(c => (c.progress || 0) > 0 && (c.progress || 0) < 100).length;
+    const completed = processedCourses.filter(c => (c.progress || 0) >= 100).length;
+    const notStarted = processedCourses.filter(c => (c.progress || 0) === 0).length;
+    const averageProgress = total > 0 
+      ? processedCourses.reduce((sum, course) => sum + (course.progress || 0), 0) / total 
+      : 0;
+
+    return { total, inProgress, completed, notStarted, averageProgress };
   }, [processedCourses]);
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[500px]">
-        <div className="text-center">
-          <LoadingSpinner size="lg" className="text-blue-600" />
-          <p className="text-gray-600 mt-4 text-lg">
-            {t('Loading your courses...')}
-          </p>
-        </div>
+      <div className="flex items-center justify-center min-h-64">
+        <LoadingSpinner size="lg" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Card className="p-8 text-center max-w-md border-gray-200">
-          <BookOpen className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">
-            {t('Unable to load your courses')}
-          </h3>
-          <p className="text-gray-600 mb-6">
-            {error}
-          </p>
-          <Button 
-            onClick={refreshData}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            {t('Try Again')}
-          </Button>
-        </Card>
+      <div className="text-center py-8">
+        <p className="text-red-600 mb-4">{error}</p>
+        <Button onClick={loadData} variant="outline">
+          {t('Try Again')}
+        </Button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
-      {/* Header Section - Clean and Motivational */}
-      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-8">
-        <div className="max-w-4xl">
-          <div className="flex items-center justify-between mb-4">
-      <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                {t('My Learning Journey')}
-        </h1>
-              <p className="text-gray-700 text-lg">
-                {summaryStats.totalCourses > 0 
-                  ? t('Track your progress and continue learning at your own pace')
-                  : t('Start your learning journey by enrolling in courses')
-                }
-        </p>
-      </div>
-
-            {/* Sync Status and Controls */}
-            <div className="flex items-center gap-3">
-              {!isOnline && (
-                <div className="flex items-center gap-2 text-orange-600 bg-orange-50 px-3 py-2 rounded-lg border border-orange-200">
-                  <WifiOff className="w-4 h-4" />
-                  <span className="text-sm font-medium">{t('Offline')}</span>
-                </div>
-              )}
-              
-              {syncStatus === 'syncing' && (
-                <div className="flex items-center gap-2 text-blue-600 bg-blue-50 px-3 py-2 rounded-lg border border-blue-200">
-                  <RotateCcw className="w-4 h-4 animate-spin" />
-                  <span className="text-sm font-medium">{t('Syncing...')}</span>
-                </div>
-              )}
-              
-              {syncStatus === 'success' && (
-                <div className="flex items-center gap-2 text-green-600 bg-green-50 px-3 py-2 rounded-lg border border-green-200">
-                  <CheckCircle className="w-4 h-4" />
-                  <span className="text-sm font-medium">{t('Synced')}</span>
-                </div>
-              )}
-              
-              {syncStatus === 'error' && (
-                <div className="flex items-center gap-2 text-red-600 bg-red-50 px-3 py-2 rounded-lg border border-red-200">
-                  <RefreshCw className="w-4 h-4" />
-                  <span className="text-sm font-medium">{t('Sync Failed')}</span>
-            </div>
-              )}
-              
-              <Button
-                onClick={handleProgressRefresh}
-                disabled={isRefreshing || !isOnline}
-                variant="outline"
-                size="sm"
-                className="border-blue-200 text-blue-600 hover:bg-blue-50"
-              >
-                <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-                {t('Refresh')}
-              </Button>
-            </div>
-          </div>
-          
-          {/* Last Sync Time */}
-          {lastSyncTime && (
-            <div className="text-sm text-gray-500 mb-6">
-              {t('Last synced')}: {lastSyncTime.toLocaleTimeString()}
-            </div>
-          )}
-          
-          {/* Learning Statistics - Enhanced */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-blue-100">
-              <div className="flex items-center gap-3">
-                <div className="bg-blue-100 p-2 rounded-lg">
-                  <BookOpen className="w-5 h-5 text-blue-600" />
-                </div>
-            <div>
-                  <div className="text-2xl font-bold text-gray-900">{summaryStats.totalCourses}</div>
-                  <div className="text-sm text-gray-600">{t('Enrolled Courses')}</div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-green-100">
-              <div className="flex items-center gap-3">
-                <div className="bg-green-100 p-2 rounded-lg">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-gray-900">{summaryStats.completedCourses}</div>
-                  <div className="text-sm text-gray-600">{t('Completed')}</div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-orange-100">
-              <div className="flex items-center gap-3">
-                <div className="bg-orange-100 p-2 rounded-lg">
-                  <TrendingUp className="w-5 h-5 text-orange-600" />
-          </div>
-            <div>
-                  <div className="text-2xl font-bold text-gray-900">{summaryStats.inProgressCourses}</div>
-                  <div className="text-sm text-gray-600">{t('In Progress')}</div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-purple-100">
-              <div className="flex items-center gap-3">
-                <div className="bg-purple-100 p-2 rounded-lg">
-                  <Clock className="w-5 h-5 text-purple-600" />
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-gray-900">
-                    {summaryStats.totalTimeSpent > 60 
-                      ? `${Math.floor(summaryStats.totalTimeSpent / 60)}h`
-                      : `${summaryStats.totalTimeSpent}m`
-                    }
-                  </div>
-                  <div className="text-sm text-gray-600">{t('Time Spent')}</div>
-                </div>
-              </div>
-            </div>
-          </div>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            {t('My Courses')}
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
+            {t('Continue your learning journey')}
+          </p>
         </div>
+        
+        <Button
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          variant="outline"
+          size="sm"
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+          {t('Refresh')}
+        </Button>
       </div>
 
-      {/* Search and Filter Section */}
-      {summaryStats.totalCourses > 0 && (
-        <Card className="p-6 border-gray-200 shadow-sm">
-          <div className="flex flex-col md:flex-row gap-4">
-            {/* Search */}
-            <div className="flex-1">
-              <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-          <Input
-            type="text"
-            placeholder={t('Search your courses...')}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-11 h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg"
-          />
-        </div>
-      </div>
-
-            {/* Status Filter */}
-            <div className="md:w-56">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full h-12 px-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-              >
-                <option value="all">{t('All Courses')}</option>
-                <option value="in_progress">{t('In Progress')}</option>
-                <option value="completed">{t('Completed')}</option>
-                <option value="not_started">{t('Not Started')}</option>
-              </select>
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="p-4">
+          <div className="flex items-center">
+            <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+              <BookOpen className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                {t('Total Courses')}
+              </p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                {statistics.total}
+              </p>
             </div>
           </div>
         </Card>
-      )}
 
-      {/* Courses Section */}
-      <div>
-        {summaryStats.totalCourses > 0 && (
-        <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">{t('Your Courses')}</h2>
-            <Badge variant="default" className="bg-gray-100 text-gray-700 px-3 py-1 text-sm">
-              {filteredCourses.length} {t('of')} {summaryStats.totalCourses} {t('courses')}
-          </Badge>
-        </div>
-        )}
-
-        {filteredCourses.length > 0 ? (
-          <div className="space-y-6">
-            {filteredCourses.map((course: any) => (
-              <Card key={course.id || course._id} className="border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
-                <div className="p-6">
-                <div className="flex flex-col lg:flex-row gap-6">
-                  {/* Course Thumbnail */}
-                    <div className="lg:w-48 lg:h-32 w-full h-48 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
-                    {course.thumbnail ? (
-                      <img 
-                        src={getFileUrl(course.thumbnail, 'thumbnail')} 
-                        alt={course.title}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <BookOpen className="w-8 h-8 text-gray-400" />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Course Details */}
-                  <div className="flex-1 min-w-0">
-                      <div className="flex flex-col gap-4">
-                        {/* Header */}
-                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          {course.category && (
-                                <Badge variant="default" className="text-xs bg-gray-100 text-gray-700">
-                              {t(course.category)}
-                            </Badge>
-                          )}
-                          {course.status === 'completed' && (
-                                <Badge variant="success" className="text-xs bg-green-100 text-green-800">
-                                  <CheckCircle className="w-3 h-3 mr-1" />
-                              {t('Completed')}
-                            </Badge>
-                          )}
-                          {course.status === 'in_progress' && (
-                                <Badge variant="info" className="text-xs bg-blue-100 text-blue-800">
-                                  <TrendingUp className="w-3 h-3 mr-1" />
-                              {t('In Progress')}
-                            </Badge>
-                          )}
-                              {course.status === 'not_started' && (
-                                <Badge variant="default" className="text-xs bg-gray-100 text-gray-600">
-                                  <Target className="w-3 h-3 mr-1" />
-                              {t('Not Started')}
-                            </Badge>
-                          )}
-                        </div>
-                        
-                            <h3 className="font-bold text-xl text-gray-900 mb-2 line-clamp-2">
-                          {course.title}
-                        </h3>
-                        
-                        <p className="text-gray-600 text-sm mb-3 line-clamp-2 leading-relaxed">
-                          {course.description}
-                        </p>
-                        
-                            {/* Instructor */}
-                        {course.instructorName && (
-                          <div className="flex items-center gap-2 mb-4">
-                                <Avatar name={course.instructorName} />
-                            <span className="text-sm text-gray-600">
-                              {t('by')} {course.instructorName}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                          {/* Progress Circle and Action */}
-                      <div className="flex flex-col sm:items-end gap-3">
-                            <div className="text-center sm:text-right">
-                              <div className="text-3xl font-bold text-blue-600 mb-1">
-                            {course.progress.percentage}%
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {course.progress.completedLessons}/{course.progress.totalLessons} {t('lessons')}
-                          </div>
-                              {course.progress.timeSpent > 0 && (
-                                <div className="text-xs text-gray-500 mt-1">
-                                  {course.progress.timeSpentFormatted} {t('spent')}
-                                </div>
-                              )}
-                              
-                              {/* Progress Sync Indicator */}
-                              {course.progress.lastSynced && (
-                                <div className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                                  <CheckCircle className="w-3 h-3" />
-                                  {t('Progress saved')}
-                                </div>
-                              )}
-                        </div>
-                        
-                        <Link to={`/course/${course.id || course._id}`}>
-                              <Button 
-                                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2"
-                                onClick={() => {
-                                  // Trigger progress sync when navigating to course
-                                  syncCourseProgress(course.id || course._id);
-                                  // Set flag for progress update detection
-                                  localStorage.setItem('lastCourseAccessed', course.id || course._id);
-                                }}
-                              >
-                            {course.status === 'completed' ? (
-                              <>
-                                <Award className="w-4 h-4 mr-2" />
-                                {t('Review')}
-                              </>
-                                ) : course.status === 'in_progress' ? (
-                              <>
-                                <Play className="w-4 h-4 mr-2" />
-                                {t('Continue')}
-                              </>
-                                ) : (
-                                  <>
-                                    <Play className="w-4 h-4 mr-2" />
-                                    {t('Start Learning')}
-                              </>
-                            )}
-                          </Button>
-                        </Link>
-                      </div>
-                    </div>
-
-                    {/* Progress Bar */}
-                    <div className="space-y-2">
-                          <div className="w-full bg-gray-200 rounded-full h-3">
-                        <div 
-                              className={`h-3 rounded-full transition-all duration-500 ${
-                            course.status === 'completed' ? 'bg-green-500' : 'bg-blue-500'
-                          }`}
-                          style={{ width: `${course.progress.percentage}%` }}
-                        />
-                      </div>
-                          
-                          {/* Additional Progress Info */}
-                          <div className="flex justify-between items-center text-xs text-gray-500">
-                            <span>
-                              {course.progress.percentage === 0 
-                                ? t('Ready to start')
-                                : course.status === 'completed'
-                                ? t('Course completed!')
-                                : t('Keep going!')
-                              }
-                            </span>
-                            <div className="flex items-center gap-2">
-                              {course.enrollmentDate && (
-                                <span className="flex items-center gap-1">
-                                  <Calendar className="w-3 h-3" />
-                                  {t('Enrolled')} {new Date(course.enrollmentDate).toLocaleDateString()}
-                                </span>
-                              )}
-                              {course.progress.lastSynced && (
-                                <span className="flex items-center gap-1 text-green-600" title={t('Progress synced with database')}>
-                                  <CheckCircle className="w-3 h-3" />
-                                  {t('Synced')}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
-        ) : summaryStats.totalCourses === 0 ? (
-          // No enrolled courses
-          <Card className="p-12 text-center border-gray-200 shadow-sm">
-            <div className="bg-blue-50 p-6 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center">
-              <BookOpen className="w-12 h-12 text-blue-600" />
+        <Card className="p-4">
+          <div className="flex items-center">
+            <div className="p-2 bg-yellow-100 dark:bg-yellow-900 rounded-lg">
+              <TrendingUp className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-3">
-              {t('Start Your Learning Journey')}
-            </h3>
-            <p className="text-gray-600 mb-8 max-w-md mx-auto leading-relaxed">
-              {t('You haven\'t enrolled in any courses yet. Explore our course catalog and start learning today!')}
-            </p>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                {t('In Progress')}
+              </p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                {statistics.inProgress}
+              </p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-4">
+          <div className="flex items-center">
+            <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+              <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                {t('Completed')}
+              </p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                {statistics.completed}
+              </p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-4">
+          <div className="flex items-center">
+            <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg">
+              <Target className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                {t('Avg Progress')}
+              </p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                {Math.round(statistics.averageProgress)}%
+              </p>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex-1">
+          <Input
+            type="text"
+            placeholder={t('Search courses...')}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full"
+          />
+        </div>
+        
+        <div className="relative">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="w-full h-12 px-4 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white appearance-none [&::-ms-expand]:hidden"
+          >
+            <option value="all">{t('All Courses')}</option>
+            <option value="in-progress">{t('In Progress')}</option>
+            <option value="completed">{t('Completed')}</option>
+            <option value="not-started">{t('Not Started')}</option>
+          </select>
+          <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none">
+            <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      {/* Courses Grid */}
+      {filteredCourses.length === 0 ? (
+        <Card className="p-8 text-center">
+          <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+            {searchTerm || statusFilter !== 'all' 
+              ? t('No courses match your filters')
+              : t('No courses enrolled yet')
+            }
+          </h3>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            {searchTerm || statusFilter !== 'all'
+              ? t('Try adjusting your search or filters')
+              : t('Browse available courses to get started')
+            }
+          </p>
+          {!searchTerm && statusFilter === 'all' && (
             <Link to="/dashboard">
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3">
-                <BookOpen className="w-5 h-5 mr-2" />
+              <Button>
                 {t('Browse Courses')}
               </Button>
             </Link>
-          </Card>
-        ) : (
-          // No courses match filter
-          <Card className="p-12 text-center border-gray-200 shadow-sm">
-            <div className="bg-gray-50 p-6 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center">
-              <Search className="w-12 h-12 text-gray-400" />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-3">
-              {t('No courses match your search')}
-            </h3>
-            <p className="text-gray-600 mb-6 max-w-md mx-auto">
-              {t('Try adjusting your search terms or filters')}
-            </p>
-              <Button
-                variant="outline"
-              onClick={() => {
-                setSearchTerm('');
-                setStatusFilter('all');
-              }}
-              className="border-blue-200 text-blue-600 hover:bg-blue-50"
-              >
-                {t('Clear Search')}
-              </Button>
-          </Card>
-        )}
-      </div>
+          )}
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredCourses.map((course) => (
+            <Card key={course._id} className="overflow-hidden hover:shadow-lg transition-shadow">
+              {/* Course Thumbnail */}
+              <div className="relative h-48 bg-gray-200 dark:bg-gray-700">
+                {course.thumbnail ? (
+                  <img
+                    src={course.thumbnail}
+                    alt={course.title}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-full">
+                    <BookOpen className="h-12 w-12 text-gray-400" />
+                  </div>
+                )}
+                
+                {/* Progress Badge */}
+                <div className="absolute top-3 right-3">
+                  <Badge variant={course.progress >= 100 ? 'success' : 'default'}>
+                    {course.progress >= 100 ? t('Completed') : `${Math.round(course.progress)}%`}
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Course Content */}
+              <div className="p-4">
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-2 line-clamp-2">
+                  {course.title}
+                </h3>
+                
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
+                  {course.description}
+                </p>
+
+                {/* Instructor */}
+                <div className="flex items-center mb-3">
+                  <Avatar
+                    src={course.instructorAvatar}
+                    name={cleanInstructorName(course.instructorName)}
+                    size="sm"
+                  />
+                  <div className="ml-2">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      {cleanInstructorName(course.instructorName)}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {t('Instructor')}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Course Stats */}
+                <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 mb-4">
+                  <div className="flex items-center">
+                    <Clock className="h-4 w-4 mr-1" />
+                    <span>{course.totalDuration ? `${Math.round(course.totalDuration / 60)}m` : t('N/A')}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <BookOpen className="h-4 w-4 mr-1" />
+                    <span>{course.totalModules} {t('modules')}</span>
+                  </div>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="mb-4">
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-gray-600 dark:text-gray-400">
+                      {t('Progress')}
+                    </span>
+                    <span className="text-gray-900 dark:text-white font-medium">
+                      {Math.round(course.progress)}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                    <div
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${course.progress}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Action Button */}
+                <Link to={`/course/${course._id}`} className="block">
+                  <Button className="w-full" variant={course.progress >= 100 ? 'outline' : 'primary'}>
+                    {course.progress >= 100 ? (
+                      <>
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        {t('Review Course')}
+                      </>
+                    ) : (
+                      <>
+                        <Play className="h-4 w-4 mr-2" />
+                        {t('Continue Learning')}
+                      </>
+                    )}
+                  </Button>
+                </Link>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

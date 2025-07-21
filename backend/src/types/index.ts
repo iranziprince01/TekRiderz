@@ -988,13 +988,8 @@ export interface EmailTemplate {
 
 
 
-// PWA types
-export interface SyncData {
-  type: 'course-progress' | 'user-data' | 'offline-actions';
-  data: any;
-  timestamp: string;
-  userId: string;
-}
+
+
 
 export interface PushSubscription {
   endpoint: string;
@@ -1200,7 +1195,6 @@ export interface MobileDevice extends BaseDocument {
   isActive: boolean;
   pushToken?: string;
   settings: {
-    offlineMode: boolean;
     dataSync: boolean;
     pushNotifications: boolean;
     downloadQuality: 'low' | 'medium' | 'high';
@@ -1258,7 +1252,7 @@ export interface MobileSession extends BaseDocument {
   userId: string;
   deviceId: string;
   courseId: string;
-  sessionType: 'online' | 'offline' | 'sync';
+  sessionType: 'online' | 'sync';
   startedAt: string;
   endedAt?: string;
   duration: number;
@@ -1273,7 +1267,7 @@ export interface MobileSession extends BaseDocument {
     dataUsage: number;
     batteryUsage: number;
     networkType: string;
-    connectionQuality: 'excellent' | 'good' | 'poor' | 'offline';
+    connectionQuality: 'excellent' | 'good' | 'poor';
   };
   syncStatus: {
     pending: boolean;

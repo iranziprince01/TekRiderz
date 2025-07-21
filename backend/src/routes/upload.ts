@@ -20,59 +20,43 @@ if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && proce
   console.error('Cloudinary configuration missing. Please check your environment variables.');
 }
 
-// Upload preset mapping - use different presets for different content types
+// Upload preset mapping - use different presets for different content types (images only)
 const UPLOAD_PRESET_MAP = {
-  'course-thumbnail': process.env.CLOUDINARY_UPLOAD_PRESET, // tekriders-uploads (has default folder)
-  'profile-picture': process.env.CLOUDINARY_UPLOAD_PRESET, // We'll override folder for this
+  'course-thumbnail': process.env.CLOUDINARY_UPLOAD_PRESET,
+  'profile-picture': process.env.CLOUDINARY_UPLOAD_PRESET,
   'user-avatar': process.env.CLOUDINARY_UPLOAD_PRESET,
   'course-material': process.env.CLOUDINARY_UPLOAD_PRESET,
   'general': process.env.CLOUDINARY_UPLOAD_PRESET
 };
 
-// Folder mapping for different content types
+// Folder mapping for different content types (images only)
 const folderMap = {
   'course-thumbnail': 'tekriders/course-thumbnails',
   'profile-picture': 'tekriders/profile-pictures',
   'user-avatar': 'tekriders/profile-pictures',
-  'course-material': 'tekriders/course-thumbnails',
+  'course-material': 'tekriders/course-materials',
   'general': 'tekriders/general'
 };
 
 const router = Router();
 
-// Configure multer for memory storage (images and PDFs)
+// Configure multer for image uploads only (PDFs go to Firebase Storage)
 const upload = multer({ 
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 25 * 1024 * 1024, // 25MB limit for PDFs
+    fileSize: 10 * 1024 * 1024, // 10MB limit for images
   },
   fileFilter: (req: Request, file: Express.Multer.File, cb: FileFilterCallback) => {
-    // Check file type - allow both images and PDFs
-    if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') {
+    // Only allow images - PDFs should use Firebase Storage
+    if (file.mimetype.startsWith('image/')) {
       cb(null, true);
     } else {
-      cb(new Error('Only image and PDF files are allowed'));
+      cb(new Error('Only image files are allowed. PDFs should be uploaded via Firebase Storage.'));
     }
   }
 });
 
-// Configure multer for PDF uploads
-const pdfUpload = multer({ 
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 25 * 1024 * 1024, // 25MB limit for PDFs
-  },
-  fileFilter: (req: Request, file: Express.Multer.File, cb: FileFilterCallback) => {
-    // Check file type
-    if (file.mimetype === 'application/pdf') {
-      cb(null, true);
-    } else {
-      cb(new Error('Only PDF files are allowed'));
-    }
-  }
-});
-
-// Cloudinary upload proxy endpoint
+// Cloudinary upload endpoint (images only - PDFs go to Firebase Storage)
 router.post('/cloudinary', authenticate, upload.single('file'), async (req: Request, res: Response): Promise<void> => {
   try {
     if (!req.file) {
@@ -83,14 +67,19 @@ router.post('/cloudinary', authenticate, upload.single('file'), async (req: Requ
       return;
     }
 
-    // Determine type based on file type if not provided
+    // Ensure only images are uploaded to Cloudinary
+    if (req.file.mimetype === 'application/pdf') {
+      res.status(400).json({
+        success: false,
+        error: 'PDF files should be uploaded via Firebase Storage. Use /api/v1/firebase-pdf/upload instead.'
+      });
+      return;
+    }
+
+    // Determine type based on file type
     let { type } = req.body;
     if (!type) {
-      if (req.file.mimetype === 'application/pdf') {
-        type = 'pdf-document';
-      } else {
-        type = 'course-thumbnail';
-      }
+      type = 'course-thumbnail'; // Default for images
     }
 
     // Check if Cloudinary is configured
@@ -120,14 +109,14 @@ router.post('/cloudinary', authenticate, upload.single('file'), async (req: Requ
       originalType: req.body.type,
       determinedType: type,
       fileMimeType: req.file.mimetype,
-      isPdf: req.file.mimetype === 'application/pdf',
+      isImage: req.file.mimetype.startsWith('image/'),
       expectedFolder: folderMap[type as keyof typeof folderMap]
     });
 
-    // Upload to Cloudinary - use regular upload function for all files
+    // Upload to Cloudinary - images only
     const result = await uploadToCloudinary(req.file, cloudinaryConfig, type);
 
-    logger.info('File uploaded to Cloudinary successfully', {
+    logger.info('Image uploaded to Cloudinary successfully', {
       publicId: result.public_id,
       secureUrl: result.secure_url,
       userId: req.user?.id,

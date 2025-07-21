@@ -45,7 +45,12 @@ export class CourseController {
               return {
                 ...course,
                 isEnrolled,
-                enrollmentId: enrollment?._id,
+                enrollment: enrollment ? {
+                  id: enrollment._id,
+                  enrolledAt: enrollment.enrolledAt,
+                  progress: enrollment.progress || 0,
+                  status: enrollment.status
+                } : null,
                 progress: enrollment?.progress || 0
               };
             } catch (error) {
@@ -53,7 +58,7 @@ export class CourseController {
               return {
                 ...course,
                 isEnrolled: false,
-                enrollmentId: null,
+                enrollment: null,
                 progress: 0
               };
             }
@@ -70,7 +75,7 @@ export class CourseController {
         coursesWithEnrollment = publishedCourses.map((course: any) => ({
           ...course,
           isEnrolled: false,
-          enrollmentId: null,
+          enrollment: null,
           progress: 0
         }));
       }
@@ -2035,8 +2040,7 @@ export class CourseController {
         hasAssignments: course.contentFlags?.hasAssignments || totalAssignments > 0,
 
         hasDiscussions: false, // Placeholder
-        downloadableContent: false, // Placeholder
-        offlineAccess: false // Placeholder
+        downloadableContent: false // Placeholder
       };
 
       // Learning path preview (first few sections)

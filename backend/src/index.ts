@@ -17,8 +17,10 @@ import courseRoutes from './routes/courses';
 import { adminRoutes } from './routes/admin';
 import uploadRoutes from './routes/upload';
 import firebasePdfRoutes from './routes/firebasePdf';
+import cleanupRoutes from './routes/cleanup';
+import { cleanupService } from './services/cleanupService';
 
-import syncRoutes from './routes/sync';
+
 import speechRoutes from './routes/speech';
 import { globalRateLimiter, getRateLimitStatus, clearRateLimit } from './middleware/rateLimiter';
 
@@ -78,8 +80,9 @@ app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/upload', uploadRoutes);
 app.use('/api/v1/firebase-pdf', firebasePdfRoutes);
 app.use('/api/v1/speech', speechRoutes);
+app.use('/api/v1/cleanup', cleanupRoutes);
 
-app.use('/api/v1/sync', syncRoutes);
+
 
 // Rate limiting status endpoint
 app.get('/api/v1/rate-limit/status', getRateLimitStatus);
@@ -287,6 +290,15 @@ const startServer = async () => {
 
     // Upload directory creation removed - using external services only
 
+    // Start scheduled cleanup task
+    setInterval(async () => {
+      try {
+        await cleanupService.performCleanup();
+      } catch (error) {
+        logger.error('Scheduled cleanup failed:', error);
+      }
+    }, 30 * 60 * 1000); // Run every 30 minutes
+
     // Start HTTP server
     const PORT = config.server.port;
     server.listen(PORT, () => {
@@ -294,6 +306,7 @@ const startServer = async () => {
       logger.info(`Environment: ${config.server.nodeEnv}`);
       logger.info(`API Base URL: http://localhost:${PORT}/api/v1`);
       logger.info(`External services: Cloudinary (images) + YouTube (videos)`);
+      logger.info(`🧹 Scheduled cleanup enabled (every 30 minutes)`);
       
       if (config.server.isDevelopment) {
         logger.info(`Development mode - CORS enabled for: ${config.cors.allowedOrigins.join(', ')}`);

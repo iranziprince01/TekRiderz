@@ -91,9 +91,7 @@ export class ErrorHandler {
     });
 
     // Handle network errors
-    window.addEventListener('offline', () => {
-      this.handleError(new Error('Network connection lost'), 'Network offline');
-    });
+
   }
 
   // Main error handling method

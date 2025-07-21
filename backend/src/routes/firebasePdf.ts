@@ -1,3 +1,22 @@
+/**
+ * Firebase PDF Storage Routes
+ * 
+ * This module handles PDF operations for course module materials.
+ * Only tutors upload PDFs (lecture notes, module materials).
+ * Learners download PDFs from the course module pages.
+ * 
+ * PDFs are organized by course and module:
+ * - Module PDFs: pdfs/courses/{courseId}/modules/{moduleId}/{tutorId}_{timestamp}_{filename}.pdf
+ * 
+ * Benefits of Firebase Storage for PDFs:
+ * - Clean, organized URLs: https://storage.googleapis.com/bucket/pdfs/courses/123/modules/456/file.pdf
+ * - Scalable and cost-effective
+ * - CDN delivery for fast access
+ * - Built-in security and access controls
+ * - No long URLs like Cloudinary
+ * - Clear separation: tutors upload, learners download
+ */
+
 import { Router, Request, Response } from 'express';
 import { authenticate } from '../middleware/auth';
 import { logger } from '../utils/logger';
@@ -21,7 +40,7 @@ const pdfUpload = multer({
   }
 });
 
-// Upload PDF to Firebase Storage
+// Upload PDF to Firebase Storage (Tutors only)
 router.post('/upload', authenticate, pdfUpload.single('file'), async (req: Request, res: Response) => {
   try {
     if (!req.file) {
@@ -32,13 +51,21 @@ router.post('/upload', authenticate, pdfUpload.single('file'), async (req: Reque
       return;
     }
 
-    const { courseId } = req.body;
-    const userId = req.user?.id;
+    const { courseId, moduleId } = req.body;
+    const tutorId = req.user?.id;
 
-    if (!userId) {
+    if (!tutorId) {
       res.status(401).json({
         success: false,
-        error: 'User not authenticated'
+        error: 'Tutor not authenticated'
+      });
+      return;
+    }
+
+    if (!courseId || !moduleId) {
+      res.status(400).json({
+        success: false,
+        error: 'Course ID and Module ID are required'
       });
       return;
     }
@@ -46,16 +73,18 @@ router.post('/upload', authenticate, pdfUpload.single('file'), async (req: Reque
     logger.info('Firebase PDF upload request:', {
       fileName: req.file.originalname,
       size: req.file.size,
-      userId,
-      courseId
+      tutorId,
+      courseId,
+      moduleId
     });
 
     // Upload to Firebase Storage
     const result = await firebasePdfService.uploadPdf(
       req.file.buffer,
       req.file.originalname,
-      userId,
-      courseId
+      tutorId,
+      courseId,
+      moduleId
     );
 
     if (result.success) {
@@ -139,29 +168,28 @@ router.post('/download-url', authenticate, async (req: Request, res: Response) =
   }
 });
 
-// List PDFs for user or course
-router.get('/list', authenticate, async (req: Request, res: Response) => {
+// List PDFs for a specific module (for learners to download)
+router.get('/list-module', authenticate, async (req: Request, res: Response) => {
   try {
-    const { courseId } = req.query;
-    const userId = req.user?.id;
+    const { courseId, moduleId } = req.query;
 
-    if (!userId) {
-      res.status(401).json({
+    if (!courseId || !moduleId) {
+      res.status(400).json({
         success: false,
-        error: 'User not authenticated'
+        error: 'Course ID and Module ID are required'
       });
       return;
     }
 
-    logger.info('Listing Firebase PDFs:', {
-      userId,
-      courseId: courseId as string
+    logger.info('Listing module PDFs:', {
+      courseId: courseId as string,
+      moduleId: moduleId as string
     });
 
-    // List PDFs
-    const result = await firebasePdfService.listPdfs(
-      courseId ? undefined : userId,
-      courseId as string
+    // List PDFs for specific module
+    const result = await firebasePdfService.listModulePdfs(
+      courseId as string,
+      moduleId as string
     );
 
     if (result.success) {
@@ -179,10 +207,53 @@ router.get('/list', authenticate, async (req: Request, res: Response) => {
     }
 
   } catch (error) {
-    logger.error('Failed to list PDFs:', error);
+    logger.error('Failed to list module PDFs:', error);
     res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to list PDFs'
+      error: error instanceof Error ? error.message : 'Failed to list module PDFs'
+    });
+  }
+});
+
+// List PDFs for a course (for tutors to manage)
+router.get('/list-course', authenticate, async (req: Request, res: Response) => {
+  try {
+    const { courseId } = req.query;
+
+    if (!courseId) {
+      res.status(400).json({
+        success: false,
+        error: 'Course ID is required'
+      });
+      return;
+    }
+
+    logger.info('Listing course PDFs:', {
+      courseId: courseId as string
+    });
+
+    // List all PDFs for a course
+    const result = await firebasePdfService.listCoursePdfs(courseId as string);
+
+    if (result.success) {
+      res.json({
+        success: true,
+        data: {
+          files: result.files
+        }
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: result.error
+      });
+    }
+
+  } catch (error) {
+    logger.error('Failed to list course PDFs:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to list course PDFs'
     });
   }
 });

@@ -983,7 +983,7 @@ export const CourseCreation: React.FC = () => {
                   <div>
                     <label className="block text-sm font-semibold text-gray-800 mb-3">
                       <FileText className="inline h-4 w-4 mr-2" />
-                      {language === 'rw' ? 'Inyandiko z\'Isomo (PDF)' : 'Lecture Notes (PDF)'}
+                      {language === 'rw' ? 'Inyandiko z\'Isomo (PDF)' : 'Module Notes (PDF)'}
                     </label>
                     <div className="bg-gray-50 rounded-xl p-4">
                       <FirebasePdfUpload
@@ -994,7 +994,8 @@ export const CourseCreation: React.FC = () => {
                           }
                         })}
                         currentPdfUrl={module.content.pdfUrl}
-                        courseId={courseId}
+                        courseId={courseId || 'new'}
+                        moduleId={module.id}
                       />
                     </div>
                   </div>

@@ -506,6 +506,8 @@ const translations = {
     'common.popular': 'Popular',
     'common.recommended': 'Recommended',
     'common.retry': 'Retry',
+    'common.pageNotFound': 'Page Not Found',
+    'common.pageNotFoundDesc': 'The page you are looking for does not exist.',
 
     // Learner specific
     'learner.welcomeBack': 'Welcome back',
@@ -1027,6 +1029,8 @@ const translations = {
     'common.popular': 'Kizwi cyane',
     'common.recommended': 'Byasabwe',
     'common.retry': 'Ongera ugerageze',
+    'common.pageNotFound': 'Urupapuro Rutaboneka',
+    'common.pageNotFoundDesc': 'Urupapuro ushakisha ntiruhari.',
 
     // Learner specific
     'learner.welcomeBack': 'Murakaza neza',

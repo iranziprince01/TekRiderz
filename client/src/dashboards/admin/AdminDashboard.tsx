@@ -6,7 +6,7 @@ import { Button } from '../../components/ui/Button';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { Alert } from '../../components/ui/Alert';
 import { Badge } from '../../components/ui/Badge';
-import { apiClient } from '../../utils/api';
+import { apiClient, cleanInstructorName } from '../../utils/api';
 import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 import { 
   Users, 
@@ -539,7 +539,7 @@ const AdminDashboard: React.FC = () => {
                       {course.title}
                     </p>
                     <p className="text-xs text-gray-600 dark:text-gray-400">
-                      {t('common.by')} {course.instructorName} • {formatDate(course.submittedAt)}
+                      {t('common.by')} {cleanInstructorName(course.instructorName)} • {formatDate(course.submittedAt)}
                     </p>
                   </div>
                   <Button 

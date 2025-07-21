@@ -212,7 +212,7 @@ export class EnrollmentModel extends BaseModel<Enrollment> {
       // Create new enrollment
       const enrollmentData = {
         type: 'enrollment',
-        id: this.generateId(),
+        id: this.generateId(), // Keep this for now, BaseModel will ensure consistency
         userId,
         courseId,
         status: 'active' as EnrollmentStatus,

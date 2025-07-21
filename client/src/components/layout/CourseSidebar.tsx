@@ -62,23 +62,7 @@ const CourseSidebar: React.FC<CourseSidebarProps> = ({
       });
     }
 
-    // Analytics - only for instructors and admins
-    if (permissions?.canViewAnalytics) {
-      nav.push({
-        name: language === 'rw' ? 'Isesengura' : 'Analytics',
-        href: `/course/${id}/analytics`,
-        icon: TrendingUp,
-      });
-    }
 
-    // Management - only for course owners and admins who can edit
-    if (permissions?.canEdit || permissions?.canManageContent) {
-      nav.push({
-        name: language === 'rw' ? 'Icunga' : 'Management',
-        href: `/course/${id}/management`,
-        icon: Settings,
-      });
-    }
 
     return nav;
   };

@@ -30,7 +30,8 @@ export abstract class BaseModel<T extends BaseDocument & MaybeDocument> {
       
       const doc = {
         ...data,
-        _id: generatedId,
+        _id: generatedId, // Set _id to our generated ID
+        ...(('id' in data) && { id: generatedId }), // Set id to the same generated ID if it exists
         createdAt: now,
         updatedAt: now,
       } as T;
@@ -46,6 +47,7 @@ export abstract class BaseModel<T extends BaseDocument & MaybeDocument> {
       return {
         ...doc,
         _id: result.id || generatedId, // Use CouchDB ID if available, fallback to generated
+        ...(('id' in doc) && { id: result.id || generatedId }), // Ensure id field matches _id if it exists
         _rev: result.rev,
       } as T;
     } catch (error) {

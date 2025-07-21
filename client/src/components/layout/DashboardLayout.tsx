@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import Header from './Header';
 import Sidebar from './Sidebar';
-import OfflineLoginIndicator from '../common/OfflineLoginIndicator';
+
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -37,7 +37,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
           <div className="h-[calc(100vh-4rem)] overflow-y-auto">
             <div className="px-4 sm:px-6 lg:px-8 py-4">
               <div className="max-w-7xl mx-auto">
-                <OfflineLoginIndicator />
+
                 {children}
               </div>
             </div>

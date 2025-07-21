@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import { getCourseQuizzes, getCourse, getCourseGrades } from '../../utils/api';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
@@ -80,6 +81,7 @@ export const CourseAssessments: React.FC<CourseAssessmentsProps> = ({
 }) => {
   const navigate = useNavigate();
   const { language } = useLanguage();
+  const { theme } = useTheme();
   
   // State management
   const [quizzes, setQuizzes] = useState<Quiz[]>(initialQuizzes);

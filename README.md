@@ -1,6 +1,6 @@
 # TekRiders - Modern E-Learning Platform
 
-> A comprehensive e-learning platform designed for modern education needs, featuring intuitive course management, interactive learning experiences, and robust offline capabilities.
+> A comprehensive e-learning platform designed for modern education needs, featuring intuitive course management and interactive learning experiences.
 
 ![React](https://img.shields.io/badge/React-18-blue?logo=react)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?logo=typescript)
@@ -27,15 +27,12 @@ TekRiders is a full-stack e-learning platform that enables seamless knowledge sh
 
 ### **Modern Experience**
 - Responsive design for all devices
-- Progressive Web App (PWA) capabilities
-- Offline learning functionality
 - Multi-language support (English/Kinyarwanda)
 
 ### **Security & Performance**
 - JWT-based authentication
 - Data encryption and validation
 - Optimized loading and caching
-- Real-time data synchronization
 
 ## Technology Stack
 
@@ -55,9 +52,6 @@ TekRiders is a full-stack e-learning platform that enables seamless knowledge sh
 
 ### **Database & Storage**
 - **CouchDB** - Primary document database
-- **PouchDB** - Client-side synchronization
-- **IndexedDB** - Browser-based storage
-- **Real-time sync** - Automatic data synchronization
 
 ## Getting Started
 
@@ -171,7 +165,7 @@ npm run start               # Start production servers
 - Intuitive dashboard interfaces
 - Real-time notifications
 - Responsive mobile design
-- Offline learning capabilities
+
 
 ### **Data Management**
 - Secure user authentication
@@ -182,9 +176,7 @@ npm run start               # Start production servers
 ## Progressive Web App
 
 TekRiderz functions as a Progressive Web App, providing:
-- **Offline Access** - Continue learning without internet
 - **Mobile Installation** - Add to home screen like a native app
-- **Background Sync** - Automatic data updates when online
 - **Fast Loading** - Optimized performance and caching
 
 ## Security Features

@@ -19,7 +19,6 @@ export interface CoursePermissions {
   canApprove: boolean;
   canReject: boolean;
   canPublish: boolean;
-  canViewAnalytics: boolean;
   canManageContent: boolean;
   canTakeQuizzes: boolean;
   canWatchVideos: boolean;
@@ -37,7 +36,6 @@ export const getCoursePermissions = (user: User | null, course: Course): CourseP
       canApprove: false,
       canReject: false,
       canPublish: false,
-      canViewAnalytics: false,
       canManageContent: false,
       canTakeQuizzes: false,
       canWatchVideos: false,
@@ -61,7 +59,7 @@ export const getCoursePermissions = (user: User | null, course: Course): CourseP
       canApprove: course.status === 'submitted',
       canReject: course.status === 'submitted',
       canPublish: course.status === 'approved',
-      canViewAnalytics: canAccessCourse,
+
       canManageContent: canAccessCourse,
       canTakeQuizzes: false, // Admins don't take quizzes
       canWatchVideos: canAccessCourse,
@@ -80,7 +78,6 @@ export const getCoursePermissions = (user: User | null, course: Course): CourseP
         canApprove: false,
         canReject: false,
         canPublish: false, // ✅ No longer needed - courses auto-publish after admin approval
-        canViewAnalytics: ['submitted', 'approved', 'published'].includes(course.status),
         canManageContent: ['draft', 'rejected', 'approved', 'published'].includes(course.status), // ✅ Allow content management
         canTakeQuizzes: true, // Course owners can always access their quizzes for testing/management
         canWatchVideos: true,
@@ -96,7 +93,6 @@ export const getCoursePermissions = (user: User | null, course: Course): CourseP
         canApprove: false,
         canReject: false,
         canPublish: false,
-        canViewAnalytics: false,
         canManageContent: false,
         canTakeQuizzes: course.status === 'published',
         canWatchVideos: course.status === 'published',
@@ -115,7 +111,6 @@ export const getCoursePermissions = (user: User | null, course: Course): CourseP
       canApprove: false,
       canReject: false,
       canPublish: false,
-      canViewAnalytics: false,
       canManageContent: false,
       canTakeQuizzes: course.status === 'published',
       canWatchVideos: course.status === 'published',
@@ -132,7 +127,6 @@ export const getCoursePermissions = (user: User | null, course: Course): CourseP
     canApprove: false,
     canReject: false,
     canPublish: false,
-    canViewAnalytics: false,
     canManageContent: false,
     canTakeQuizzes: false,
     canWatchVideos: false,
@@ -169,20 +163,9 @@ export const getAvailableTabs = (permissions: CoursePermissions): Array<{
       id: 'grades',
       label: 'Grades',
       icon: 'BarChart3',
-      available: permissions.canViewGrades || permissions.canViewAnalytics,
+      available: permissions.canViewGrades,
     },
-    {
-      id: 'analytics',
-      label: 'Analytics',
-      icon: 'TrendingUp',
-      available: permissions.canViewAnalytics,
-    },
-    {
-      id: 'management',
-      label: 'Management',
-      icon: 'Settings',
-      available: permissions.canEdit || permissions.canManageContent,
-    },
+
   ];
 };
 

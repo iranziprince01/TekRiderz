@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -44,6 +45,7 @@ export const ModulesList: React.FC<ModulesListProps> = ({
 }) => {
   const navigate = useNavigate();
   const { language } = useLanguage();
+  const { theme } = useTheme();
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
 
   const toggleModule = (moduleId: string) => {

@@ -1,5 +1,4 @@
 // JSON-based Quiz System Types
-// Designed for offline-first PWA architecture
 
 export interface QuizQuestion {
   id: string;
@@ -87,10 +86,7 @@ export interface QuizAttempt {
   questionsAnswered: string[];
   isCompleted: boolean;
   
-  // Offline sync
-  synced: boolean;
-  syncedAt?: string;
-  pendingSync: boolean;
+
 }
 
 export interface QuizProgress {
@@ -115,23 +111,7 @@ export interface QuizProgress {
   improvementAreas: string[]; // topics/tags needing work
 }
 
-// Offline storage interfaces
-export interface OfflineQuizData extends QuizData {
-  cachedAt: number;
-  offline: true;
-  downloadSize: number;
-}
 
-export interface OfflineQuizAction {
-  id: string;
-  type: 'quiz_attempt' | 'quiz_submission' | 'quiz_progress_update';
-  quizId: string;
-  userId: string;
-  data: QuizAttempt | Partial<QuizProgress>;
-  timestamp: number;
-  priority: number; // 1 = high, 2 = medium, 3 = low
-  retryCount: number;
-}
 
 // Quiz grading and feedback
 export interface QuizFeedback {

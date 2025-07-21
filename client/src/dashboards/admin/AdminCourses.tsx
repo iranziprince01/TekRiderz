@@ -13,7 +13,7 @@ import {
   Trash2, 
   X
 } from 'lucide-react';
-import { apiClient } from '../../utils/api';
+import { apiClient, cleanInstructorName } from '../../utils/api';
 
 interface CourseData {
   id: string;
@@ -523,43 +523,64 @@ const AdminCourses: React.FC = () => {
         </div>
         
         <div className="flex gap-4">
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-6 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white min-w-32"
-          >
-            <option value="">{t('admin.courses.allStatus')}</option>
-            <option value="draft">{t('admin.courses.status.draft')}</option>
-            <option value="pending">{t('admin.courses.status.pending')}</option>
-            <option value="submitted">{t('admin.courses.status.submitted')}</option>
-            <option value="approved">{t('admin.courses.status.approved')}</option>
-            <option value="published">{t('admin.courses.status.published')}</option>
-            <option value="rejected">{t('admin.courses.status.rejected')}</option>
-            <option value="archived">{t('admin.courses.status.archived')}</option>
-          </select>
+          <div className="relative">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full h-12 px-4 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white min-w-32 appearance-none [&::-ms-expand]:hidden"
+            >
+              <option value="">{t('admin.courses.allStatus')}</option>
+              <option value="draft">{t('admin.courses.status.draft')}</option>
+              <option value="pending">{t('admin.courses.status.pending')}</option>
+              <option value="submitted">{t('admin.courses.status.submitted')}</option>
+              <option value="approved">{t('admin.courses.status.approved')}</option>
+              <option value="published">{t('admin.courses.status.published')}</option>
+              <option value="rejected">{t('admin.courses.status.rejected')}</option>
+              <option value="archived">{t('admin.courses.status.archived')}</option>
+            </select>
+            <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none">
+              <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
 
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="px-6 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white min-w-36"
-          >
-            <option value="">{t('admin.courses.allCategories')}</option>
-            <option value="programming">{t('courses.programming')}</option>
-            <option value="design">{t('courses.design')}</option>
-            <option value="business-tech">{t('courses.businessTech')}</option>
-            <option value="general-it">{t('courses.generalIT')}</option>
-          </select>
+          <div className="relative">
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="w-full h-12 px-4 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white min-w-36 appearance-none [&::-ms-expand]:hidden"
+            >
+              <option value="">{t('admin.courses.allCategories')}</option>
+              <option value="programming">{t('courses.programming')}</option>
+              <option value="design">{t('courses.design')}</option>
+              <option value="business-tech">{t('courses.businessTech')}</option>
+              <option value="general-it">{t('courses.generalIT')}</option>
+            </select>
+            <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none">
+              <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
 
-          <select
-            value={levelFilter}
-            onChange={(e) => setLevelFilter(e.target.value)}
-            className="px-6 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white min-w-28"
-          >
-            <option value="">{t('admin.courses.allLevels')}</option>
-            <option value="beginner">{t('courses.beginner')}</option>
-            <option value="intermediate">{t('courses.intermediate')}</option>
-            <option value="advanced">{t('courses.advanced')}</option>
-          </select>
+          <div className="relative">
+            <select
+              value={levelFilter}
+              onChange={(e) => setLevelFilter(e.target.value)}
+              className="w-full h-12 px-4 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white min-w-28 appearance-none [&::-ms-expand]:hidden"
+            >
+              <option value="">{t('admin.courses.allLevels')}</option>
+              <option value="beginner">{t('courses.beginner')}</option>
+              <option value="intermediate">{t('courses.intermediate')}</option>
+              <option value="advanced">{t('courses.advanced')}</option>
+            </select>
+            <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none">
+              <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -582,7 +603,7 @@ const AdminCourses: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-500 dark:text-gray-400">{t('admin.courses.tutor')}</p>
-                  <p className="font-medium text-gray-900 dark:text-white">{course.instructorName}</p>
+                  <p className="font-medium text-gray-900 dark:text-white">{cleanInstructorName(course.instructorName)}</p>
                 </div>
                 <div>
                   {getStatusBadge(course.status)}

@@ -148,7 +148,21 @@ const Course: React.FC = () => {
     }
   }, [location.state, navigate]);
 
+  // Listen for enrollment updates
+  useEffect(() => {
+    const handleEnrollmentUpdate = (event: CustomEvent) => {
+      if (event.detail.courseId === courseId) {
+        console.log('Enrollment update detected, refreshing course data');
+        fetchCourseData();
+      }
+    };
 
+    window.addEventListener('courseEnrollmentUpdated', handleEnrollmentUpdate as EventListener);
+    
+    return () => {
+      window.removeEventListener('courseEnrollmentUpdated', handleEnrollmentUpdate as EventListener);
+    };
+  }, [courseId]);
 
   // Fetch course permissions
   useEffect(() => {
@@ -160,6 +174,29 @@ const Course: React.FC = () => {
       setPermissions(coursePermissions);
     }
   }, [courseData, user]);
+
+  // Load course data on mount
+  useEffect(() => {
+    if (courseId) {
+      fetchCourseData();
+    }
+  }, [courseId]);
+
+  // Listen for enrollment updates
+  useEffect(() => {
+    const handleEnrollmentUpdate = (event: CustomEvent) => {
+      if (event.detail.courseId === courseId) {
+        console.log('Course page: Enrollment update detected, refreshing data');
+        fetchCourseData();
+      }
+    };
+
+    window.addEventListener('courseEnrollmentUpdated', handleEnrollmentUpdate as EventListener);
+    
+    return () => {
+      window.removeEventListener('courseEnrollmentUpdated', handleEnrollmentUpdate as EventListener);
+    };
+  }, [courseId]);
 
   const fetchCourseData = async () => {
     setLoading(true);
@@ -213,9 +250,23 @@ const Course: React.FC = () => {
       if (progressData?.completedLessons) {
         if (Array.isArray(progressData.completedLessons)) {
           completedLessons = progressData.completedLessons;
-        } else if (progressData.completedLessons.length !== undefined) {
-          // If it's array-like but not an array, convert it
-          completedLessons = Array.from(progressData.completedLessons);
+        } else if (typeof progressData.completedLessons === 'object' && progressData.completedLessons !== null) {
+          // If it's an object, try to convert to array
+          try {
+            completedLessons = Object.values(progressData.completedLessons);
+          } catch (error) {
+            console.warn('Failed to convert completedLessons object to array:', error);
+            completedLessons = [];
+          }
+        } else if (typeof progressData.completedLessons === 'string') {
+          // If it's a string, try to parse it
+          try {
+            const parsed = JSON.parse(progressData.completedLessons);
+            completedLessons = Array.isArray(parsed) ? parsed : [];
+          } catch (error) {
+            console.warn('Failed to parse completedLessons string:', error);
+            completedLessons = [];
+          }
         } else {
           console.warn('completedLessons is not an array:', progressData.completedLessons);
           completedLessons = [];
@@ -878,41 +929,7 @@ const Course: React.FC = () => {
             } 
           />
           
-          {/* Analytics */}
-          <Route 
-            path="/analytics" 
-            element={
-              <div className="p-8 text-center">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                  {language === 'rw' ? 'Isesengura rizaza' : 'Analytics Coming Soon'}
-        </h3>
-        <p className="text-gray-500 dark:text-gray-400">
-          {language === 'rw' 
-                    ? 'Ibyerekeye isesengura bizongera bigaragare vuba'
-                    : 'Course analytics will be available soon'
-                  }
-              </p>
-            </div>
-            } 
-          />
-          
-          {/* Management */}
-          <Route 
-            path="/management" 
-            element={
-              <div className="p-8 text-center">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-          {language === 'rw' ? 'Icunga ry\'isomo' : 'Course Management'}
-        </h3>
-        <p className="text-gray-500 dark:text-gray-400">
-          {language === 'rw' 
-                    ? 'Ibikoresho byo gucunga isomo bizongera bigaragare vuba'
-                    : 'Course management tools will be available soon'
-                  }
-          </p>
-        </div>
-            } 
-          />
+
         </Routes>
       </CourseLayout>
     </>

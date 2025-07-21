@@ -659,7 +659,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Set token in apiClient for API requests
       await apiClient.setToken(token);
       
-      // Store user ID and role in localStorage for offline access and PouchDB sync
+      // Store user ID and role in localStorage
       localStorage.setItem('currentUserId', user.id);
       localStorage.setItem('userRole', user.role);
       localStorage.setItem('userEmail', user.email);
@@ -705,7 +705,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Clear token from apiClient
       await apiClient.setToken(null);
       
-      // Clear offline session and cached credentials
+      // Clear cached credentials
       try {
         localStorage.removeItem('currentUserId');
         localStorage.removeItem('userRole');
@@ -726,7 +726,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       navigate('/login', { replace: true });
     } catch (error) {
-      // Even if online logout fails, clear offline data
+      // Even if online logout fails, clear cached data
       try {
         localStorage.removeItem('currentUserId');
         localStorage.removeItem('userRole');
@@ -756,7 +756,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Update token in apiClient
       await apiClient.setToken(token);
       
-      // Update localStorage for offline access
+      // Update localStorage
       localStorage.setItem('currentUserId', user.id);
       localStorage.setItem('userRole', user.role);
       localStorage.setItem('userEmail', user.email);

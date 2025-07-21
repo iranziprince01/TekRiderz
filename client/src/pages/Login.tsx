@@ -7,7 +7,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Alert } from '../components/ui/Alert';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
-import { Mail, Lock, GraduationCap, Eye, EyeOff, ArrowRight, Wifi, WifiOff } from 'lucide-react';
+import { Mail, Lock, GraduationCap, Eye, EyeOff, ArrowRight } from 'lucide-react';
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -15,31 +15,13 @@ const Login: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [hasOfflineCredentials, setHasOfflineCredentials] = useState(false);
-  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
 
   const { login } = useAuth();
   const { language } = useLanguage();
   const navigate = useNavigate();
 
-  // Check for offline credentials when email changes
-  useEffect(() => {
-        setHasOfflineCredentials(false);
-  }, [email]);
 
-  // Listen for online/offline changes
-  useEffect(() => {
-    const handleOnline = () => setIsOffline(false);
-    const handleOffline = () => setIsOffline(true);
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,48 +78,7 @@ const Login: React.FC = () => {
                 </Alert>
               )}
 
-              {/* Network Status & Offline Auth Indicator */}
-              {isOffline && (
-                <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-3">
-                  <div className="flex items-center">
-                    <WifiOff className="h-5 w-5 text-orange-500 mr-2" />
-                    <div className="text-sm">
-                      <p className="font-medium text-orange-800 dark:text-orange-200">
-                        {language === 'rw' ? 'Nta ntaneti' : 'You\'re offline'}
-                      </p>
-                      <p className="text-orange-600 dark:text-orange-300">
-                        {language === 'rw' 
-                          ? 'Wakanda online wakore login cyangwa koresha offline account'
-                          : 'Connect to the internet for full access or use cached credentials'
-                        }
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
 
-              {hasOfflineCredentials && (
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <svg className="h-5 w-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <div className="ml-2 text-sm">
-                      <p className="font-medium text-blue-800 dark:text-blue-200">
-                        {language === 'rw' ? 'Offline credentials ziraboneka' : 'Offline credentials available'}
-                      </p>
-                      <p className="text-blue-600 dark:text-blue-300">
-                        {language === 'rw' 
-                          ? 'Ushobora kwinjira offline ukoresha credentials zisobitswe'
-                          : 'You can login offline using your cached credentials'
-                        }
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

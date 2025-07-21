@@ -5,7 +5,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { Button } from '../ui/Button';
 import Avatar from '../ui/Avatar';
-import NetworkStatusIndicator from '../common/NetworkStatusIndicator';
+
 import { 
   Moon, 
   Sun, 
@@ -130,7 +130,7 @@ const Header: React.FC<HeaderProps> = ({
             </Button>
 
             {/* Network Status Indicator (always visible when user is logged in) */}
-            {user && <NetworkStatusIndicator />}
+
 
             {user ? (
               <>
@@ -147,8 +147,6 @@ const Header: React.FC<HeaderProps> = ({
                        src={avatar?.src} 
                        name={user.name} 
                        size="sm" 
-                       showOnlineStatus={true}
-                       isOnline={true}
                      />
                     <ChevronDown className="h-3 w-3 text-gray-500 dark:text-gray-400 hidden sm:block" />
                   </Button>
@@ -162,8 +160,6 @@ const Header: React.FC<HeaderProps> = ({
                              src={avatar?.src} 
                              name={user.name} 
                              size="md" 
-                             showOnlineStatus={true}
-                             isOnline={true}
                            />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{user.name}</p>

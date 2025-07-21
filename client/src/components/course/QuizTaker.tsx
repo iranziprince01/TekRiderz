@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import { submitQuiz } from '../../utils/api';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
@@ -78,6 +79,7 @@ export const QuizTaker: React.FC<QuizTakerProps> = ({
 }) => {
   const navigate = useNavigate();
   const { language } = useLanguage();
+  const { theme } = useTheme();
   
   // Safety checks for required props
   if (!quiz || !courseId || !quiz.questions || !Array.isArray(quiz.questions)) {
@@ -501,23 +503,7 @@ export const QuizTaker: React.FC<QuizTakerProps> = ({
           </Card>
         )}
 
-        {/* Action Buttons */}
-        <div className="flex justify-center space-x-4">
-          <Button
-            onClick={() => navigate(`/course/${courseId}/assessments`)}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            {language === 'rw' ? 'Garuka ku bizamini' : 'Back to Assessments'}
-            <ArrowLeft className="w-4 h-4 ml-2" />
-          </Button>
-          
-          <Button
-            onClick={() => navigate(`/course/${courseId}/assessments`)}
-            variant="outline"
-          >
-            {language === 'rw' ? 'Garuka ku bizamini' : 'Back to Assessments'}
-          </Button>
-        </div>
+
       </div>
     );
   };

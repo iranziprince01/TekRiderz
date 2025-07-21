@@ -3,13 +3,9 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { LanguageProvider } from './contexts/LanguageContext';
-import { NetworkStatusProvider } from './contexts/NetworkStatusContext';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { NotificationManager } from './components/ui/NotificationManager';
 import ProtectedRoute from './components/ProtectedRoute';
-import OfflineIndicator from './components/common/OfflineIndicator';
-import NetworkStatusIndicator from './components/common/NetworkStatusIndicator';
-import OfflineLoginIndicator from './components/common/OfflineLoginIndicator';
 
 // Pages
 import Landing from './pages/Landing';
@@ -29,17 +25,7 @@ function App() {
       try {
         console.log('Initializing TekRiders App...');
         
-        // Initialize service worker in production only
-        if (import.meta.env.PROD && 'serviceWorker' in navigator) {
-          try {
-            const registration = await navigator.serviceWorker.register('/sw.js', {
-              scope: '/'
-            });
-            console.log('Service Worker registered:', registration.scope);
-          } catch (swError: any) {
-                          console.warn('Service Worker registration failed:', swError?.message || 'Unknown error');
-          }
-        }
+
 
         console.log('App initialization completed successfully');
         
@@ -100,7 +86,6 @@ Type any command in the console to use these tools.
 
   return (
     <ErrorBoundary>
-      <NetworkStatusProvider>
       <ThemeProvider>
       <LanguageProvider>
           <Router>
@@ -143,7 +128,6 @@ Type any command in the console to use these tools.
           </Router>
         </LanguageProvider>
         </ThemeProvider>
-      </NetworkStatusProvider>
     </ErrorBoundary>
   );
 }

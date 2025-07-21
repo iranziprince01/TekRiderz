@@ -2447,18 +2447,60 @@ router.delete('/courses/:courseId', async (req: Request, res: Response): Promise
     // If force delete or no enrollments, proceed with deletion
     await courseModel.delete(courseId);
 
-    // Also clean up related data if force deleting
-    if (force && hasEnrollments) {
+    // Clean up enrollments when course is deleted
+    if (hasEnrollments) {
       try {
-        // Note: In a real system, you might want to handle this more carefully
-        // For now, we'll just log that enrollments exist
-        logger.warn('Force deleting course with enrollments', {
+        // Get all enrollments for this course
+        const allEnrollments = await enrollmentModel.getCourseEnrollments(courseId, { limit: 10000 });
+        
+        // Delete all enrollments for this course
+        for (const enrollment of allEnrollments.enrollments) {
+          try {
+            await enrollmentModel.delete(enrollment._id!);
+            logger.info('Deleted enrollment for deleted course:', {
+              enrollmentId: enrollment._id,
+              userId: enrollment.userId,
+              courseId: enrollment.courseId
+            });
+          } catch (enrollmentDeleteError) {
+            logger.error('Failed to delete enrollment:', {
+              enrollmentId: enrollment._id,
+              error: enrollmentDeleteError
+            });
+          }
+        }
+        
+        // Also clean up progress records for this course
+        try {
+          const { progressModel } = await import('../models/Progress');
+          const progressResult = await progressModel.getCourseProgress(courseId, { limit: 10000 });
+          
+          for (const progress of progressResult.progress) {
+            try {
+              await progressModel.delete(progress._id!);
+              logger.info('Deleted progress record for deleted course:', {
+                progressId: progress._id,
+                userId: progress.userId,
+                courseId: progress.courseId
+              });
+            } catch (progressDeleteError) {
+              logger.error('Failed to delete progress record:', {
+                progressId: progress._id,
+                error: progressDeleteError
+              });
+            }
+          }
+        } catch (progressCleanupError) {
+          logger.error('Failed to cleanup progress records during course delete:', progressCleanupError);
+        }
+        
+        logger.info('Cleaned up enrollments for deleted course', {
           courseId,
-          enrollments: enrollmentsResult.enrollments.length,
+          enrollmentsDeleted: allEnrollments.enrollments.length,
           adminId: (req as any).user.id,
         });
       } catch (cleanupError) {
-        logger.error('Failed to cleanup course data during force delete:', cleanupError);
+        logger.error('Failed to cleanup enrollments during course delete:', cleanupError);
       }
     }
 

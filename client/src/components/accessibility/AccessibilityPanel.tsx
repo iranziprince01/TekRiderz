@@ -15,6 +15,8 @@ import {
   Wifi
 } from 'lucide-react';
 import { speechService, webSpeechFallback } from '../../services/speechService';
+import { useLanguage } from '../../contexts/LanguageContext';
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface AccessibilityPanelProps {
   onSpeechToText?: (text: string) => void;
@@ -29,6 +31,8 @@ export const AccessibilityPanel: React.FC<AccessibilityPanelProps> = ({
   isVisible = false,
   onToggleVisibility
 }) => {
+  const { language } = useLanguage();
+  const { theme } = useTheme();
   const [isMinimized, setIsMinimized] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);

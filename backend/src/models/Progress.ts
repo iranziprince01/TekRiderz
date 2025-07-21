@@ -54,7 +54,7 @@ export class ProgressModel extends BaseModel<Progress> {
       if (!progress) {
         progress = await this.create({
           type: 'progress',
-          id: this.generateId(),
+          id: this.generateId(), // Keep this for now, BaseModel will ensure consistency
           userId,
           courseId,
           completedLessons: [],

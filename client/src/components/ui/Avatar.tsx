@@ -1,21 +1,18 @@
 import React, { useState } from 'react';
+import { cleanInstructorName } from '../../utils/api';
 
 interface AvatarProps {
   src?: string;
   name: string;
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
-  showOnlineStatus?: boolean;
-  isOnline?: boolean;
 }
 
 export const Avatar: React.FC<AvatarProps> = ({
   src,
   name,
   size = 'md',
-  className = '',
-  showOnlineStatus = false,
-  isOnline = false
+  className = ''
 }) => {
   const [imageError, setImageError] = useState(false);
 
@@ -28,19 +25,11 @@ export const Avatar: React.FC<AvatarProps> = ({
     xl: 'w-16 h-16 text-xl'
   };
 
-  const statusSizeClasses = {
-    xs: 'w-1.5 h-1.5 border',
-    sm: 'w-2 h-2 border',
-    md: 'w-2.5 h-2.5 border-2',
-    lg: 'w-3 h-3 border-2',
-    xl: 'w-4 h-4 border-2'
-  };
-
   // Get user initials for fallback
   const getUserInitials = (name: string): string => {
     if (!name || typeof name !== 'string') return 'U';
-    
-    return name
+    // Always clean the name before generating initials
+    return cleanInstructorName(name)
       .trim()
       .split(' ')
       .map(word => word.charAt(0))
@@ -53,7 +42,9 @@ export const Avatar: React.FC<AvatarProps> = ({
     setImageError(true);
   };
 
-  const displayImage = src && !imageError && src.length > 0;
+  // Detect fallback SVG avatar (with 'User' text)
+  const isFallbackAvatar = src?.startsWith('data:image/svg+xml') && src.includes('User');
+  const displayImage = src && !imageError && src.length > 0 && !isFallbackAvatar;
 
   return (
     <div className={`relative inline-block ${className}`}>
@@ -87,21 +78,7 @@ export const Avatar: React.FC<AvatarProps> = ({
         )}
       </div>
       
-      {/* Online Status Indicator */}
-      {showOnlineStatus && (
-        <div 
-          className={`
-            absolute 
-            bottom-0 
-            right-0 
-            ${statusSizeClasses[size]}
-            rounded-full 
-            border-white
-            ${isOnline ? 'bg-green-500' : 'bg-gray-400'}
-          `}
-          title={isOnline ? 'Online' : 'Offline'}
-        />
-      )}
+
     </div>
   );
 };

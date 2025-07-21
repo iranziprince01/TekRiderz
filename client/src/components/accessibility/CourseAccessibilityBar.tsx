@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { speechService, webSpeechFallback } from '../../services/speechService';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface CourseAccessibilityBarProps {
   pageContent?: string;
@@ -26,6 +27,7 @@ export const CourseAccessibilityBar: React.FC<CourseAccessibilityBarProps> = ({
   courseTitle
 }) => {
   const { language } = useLanguage();
+  const { theme } = useTheme();
   const [isExpanded, setIsExpanded] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);

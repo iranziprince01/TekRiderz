@@ -6,7 +6,8 @@ interface FirebasePdfUploadProps {
   onPdfUploaded: (url: string, filePath: string) => void;
   currentPdfUrl?: string;
   currentFilePath?: string;
-  courseId?: string;
+  courseId: string; // Required for module PDFs
+  moduleId: string; // Required for module PDFs
   className?: string;
 }
 
@@ -15,6 +16,7 @@ export const FirebasePdfUpload: React.FC<FirebasePdfUploadProps> = ({
   currentPdfUrl,
   currentFilePath,
   courseId,
+  moduleId,
   className = ''
 }) => {
   const [uploading, setUploading] = useState(false);
@@ -61,9 +63,8 @@ export const FirebasePdfUpload: React.FC<FirebasePdfUploadProps> = ({
       // Create form data
       const formData = new FormData();
       formData.append('file', file);
-      if (courseId) {
-        formData.append('courseId', courseId);
-      }
+      formData.append('courseId', courseId);
+      formData.append('moduleId', moduleId);
 
       // Upload to Firebase via backend
       const response = await fetch('/api/v1/firebase-pdf/upload', {
@@ -272,10 +273,10 @@ export const FirebasePdfUpload: React.FC<FirebasePdfUploadProps> = ({
             
             <div>
               <h3 className="text-lg font-medium text-gray-900">
-                Upload Lecture Notes (PDF)
+                Upload Module Notes (PDF)
               </h3>
               <p className="text-gray-600 mt-1">
-                Drag and drop a PDF file here, or click to browse
+                Upload lecture notes or materials for this module
               </p>
             </div>
 

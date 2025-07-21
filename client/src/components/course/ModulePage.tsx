@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import { updateLessonProgress } from '../../utils/api';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
@@ -46,6 +47,7 @@ export const ModulePage: React.FC<ModulePageProps> = ({
 }) => {
   const navigate = useNavigate();
   const { language } = useLanguage();
+  const { theme } = useTheme();
   const [isCompleting, setIsCompleting] = useState(false);
   const [localCompleted, setLocalCompleted] = useState(module.isCompleted);
   const [videoLoaded, setVideoLoaded] = useState(false);

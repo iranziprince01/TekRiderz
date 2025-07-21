@@ -1,3 +1,21 @@
+/**
+ * Firebase PDF Storage Service
+ * 
+ * This service handles PDF operations for course module materials.
+ * Only tutors upload PDFs (lecture notes, module materials).
+ * Learners download PDFs from the course module pages.
+ * 
+ * PDFs are organized by course and module:
+ * - Module PDFs: pdfs/courses/{courseId}/modules/{moduleId}/{tutorId}_{timestamp}_{filename}.pdf
+ * 
+ * Benefits of Firebase Storage for PDFs:
+ * - Clean URLs: https://storage.googleapis.com/bucket/pdfs/courses/123/modules/456/file.pdf
+ * - Organized by course and module for easy access
+ * - Cost-effective for large files
+ * - No complex URL structures
+ * - Clear separation: tutors upload, learners download
+ */
+
 import { bucket } from '../config/firebase';
 import { logger } from '../utils/logger';
 
@@ -33,13 +51,14 @@ export class FirebasePdfService {
   }
 
   /**
-   * Upload PDF to Firebase Storage
+   * Upload PDF to Firebase Storage (Tutors only)
    */
   async uploadPdf(
     fileBuffer: Buffer,
     fileName: string,
-    userId: string,
-    courseId?: string
+    tutorId: string,
+    courseId: string,
+    moduleId: string
   ): Promise<FirebasePdfUploadResult> {
     try {
       if (!this.bucketName) {
@@ -51,12 +70,15 @@ export class FirebasePdfService {
         throw new Error('Firebase Storage bucket is not initialized. Please check Firebase configuration.');
       }
 
-      // Create unique file path
+      // Validate required parameters for module PDF upload
+      if (!courseId || !moduleId) {
+        throw new Error('Course ID and Module ID are required for PDF upload');
+      }
+
+      // Create unique file path for module PDFs
       const timestamp = Date.now();
       const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const filePath = courseId 
-        ? `${this.pdfFolder}/courses/${courseId}/${userId}_${timestamp}_${sanitizedFileName}`
-        : `${this.pdfFolder}/users/${userId}/${timestamp}_${sanitizedFileName}`;
+      const filePath = `${this.pdfFolder}/courses/${courseId}/modules/${moduleId}/${tutorId}_${timestamp}_${sanitizedFileName}`;
 
       // Create file reference
       const file = bucket.file(filePath);
@@ -66,23 +88,26 @@ export class FirebasePdfService {
         metadata: {
           contentType: 'application/pdf',
           metadata: {
-            uploadedBy: userId,
-            courseId: courseId || '',
+            uploadedBy: tutorId,
+            courseId: courseId,
+            moduleId: moduleId,
             originalName: fileName,
-            uploadedAt: new Date().toISOString()
+            uploadedAt: new Date().toISOString(),
+            uploadedByRole: 'tutor'
           }
         },
-        public: true // Make file publicly accessible
+        public: true // Make file publicly accessible for learners
       });
 
       // Get public URL
       const publicUrl = `https://storage.googleapis.com/${this.bucketName}/${filePath}`;
 
-      logger.info('PDF uploaded to Firebase Storage successfully', {
+      logger.info('Module PDF uploaded to Firebase Storage successfully', {
         fileName,
         filePath,
-        userId,
+        tutorId,
         courseId,
+        moduleId,
         size: fileBuffer.length
       });
 
@@ -191,11 +216,11 @@ export class FirebasePdfService {
   }
 
   /**
-   * List PDFs for a user or course
+   * List PDFs for a specific module (for learners to download)
    */
-  async listPdfs(
-    userId?: string,
-    courseId?: string
+  async listModulePdfs(
+    courseId: string,
+    moduleId: string
   ): Promise<{ success: boolean; files?: any[]; error?: string }> {
     try {
       if (!this.bucketName) {
@@ -207,12 +232,8 @@ export class FirebasePdfService {
         throw new Error('Firebase Storage bucket is not initialized. Please check Firebase configuration.');
       }
 
-      let prefix = this.pdfFolder;
-      if (courseId) {
-        prefix += `/courses/${courseId}/`;
-      } else if (userId) {
-        prefix += `/users/${userId}/`;
-      }
+      // List PDFs for specific module
+      const prefix = `${this.pdfFolder}/courses/${courseId}/modules/${moduleId}/`;
 
       const [files] = await bucket.getFiles({ prefix });
 
@@ -223,7 +244,9 @@ export class FirebasePdfService {
           size: file.metadata?.size,
           uploadedAt: file.metadata?.timeCreated,
           url: `https://storage.googleapis.com/${this.bucketName}/${file.name}`,
-          metadata: file.metadata?.metadata
+          metadata: file.metadata?.metadata,
+          tutorId: file.metadata?.metadata?.uploadedBy,
+          originalName: file.metadata?.metadata?.originalName
         }));
 
       return {
@@ -232,10 +255,58 @@ export class FirebasePdfService {
       };
 
     } catch (error) {
-      logger.error('Failed to list PDFs:', error);
+      logger.error('Failed to list module PDFs:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to list PDFs'
+        error: error instanceof Error ? error.message : 'Failed to list module PDFs'
+      };
+    }
+  }
+
+  /**
+   * List PDFs for a course (for tutors to manage)
+   */
+  async listCoursePdfs(
+    courseId: string
+  ): Promise<{ success: boolean; files?: any[]; error?: string }> {
+    try {
+      if (!this.bucketName) {
+        throw new Error('Firebase Storage bucket not configured');
+      }
+
+      // Check if bucket is available
+      if (!bucket) {
+        throw new Error('Firebase Storage bucket is not initialized. Please check Firebase configuration.');
+      }
+
+      // List all PDFs for a course
+      const prefix = `${this.pdfFolder}/courses/${courseId}/`;
+
+      const [files] = await bucket.getFiles({ prefix });
+
+      const pdfFiles = files
+        .filter((file: any) => file.metadata?.contentType === 'application/pdf')
+        .map((file: any) => ({
+          name: file.name,
+          size: file.metadata?.size,
+          uploadedAt: file.metadata?.timeCreated,
+          url: `https://storage.googleapis.com/${this.bucketName}/${file.name}`,
+          metadata: file.metadata?.metadata,
+          tutorId: file.metadata?.metadata?.uploadedBy,
+          moduleId: file.metadata?.metadata?.moduleId,
+          originalName: file.metadata?.metadata?.originalName
+        }));
+
+      return {
+        success: true,
+        files: pdfFiles
+      };
+
+    } catch (error) {
+      logger.error('Failed to list course PDFs:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to list course PDFs'
       };
     }
   }

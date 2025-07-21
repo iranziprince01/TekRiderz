@@ -42,7 +42,7 @@ export const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
     
     if (!isCloudinaryConfigured) {
       console.warn('Cloud storage not configured. Missing required credentials.');
-      setError('Cloud storage unavailable - using offline mode');
+      setError('Cloud storage unavailable');
     } else {
       setError(''); // Clear any previous errors
       console.log('ProfilePictureUpload - Cloud storage properly configured and ready');
@@ -231,32 +231,7 @@ export const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
     }
   };
 
-  // Local storage upload method for fallback
-  const uploadToLocalStorage = async (file: File): Promise<Response> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        const imageId = `profile_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        
-        try {
-          localStorage.setItem(`profile_${imageId}`, result);
-          resolve({
-            ok: true,
-            json: () => Promise.resolve({
-              secure_url: result,
-              public_id: imageId,
-              local: true
-            })
-          } as Response);
-        } catch (storageError) {
-          reject(new Error('Local storage failed - storage may be full'));
-        }
-      };
-      reader.onerror = () => reject(new Error('Failed to read file'));
-      reader.readAsDataURL(file);
-    });
-  };
+
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -284,54 +259,12 @@ export const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
         setError(`Upload failed: ${errorMsg}`);
       }
     } else {
-      console.log('ProfilePictureUpload - Cloud storage not configured, using offline storage only');
-      await uploadAsBase64(file);
+      console.log('ProfilePictureUpload - Cloud storage not configured');
+      setError('Cloud storage not configured');
     }
   };
 
-  // Base64 upload method for when Cloudinary is not available
-  const uploadAsBase64 = async (file: File) => {
-    setUploading(true);
-    setError('');
-    setImageError(false);
 
-    try {
-      console.log('ProfilePictureUpload - Starting base64 upload for:', file.name);
-      
-      // Validate file first
-      const validationError = validateFile(file);
-      if (validationError) {
-        throw new Error(validationError);
-      }
-
-      // Convert to base64
-      const result = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const result = e.target?.result;
-          if (typeof result === 'string') {
-            resolve(result);
-          } else {
-            reject(new Error('File read result was not a string'));
-          }
-        };
-        reader.onerror = () => {
-          reject(new Error('Failed to read file'));
-        };
-        reader.readAsDataURL(file);
-      });
-
-      console.log('ProfilePictureUpload - Base64 conversion successful');
-      setImageUrl(result);
-      onImageUploaded(result);
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Base64 upload failed';
-      console.error('ProfilePictureUpload - Base64 upload failed:', error);
-      setError(errorMsg);
-    } finally {
-      setUploading(false);
-    }
-  };
 
   const removeImage = () => {
     setImageUrl('');
@@ -463,13 +396,9 @@ export const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
       )}
 
       {/* Configuration Status */}
-      {isCloudinaryConfigured ? (
+      {isCloudinaryConfigured && (
         <div className="mt-2 text-xs text-gray-600 text-center">
           Cloud storage ready
-        </div>
-      ) : (
-        <div className="mt-2 text-xs text-gray-500 text-center">
-          Offline mode
         </div>
       )}
     </div>

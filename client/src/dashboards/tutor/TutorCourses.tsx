@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useCourseStore } from '../../stores/courseStore';
-import { apiClient, getFileUrl } from '../../utils/api';
+import { apiClient, getFileUrl, cleanInstructorName } from '../../utils/api';
 import { handleApiError, handleCatchError, getErrorMessage } from '../../utils/errorHandler';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -83,7 +83,7 @@ const TutorCourses: React.FC = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
+
   
   const [stats, setStats] = useState<CourseStats>({
     total: 0,
@@ -337,21 +337,7 @@ const TutorCourses: React.FC = () => {
   };
 
   // Connection status monitoring
-  useEffect(() => {
-    const handleConnectionStatus = () => {
-      setIsConnected(navigator.onLine);
-    };
 
-    // Check connection status
-    window.addEventListener('online', handleConnectionStatus);
-    window.addEventListener('offline', handleConnectionStatus);
-    handleConnectionStatus();
-
-    return () => {
-      window.removeEventListener('online', handleConnectionStatus);
-      window.removeEventListener('offline', handleConnectionStatus);
-    };
-  }, []);
 
   // Initialize data loading
   useEffect(() => {
@@ -621,20 +607,7 @@ const TutorCourses: React.FC = () => {
           <p className="text-gray-600 dark:text-gray-400 mt-1">
             {t('tutor.courses.subtitle')}
           </p>
-          {/* Connection Status */}
-          <div className="flex items-center mt-2">
-            {isConnected ? (
-              <div className="flex items-center text-green-600 dark:text-green-400">
-                <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                <span className="text-sm">{t('tutor.courses.connected')}</span>
-              </div>
-            ) : (
-              <div className="flex items-center text-red-600 dark:text-red-400">
-                <div className="w-2 h-2 bg-red-500 rounded-full mr-2"></div>
-                <span className="text-sm">{t('tutor.courses.offline')}</span>
-              </div>
-            )}
-          </div>
+
           </div>
         <Button 
           onClick={() => navigate('/dashboard/courses/new')}
@@ -716,29 +689,43 @@ const TutorCourses: React.FC = () => {
             />
           </div>
           <div className="flex gap-6">
-            <select 
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-6 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white min-w-[140px]"
-            >
-              <option value="all">{t('tutor.courses.allStatus')}</option>
-              <option value="draft">{t('status.draft')}</option>
-              <option value="pending">{t('status.pending')}</option>
-              <option value="submitted">{t('status.submitted')}</option>
-              <option value="published">{t('status.published')}</option>
-              <option value="rejected">{t('status.rejected')}</option>
-            </select>
-            <select 
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="px-6 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white min-w-[140px]"
-            >
-              <option value="all">{t('tutor.courses.allCategories')}</option>
-              <option value="programming">Programming</option>
-              <option value="design">Design</option>
-              <option value="business-tech">Business Tech</option>
-              <option value="general-it">General IT</option>
-            </select>
+            <div className="relative">
+              <select 
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full h-12 px-4 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white min-w-[140px] appearance-none [&::-ms-expand]:hidden"
+              >
+                <option value="all">{t('tutor.courses.allStatus')}</option>
+                <option value="draft">{t('status.draft')}</option>
+                <option value="pending">{t('status.pending')}</option>
+                <option value="submitted">{t('status.submitted')}</option>
+                <option value="published">{t('status.published')}</option>
+                <option value="rejected">{t('status.rejected')}</option>
+              </select>
+              <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none">
+                <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
+            <div className="relative">
+              <select 
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="w-full h-12 px-4 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white min-w-[140px] appearance-none [&::-ms-expand]:hidden"
+              >
+                <option value="all">{t('tutor.courses.allCategories')}</option>
+                <option value="programming">Programming</option>
+                <option value="design">Design</option>
+                <option value="business-tech">Business Tech</option>
+                <option value="general-it">General IT</option>
+              </select>
+              <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none">
+                <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
           </div>
         </div>
       </Card>
@@ -822,7 +809,7 @@ const TutorCourses: React.FC = () => {
                     </h3>
                     
                     <p className="text-blue-600 dark:text-blue-400 font-medium text-xs">
-                      {course.instructorName || 'Prince Iranzi'}
+                      {cleanInstructorName(course.instructorName || 'Prince Iranzi')}
                     </p>
                   </div>
                   
@@ -1034,7 +1021,7 @@ const TutorCourses: React.FC = () => {
                           {t('tutor.courses.instructor')}
                         </span>
                         <span className="font-medium text-gray-900 dark:text-white">
-                          {selectedCourse.instructorName}
+                          {cleanInstructorName(selectedCourse.instructorName)}
                         </span>
                       </div>
                     </div>

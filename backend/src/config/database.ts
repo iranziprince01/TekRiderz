@@ -113,6 +113,7 @@ const createDesignDocuments = async (): Promise<void> => {
     await createCourseDesignDocuments();
     await createUserDesignDocuments();
     await createEnrollmentDesignDocuments();
+    await createProgressDesignDocuments();
 
     await createAnalyticsDesignDocuments();
     await createAssessmentDesignDocuments();
@@ -271,6 +272,61 @@ const createEnrollmentDesignDocuments = async (): Promise<void> => {
   } catch (error: any) {
     if (error.statusCode !== 409) {
       logger.error('Failed to create enrollment design document:', error);
+    }
+  }
+};
+
+// Create progress-specific design documents
+const createProgressDesignDocuments = async (): Promise<void> => {
+  const progressDb = databases.progress;
+  
+  try {
+    const designDoc: any = {
+      _id: '_design/progress',
+      views: {
+        by_user: {
+          map: `function(doc) {
+            if (doc.type === 'progress' && doc.userId) {
+              emit(doc.userId, null);
+            }
+          }`
+        },
+        by_course: {
+          map: `function(doc) {
+            if (doc.type === 'progress' && doc.courseId) {
+              emit(doc.courseId, null);
+            }
+          }`
+        },
+        by_user_and_course: {
+          map: `function(doc) {
+            if (doc.type === 'progress' && doc.userId && doc.courseId) {
+              emit([doc.userId, doc.courseId], null);
+            }
+          }`
+        },
+        recent_activity: {
+          map: `function(doc) {
+            if (doc.type === 'progress' && doc.lastWatched) {
+              emit(doc.lastWatched, null);
+            }
+          }`
+        }
+      }
+    };
+
+    try {
+      const existing = await progressDb.get('_design/progress');
+      designDoc._rev = existing._rev;
+    } catch (error) {
+      // Design doc doesn't exist, will create new one
+    }
+
+    await progressDb.insert(designDoc);
+    logger.info('Progress design document created/updated successfully');
+  } catch (error: any) {
+    if (error.statusCode !== 409) {
+      logger.error('Failed to create progress design document:', error);
     }
   }
 };

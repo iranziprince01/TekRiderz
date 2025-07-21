@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
-import { getFileUrl, apiClient } from '../../utils/api';
+import { getFileUrl, apiClient, cleanInstructorName } from '../../utils/api';
 import { 
   Users, 
   Star, 
@@ -55,6 +56,7 @@ export const CourseHome: React.FC<CourseHomeProps> = ({
   const navigate = useNavigate();
   const { user } = useAuth();
   const { language } = useLanguage();
+  const { theme } = useTheme();
   const [isEnrolling, setIsEnrolling] = useState(false);
 
   const getThumbnailUrl = () => {
@@ -75,13 +77,13 @@ export const CourseHome: React.FC<CourseHomeProps> = ({
       if (response.success) {
         console.log('Enrollment successful:', response.data);
         
-        // Immediate navigation to course modules
-        navigate(`/course/${course.id}/modules`);
+        // Dispatch global event to notify other components
+        window.dispatchEvent(new CustomEvent('courseEnrollmentUpdated', {
+          detail: { courseId: course.id, enrollment: response.data.enrollment }
+        }));
         
-        // Refresh the page to update enrollment status
-        setTimeout(() => {
-          window.location.reload();
-        }, 100);
+        // Navigate to modules page after successful enrollment
+        navigate(`/course/${course.id}/modules`);
       } else {
         throw new Error(response.error || 'Enrollment failed');
       }
@@ -108,7 +110,7 @@ export const CourseHome: React.FC<CourseHomeProps> = ({
         <div className="md:flex">
           {/* Course Thumbnail */}
           <div className="md:w-1/3">
-            <div className="aspect-video bg-gray-100">
+            <div className="aspect-video bg-gray-100 dark:bg-gray-800">
               {course.thumbnail ? (
                 <img
                   src={getThumbnailUrl()}
@@ -121,7 +123,7 @@ export const CourseHome: React.FC<CourseHomeProps> = ({
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
-                  <BookOpen className="w-16 h-16 text-gray-400" />
+                  <BookOpen className="w-16 h-16 text-gray-400 dark:text-gray-600" />
                 </div>
               )}
             </div>
@@ -131,7 +133,7 @@ export const CourseHome: React.FC<CourseHomeProps> = ({
           <div className="md:w-2/3 p-8">
             <div className="mb-4">
               <div className="flex flex-wrap gap-2 mb-4">
-                <Badge variant="default" className="bg-gray-100 text-gray-700">{course.category}</Badge>
+                <Badge variant="default" className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">{course.category}</Badge>
                 <Badge variant="default" className="bg-blue-100 text-blue-700">{course.level}</Badge>
                 {course.status === 'published' && (
                   <Badge variant="success" className="bg-green-100 text-green-700">
@@ -140,19 +142,19 @@ export const CourseHome: React.FC<CourseHomeProps> = ({
                 )}
               </div>
               
-              <h1 className="text-3xl font-semibold text-gray-900 mb-4">
-                {course.title}
-              </h1>
-
-              <p className="text-gray-600 text-lg leading-relaxed mb-6">
-                {course.description}
-              </p>
+                      <h1 className="text-3xl font-semibold text-gray-900 dark:text-white mb-4">
+          {course.title}
+        </h1>
+        
+        <p className="text-gray-600 dark:text-gray-400 text-lg leading-relaxed mb-6">
+          {course.description}
+        </p>
 
               {/* Course Stats */}
               <div className="flex flex-wrap gap-6 mb-6">
                 <div className="flex items-center gap-2">
                   <Users className="w-5 h-5 text-blue-500" />
-                  <span className="text-gray-700">
+                  <span className="text-gray-700 dark:text-gray-300">
                     {course.enrollmentCount?.toLocaleString() || '0'} {language === 'rw' ? 'abanyeshuri' : 'students'}
                   </span>
                 </div>
@@ -160,10 +162,10 @@ export const CourseHome: React.FC<CourseHomeProps> = ({
                 {course.rating && (
                   <div className="flex items-center gap-2">
                     <Star className="w-5 h-5 text-amber-500" />
-                    <span className="font-medium text-gray-700">
+                    <span className="font-medium text-gray-700 dark:text-gray-300">
                       {course.rating.average.toFixed(1)}
                     </span>
-                    <span className="text-gray-500 text-sm">
+                    <span className="text-gray-500 dark:text-gray-400 text-sm">
                       ({course.rating.count} {language === 'rw' ? 'ibitekerezo' : 'reviews'})
                     </span>
                   </div>
@@ -172,7 +174,7 @@ export const CourseHome: React.FC<CourseHomeProps> = ({
                 {course.totalDuration && (
                   <div className="flex items-center gap-2">
                     <Clock className="w-5 h-5 text-green-500" />
-                    <span className="text-gray-700">
+                    <span className="text-gray-700 dark:text-gray-300">
                       {formatDuration(course.totalDuration)}
                     </span>
                   </div>
@@ -181,7 +183,7 @@ export const CourseHome: React.FC<CourseHomeProps> = ({
                 {course.totalLessons && (
                   <div className="flex items-center gap-2">
                     <BookOpen className="w-5 h-5 text-purple-500" />
-                    <span className="text-gray-700">
+                    <span className="text-gray-700 dark:text-gray-300">
                       {course.totalLessons} {language === 'rw' ? 'amasomo' : 'lessons'}
                     </span>
                   </div>
@@ -192,14 +194,14 @@ export const CourseHome: React.FC<CourseHomeProps> = ({
               {isEnrolled && userProgress && (
                 <div className="mb-6">
                   <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium text-gray-700">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       {language === 'rw' ? 'Aho ugeze:' : 'Progress:'} {userProgress.completedLessons} {language === 'rw' ? 'kuri' : 'of'} {userProgress.totalLessons} {language === 'rw' ? 'amasomo' : 'lessons'}
                     </span>
                     <span className="text-sm font-medium text-blue-600">
                       {Math.round(userProgress.overallProgress)}%
                     </span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
                     <div 
                       className="bg-blue-600 h-3 rounded-full transition-all duration-300"
                       style={{ width: `${userProgress.overallProgress}%` }}
@@ -306,11 +308,13 @@ export const CourseHome: React.FC<CourseHomeProps> = ({
           </h3>
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center text-xl font-semibold">
-              {course.instructorName.charAt(0).toUpperCase()}
+              {cleanInstructorName(course.instructorName).charAt(0).toUpperCase()}
             </div>
             <div>
-              <h4 className="text-lg font-medium text-gray-900">{course.instructorName}</h4>
-              <p className="text-gray-600">
+              <h4 className="text-lg font-medium text-gray-900 dark:text-white">
+                {cleanInstructorName(course.instructorName)}
+              </h4>
+              <p className="text-gray-600 dark:text-gray-400">
                 {language === 'rw' ? 'Umwarimu ukomeye' : 'Course Instructor'}
               </p>
             </div>

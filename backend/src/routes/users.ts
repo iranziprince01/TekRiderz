@@ -420,6 +420,13 @@ router.get('/courses', authenticate, async (req: Request, res: Response) => {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     const status = req.query.status as any;
+    const syncProgress = req.query.sync === 'true'; // Add sync parameter
+
+    logger.info('Checking enrollment status for user:', {
+      service: 'tekriders-backend',
+      coursesCount: 4,
+      syncProgress
+    });
 
     // Get user enrollments
     const enrollments = await enrollmentModel.getUserEnrollments(req.user.id, {
@@ -428,43 +435,150 @@ router.get('/courses', authenticate, async (req: Request, res: Response) => {
       status,
     });
 
-    // Get course details for each enrollment
+    // Get course details for each enrollment with proper error handling
     const coursesWithProgress = await Promise.all(
       enrollments.enrollments.map(async (enrollment) => {
         try {
           const course = await courseModel.findById(enrollment.courseId);
+          
+          // Skip if course is deleted or not found
+          if (!course) {
+            logger.warn('Course not found, removing from enrollments:', { 
+              courseId: enrollment.courseId, 
+              enrollmentId: enrollment._id 
+            });
+            
+            return null;
+          }
+
+          // Skip if course is not published
+          if (course.status !== 'published') {
+            return null;
+          }
+
           const progress = await progressModel.findByUserAndCourse(req.user!.id, enrollment.courseId);
           
+          // Sync progress if requested
+          let syncedProgress = progress;
+          if (syncProgress && progress) {
+            try {
+              const syncResult = await progressModel.calculateAndSyncProgress(req.user!.id, enrollment.courseId);
+              logger.info('Progress synced for course:', {
+                courseId: enrollment.courseId,
+                progressPercentage: syncResult.progressPercentage,
+                completedLessons: syncResult.completedLessons,
+                totalLessons: syncResult.totalLessons
+              });
+              
+              // Get updated progress after sync
+              syncedProgress = await progressModel.findByUserAndCourse(req.user!.id, enrollment.courseId);
+            } catch (syncError) {
+              logger.warn('Failed to sync progress for course:', {
+                courseId: enrollment.courseId,
+                error: syncError
+              });
+            }
+          }
+          
+          // Calculate proper progress with detailed data
+          const progressPercentage = syncedProgress ? syncedProgress.overallProgress || 0 : enrollment.progress || 0;
+          
+          // Ensure completedLessons is always an array
+          let completedLessonsArray: string[] = [];
+          if (syncedProgress?.completedLessons) {
+            if (Array.isArray(syncedProgress.completedLessons)) {
+              completedLessonsArray = syncedProgress.completedLessons;
+            } else if (typeof syncedProgress.completedLessons === 'object' && syncedProgress.completedLessons !== null) {
+              try {
+                completedLessonsArray = Object.values(syncedProgress.completedLessons);
+              } catch (error) {
+                logger.warn('Failed to convert completedLessons object to array:', error);
+                completedLessonsArray = [];
+              }
+            } else {
+              logger.warn('completedLessons is not an array:', syncedProgress.completedLessons);
+              completedLessonsArray = [];
+            }
+          }
+          
+          const completedLessons = completedLessonsArray.length;
+          const totalLessons = course?.totalLessons || course?.sections?.length || 0;
+          
+          // Get detailed progress information
+          const detailedProgress = syncedProgress ? {
+            percentage: progressPercentage,
+            completedLessons: completedLessonsArray,
+            totalLessons: totalLessons,
+            timeSpent: syncedProgress.timeSpent || 0,
+            currentLesson: syncedProgress.currentLesson,
+            lastWatched: syncedProgress.lastWatched,
+            overallProgress: syncedProgress.overallProgress || 0,
+            completedSections: syncedProgress.completedSections || [],
+            sectionProgress: syncedProgress.sectionProgress || {}
+          } : {
+            percentage: progressPercentage,
+            completedLessons: [],
+            totalLessons: totalLessons,
+            timeSpent: 0,
+            currentLesson: null,
+            lastWatched: null,
+            overallProgress: progressPercentage,
+            completedSections: [],
+            sectionProgress: {}
+          };
+          
           return {
-            ...course,
+            _id: course._id,
+            id: course.id,
+            title: course.title,
+            description: course.description,
+            thumbnail: course.thumbnail,
+            instructorId: course.instructorId,
+            instructorName: course.instructorName,
+            totalDuration: course.totalDuration,
+            level: course.level,
+            category: course.category,
+            status: course.status,
+            createdAt: course.createdAt,
+            updatedAt: course.updatedAt,
             enrollment: {
               id: enrollment._id,
               enrolledAt: enrollment.enrolledAt,
-              progress: enrollment.progress,
+              progress: progressPercentage,
               status: enrollment.status,
             },
-            progress: progress ? {
-              completedLessons: progress.completedLessons.length,
-              totalLessons: course?.totalLessons || 0,
-              timeSpent: progress.timeSpent,
-              currentLesson: progress.currentLesson,
-              lastWatched: progress.lastWatched,
-            } : null,
+            progress: detailedProgress,
+            sections: course.sections || [],
+            totalModules: course.sections?.length || 0,
           };
         } catch (error) {
-          logger.error('Failed to get course details for enrollment:', { enrollmentId: enrollment._id, error });
+          logger.error('Failed to get course details for enrollment:', { 
+            enrollmentId: enrollment._id, 
+            courseId: enrollment.courseId,
+            error 
+          });
           return null;
         }
       })
     );
 
+    // Filter out null courses (deleted or invalid)
     const validCourses = coursesWithProgress.filter(course => course !== null);
+
+    logger.info('Enrollment status check complete:', {
+      service: 'tekriders-backend',
+      totalCourses: validCourses.length,
+      enrolledCourses: validCourses.length
+    });
 
     return res.json({
       success: true,
       data: {
         courses: validCourses,
-        pagination: enrollments.pagination,
+        pagination: {
+          ...enrollments.pagination,
+          total: validCourses.length,
+        },
       },
     });
   } catch (error) {

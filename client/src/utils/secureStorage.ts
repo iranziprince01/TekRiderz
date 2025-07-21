@@ -1,4 +1,4 @@
-// Comprehensive secure storage utility for offline-first applications
+// Comprehensive secure storage utility
 
 interface SecureStorageItem {
   key: string;

@@ -12,13 +12,17 @@ export const isDevelopment = () => {
 
 export const isProduction = () => !isDevelopment();
 
+// Utility function to clean instructor names
+export const cleanInstructorName = (name: string | undefined | null): string => {
+  if (!name) return '';
+  return name.replace(/^US\s+/, '');
+};
+
 interface ApiResponse<T = any> {
   success: boolean;
   data?: T;
   message?: string;
   error?: string;
-  offline?: boolean;
-  queued?: boolean;
 }
 
 // IndexedDB token storage to match AuthContext's SecureAuthStorage
@@ -270,21 +274,7 @@ class ApiClient {
         },
       });
 
-      // Check if this is an offline-queued response from service worker
-      const isOfflineQueued = response.headers.get('X-Offline-Queued') === 'true';
-      
-      if (isOfflineQueued) {
-        const queuedData = await response.json();
-        console.log('Request queued for offline sync:', endpoint);
-        
-        // Show user-friendly offline message
-        return {
-          success: true,
-          data: queuedData,
-          message: 'Saved offline. Will sync when you\'re back online.',
-          offline: true
-        };
-      }
+
 
       // Handle 401 Unauthorized - try to refresh token
       if (response.status === 401 && retryCount === 0) {
@@ -360,25 +350,12 @@ class ApiClient {
     } catch (error) {
       console.error('API Request failed:', error);
       
-      // Enhanced offline error handling
+      // Network error handling
       if (!navigator.onLine || error instanceof TypeError && error.message.includes('fetch')) {
-        // Network error - likely offline
-        if (options.method && options.method !== 'GET') {
-          // For non-GET requests, show that it will be queued
-          return {
-            success: true,
-            message: 'Request queued for when you\'re back online',
-            offline: true,
-            queued: true
-          };
-        } else {
-          // For GET requests, try to get from cache
-          return {
-            success: false,
-            error: 'You\'re offline. Some content may not be available.',
-            offline: true
-          };
-        }
+        return {
+          success: false,
+          error: 'Network error. Please check your connection and try again.'
+        };
       }
       
       return {
@@ -536,7 +513,21 @@ class ApiClient {
   // Course methods
   async getCourses(params?: any): Promise<ApiResponse> {
     const queryParams = params ? new URLSearchParams(params).toString() : '';
-    return this.makeRequest(`/courses${queryParams ? `?${queryParams}` : ''}`);
+    const response = await this.makeRequest(`/courses${queryParams ? `?${queryParams}` : ''}`);
+    
+    // Clean up invalid file references in course listings
+    if (response.success && response.data && (response.data as any).courses) {
+      try {
+        const { frontendCleanupService } = await import('../services/cleanupService');
+        (response.data as any).courses = (response.data as any).courses.map((course: any) => 
+          frontendCleanupService.cleanCourseData(course)
+        );
+      } catch (cleanupError) {
+        console.warn('Failed to clean course listings:', cleanupError);
+      }
+    }
+    
+    return response;
   }
 
   async getCourse(courseId: string): Promise<ApiResponse> {
@@ -544,11 +535,21 @@ class ApiClient {
     
     // Transform the response data to use modules terminology
     if (response.success && response.data) {
+      let transformedCourse = (response.data as any).course ? transformCourseData((response.data as any).course) : (response.data as any).course;
+      
+      // Clean up invalid file references using cleanup service
+      try {
+        const { frontendCleanupService } = await import('../services/cleanupService');
+        transformedCourse = frontendCleanupService.cleanCourseData(transformedCourse);
+      } catch (cleanupError) {
+        console.warn('Failed to clean course data:', cleanupError);
+      }
+      
       return {
         ...response,
         data: {
           ...response.data,
-          course: (response.data as any).course ? transformCourseData((response.data as any).course) : (response.data as any).course,
+          course: transformedCourse,
           progress: (response.data as any).progress ? transformProgressData((response.data as any).progress) : (response.data as any).progress,
         }
       };
@@ -635,6 +636,12 @@ class ApiClient {
   async getEnrolledCourses(params?: any): Promise<ApiResponse> {
     const queryParams = params ? new URLSearchParams(params).toString() : '';
     return this.makeRequest(`/users/courses${queryParams ? `?${queryParams}` : ''}`);
+  }
+
+  async syncCourseProgress(courseId: string): Promise<ApiResponse> {
+    return this.makeRequest(`/users/courses?sync=true&courseId=${courseId}`, {
+      method: 'POST',
+    });
   }
 
   async getPublishedCourses(params?: any): Promise<ApiResponse> {
@@ -1002,6 +1009,7 @@ export const getEnrollments = () => apiClient.getEnrollments();
 export const getInstructorCourses = (params?: any) => apiClient.getInstructorCourses(params);
 export const getEnrolledCourses = (params?: any) => apiClient.getEnrolledCourses(params);
 export const getPublishedCourses = (params?: any) => apiClient.getPublishedCourses(params);
+export const syncCourseProgress = (courseId: string) => apiClient.syncCourseProgress(courseId);
 
 // Enhanced course navigation exports
 export const getCourseHome = (courseId: string) => apiClient.getCourseHome(courseId);
@@ -1161,6 +1169,14 @@ class FileUrlService {
 
     // Check cache first
     const cacheKey = `${fileType}:${cleanFilePath}`;
+    
+    // Handle user avatar URLs specifically
+    if (fileType === 'avatar' && cleanFilePath && cleanFilePath.startsWith('user_')) {
+      // This is a user ID, not a file path - return a default avatar
+      const avatarUrl = this.getDefaultAvatarUrl(cleanFilePath);
+      this.urlCache.set(cacheKey, avatarUrl);
+      return avatarUrl;
+    }
     if (this.urlCache.has(cacheKey)) {
       const cachedUrl = this.urlCache.get(cacheKey)!;
       if (import.meta.env.DEV) {
@@ -1489,6 +1505,17 @@ class FileUrlService {
     }
     
     return url;
+  }
+
+  private getDefaultAvatarUrl(userId: string): string {
+    // Generate a consistent avatar based on user ID
+    const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4'];
+    const colorIndex = userId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % colors.length;
+    const color = colors[colorIndex];
+    
+    // Use a placeholder service or generate initials
+    const initials = userId.substring(0, 2).toUpperCase();
+    return `https://ui-avatars.com/api/?name=${initials}&background=${color.substring(1)}&color=fff&size=200&bold=true`;
   }
 
 

@@ -19,8 +19,7 @@
     "api",
     "typescript",
     "express",
-    "couchdb",
-    "pwa"
+    "couchdb"
   ],
   "author": "TekRiders Team",
   "license": "MIT",
