@@ -22,9 +22,18 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { apiClient, getFileUrl, cleanInstructorName } from '../../utils/api';
+import { 
+  cacheCourse, 
+  getCachedCourses, 
+  getEnrolledCoursesOffline,
+  getCourseOffline,
+  cacheLearnerData 
+} from '../../offline/cacheService';
+import { useAuth } from '../../contexts/AuthContext';
 
 const LearnerCourses: React.FC = () => {
   const { t } = useLanguage();
+  const { isOfflineMode } = useAuth();
   const [user, setUser] = useState<any>(null);
   const [enrolledCourses, setEnrolledCourses] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -32,6 +41,7 @@ const LearnerCourses: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
 
   // Load user and enrolled courses
   const loadData = useCallback(async () => {
@@ -39,6 +49,34 @@ const LearnerCourses: React.FC = () => {
       setIsLoading(true);
       setError(null);
 
+      // Check if we're in offline mode and user is a learner
+      if ((isOfflineMode || !navigator.onLine) && user?.role === 'learner') {
+        console.log('🔄 Loading cached courses (offline mode)');
+        setIsOffline(true);
+        
+        try {
+          // Use the new learner-specific offline function
+          const enrolledCourses = await getEnrolledCoursesOffline();
+          console.log('📚 Loaded enrolled courses for offline access:', enrolledCourses.length);
+          
+          if (enrolledCourses.length > 0) {
+            setEnrolledCourses(enrolledCourses);
+            setError(null);
+          } else {
+            setError('No enrolled courses available offline. Please enroll in courses when online.');
+          }
+        } catch (cacheError) {
+          console.error('Failed to load cached courses:', cacheError);
+          setError('Failed to load cached courses');
+        }
+        
+        return;
+      }
+
+      // Online mode - fetch from API
+      setIsOffline(false);
+      console.log('🌐 Loading courses from API (online mode)');
+      
       const [userResponse, coursesResponse] = await Promise.all([
         apiClient.getCurrentUser(),
         apiClient.getEnrolledCourses({ sync: 'true' }) // Request progress sync
@@ -52,17 +90,54 @@ const LearnerCourses: React.FC = () => {
         const courses = coursesResponse.data.courses || [];
         console.log('Loaded enrolled courses with synced progress:', courses);
         setEnrolledCourses(courses);
+        
+        // Cache courses for offline access (learners only)
+        if (user?.role === 'learner') {
+          try {
+            console.log('💾 Caching courses for offline access...');
+            await Promise.all(courses.map((course: any) => cacheCourse(course)));
+            console.log(`✅ Cached ${courses.length} courses successfully`);
+            
+            // Cache complete learner data for offline access
+            if (user) {
+              await cacheLearnerData(user, courses);
+            }
+          } catch (cacheError) {
+            console.warn('Failed to cache some courses:', cacheError);
+            // Don't block the UI if caching fails
+          }
+        } else {
+          console.log('🔄 Skipping course cache - user is not a learner');
+        }
       } else {
         console.error('Failed to load courses:', coursesResponse.error);
         setError(coursesResponse.error || 'Failed to load courses');
       }
     } catch (err: any) {
       console.error('Error loading data:', err);
+      
+      // If online request fails, try to load cached courses (learners only)
+      if (!isOfflineMode && navigator.onLine && user?.role === 'learner') {
+        console.log('🔄 Online request failed, trying cached courses...');
+        try {
+          const enrolledCourses = await getEnrolledCoursesOffline();
+          if (enrolledCourses.length > 0) {
+            console.log('📚 Fallback to cached enrolled courses:', enrolledCourses.length);
+            setEnrolledCourses(enrolledCourses);
+            setIsOffline(true);
+            setError(null);
+            return;
+          }
+        } catch (cacheError) {
+          console.error('Failed to load cached courses as fallback:', cacheError);
+        }
+      }
+      
       setError(err.message || 'Failed to load data');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [isOfflineMode]);
 
   // Load data on mount
   useEffect(() => {
@@ -72,6 +147,12 @@ const LearnerCourses: React.FC = () => {
   // Handle refresh
   const handleRefresh = useCallback(async () => {
     if (isRefreshing) return;
+    
+    // Don't refresh if offline
+    if (isOffline || isOfflineMode) {
+      console.log('🔄 Refresh disabled - offline mode');
+      return;
+    }
     
     try {
       setIsRefreshing(true);
@@ -83,6 +164,18 @@ const LearnerCourses: React.FC = () => {
         const courses = coursesResponse.data.courses || [];
         console.log('🔄 Refreshed courses with synced progress:', courses);
         setEnrolledCourses(courses);
+        
+        // Cache the refreshed courses (learners only)
+        if (user?.role === 'learner') {
+          try {
+            await Promise.all(courses.map((course: any) => cacheCourse(course)));
+            console.log(`✅ Cached ${courses.length} refreshed courses`);
+          } catch (cacheError) {
+            console.warn('Failed to cache refreshed courses:', cacheError);
+          }
+        } else {
+          console.log('🔄 Skipping course cache refresh - user is not a learner');
+        }
       } else {
         console.error('Failed to refresh courses:', coursesResponse.error);
       }
@@ -91,10 +184,15 @@ const LearnerCourses: React.FC = () => {
     } finally {
       setIsRefreshing(false);
     }
-  }, [isRefreshing]);
+  }, [isRefreshing, isOffline, isOfflineMode]);
 
-  // Refresh progress data when user returns to the page
+  // Refresh progress data when user returns to the page - only when online
   useEffect(() => {
+    if (isOffline || isOfflineMode) {
+      console.log('🔄 Visibility refresh disabled - offline mode');
+      return;
+    }
+    
     const handleVisibilityChange = () => {
       if (!document.hidden) {
         console.log('🔄 Page became visible, refreshing progress data');
@@ -114,20 +212,30 @@ const LearnerCourses: React.FC = () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [loadData]);
+  }, [loadData, isOffline, isOfflineMode]);
 
-  // Periodic progress refresh (every 30 seconds)
+  // Periodic progress refresh (every 30 seconds) - only when online
   useEffect(() => {
+    if (isOffline || isOfflineMode) {
+      console.log('🔄 Periodic refresh disabled - offline mode');
+      return;
+    }
+    
     const interval = setInterval(() => {
       console.log('🔄 Periodic progress refresh...');
       handleRefresh();
     }, 30000); // 30 seconds
 
     return () => clearInterval(interval);
-  }, [handleRefresh]);
+  }, [handleRefresh, isOffline, isOfflineMode]);
 
-  // Listen for global enrollment events
+  // Listen for global enrollment events - only when online
   useEffect(() => {
+    if (isOffline || isOfflineMode) {
+      console.log('🔄 Global enrollment events disabled - offline mode');
+      return;
+    }
+    
     const handleEnrollmentEvent = () => {
       console.log('Global enrollment event detected, refreshing My Courses data');
       loadData();
@@ -143,7 +251,7 @@ const LearnerCourses: React.FC = () => {
       window.removeEventListener('courseEnrollmentUpdated', handleEnrollmentEvent);
       window.removeEventListener('courseProgressUpdated', handleEnrollmentEvent);
     };
-  }, [loadData]);
+  }, [loadData, isOffline, isOfflineMode]);
 
   // Process enrolled courses with proper progress calculation
   const processedCourses = useMemo(() => {
@@ -275,18 +383,30 @@ const LearnerCourses: React.FC = () => {
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
             {t('Continue your learning journey')}
+            {isOffline && (
+              <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                📱 {t('Offline Mode')}
+              </span>
+            )}
           </p>
         </div>
         
-        <Button
-          onClick={handleRefresh}
-          disabled={isRefreshing}
-          variant="outline"
-          size="sm"
-        >
-          <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-          {t('Refresh')}
-        </Button>
+        <div className="flex items-center gap-2">
+          {isOffline && (
+            <div className="text-sm text-yellow-600 bg-yellow-50 px-3 py-1 rounded-md border border-yellow-200">
+              📱 {t('Limited functionality - offline mode')}
+            </div>
+          )}
+          <Button
+            onClick={handleRefresh}
+            disabled={isRefreshing || isOffline}
+            variant="outline"
+            size="sm"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {t('Refresh')}
+          </Button>
+        </div>
       </div>
 
       {/* Statistics Cards */}
@@ -496,7 +616,7 @@ const LearnerCourses: React.FC = () => {
 
                 {/* Action Button */}
                 <Link to={`/course/${course._id}`} className="block">
-                  <Button className="w-full" variant={course.progress >= 100 ? 'outline' : 'primary'}>
+                  <Button className="w-full bg-blue-500 hover:bg-blue-600 text-white transition-colors duration-200">
                     {course.progress >= 100 ? (
                       <>
                         <CheckCircle className="h-4 w-4 mr-2" />

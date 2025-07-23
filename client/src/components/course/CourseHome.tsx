@@ -58,7 +58,7 @@ export const CourseHome: React.FC<CourseHomeProps> = ({
   const { language } = useLanguage();
   const { theme } = useTheme();
   const [isEnrolling, setIsEnrolling] = useState(false);
-
+  
   const getThumbnailUrl = () => {
     return getFileUrl(course.thumbnail, 'thumbnail');
   };
@@ -191,22 +191,26 @@ export const CourseHome: React.FC<CourseHomeProps> = ({
               </div>
 
               {/* Progress Bar (if enrolled) */}
-              {isEnrolled && userProgress && (
+              {isEnrolled && (
                 <div className="mb-6">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      {language === 'rw' ? 'Aho ugeze:' : 'Progress:'} {userProgress.completedLessons} {language === 'rw' ? 'kuri' : 'of'} {userProgress.totalLessons} {language === 'rw' ? 'amasomo' : 'lessons'}
-                    </span>
-                    <span className="text-sm font-medium text-blue-600">
-                      {Math.round(userProgress.overallProgress)}%
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
-                    <div 
-                      className="bg-blue-600 h-3 rounded-full transition-all duration-300"
-                      style={{ width: `${userProgress.overallProgress}%` }}
-                    />
-                  </div>
+                  {userProgress ? (
+                    <>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          {language === 'rw' ? 'Aho ugeze:' : 'Progress:'} {userProgress.completedLessons} {language === 'rw' ? 'kuri' : 'of'} {userProgress.totalLessons} {language === 'rw' ? 'amasomo' : 'lessons'}
+                        </span>
+                        <span className="text-sm font-medium text-blue-600">
+                          {Math.round(userProgress.overallProgress)}%
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                        <div 
+                          className="bg-blue-600 h-3 rounded-full transition-all duration-300"
+                          style={{ width: `${userProgress.overallProgress}%` }}
+                        />
+                      </div>
+                    </>
+                  ) : null}
                 </div>
               )}
 
@@ -215,7 +219,7 @@ export const CourseHome: React.FC<CourseHomeProps> = ({
                 {isEnrolled ? (
                   <Button
                     onClick={handleContinue}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 text-lg"
+                    className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-3 text-lg transition-colors duration-200"
                   >
                     {userProgress && userProgress.completedLessons > 0 
                       ? (
@@ -236,7 +240,7 @@ export const CourseHome: React.FC<CourseHomeProps> = ({
                     <Button
                       onClick={handleEnroll}
                       disabled={isEnrolling}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 text-lg"
+                      className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-3 text-lg transition-colors duration-200"
                     >
                       {isEnrolling ? (
                         <>

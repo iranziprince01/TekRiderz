@@ -16,10 +16,20 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../../utils/api';
 import EnhancedCourseCard from '../../components/course/EnhancedCourseCard';
+import { 
+  cacheCourse, 
+  getCachedCourses, 
+  getEnrolledCoursesOffline, 
+  cacheLearnerData,
+  getLearnerOfflineStatus
+} from '../../offline/cacheService';
+import { performOneTimeSync } from '../../offline/syncManager';
+import { useAuth } from '../../contexts/AuthContext';
+import OfflineStatus from '../../components/common/OfflineStatus';
 
 const LearnerDashboard: React.FC = () => {
   const { t } = useLanguage();
-  const [user, setUser] = useState<any>(null);
+  const { user: authUser, isOfflineMode } = useAuth(); // Get user from AuthContext
   const [courses, setCourses] = useState<any[]>([]);
   const [enrolledCourses, setEnrolledCourses] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -27,36 +37,129 @@ const LearnerDashboard: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [levelFilter, setLevelFilter] = useState('all');
+  const [isOffline, setIsOffline] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(false); // Prevent multiple simultaneous requests
+  const [isSyncing, setIsSyncing] = useState(false); // Track sync status
 
   // Load dashboard data
   const loadDashboardData = useCallback(async () => {
+    // Prevent multiple simultaneous requests
+    if (isLoadingData) {
+      console.log('🔄 Dashboard data loading already in progress, skipping...');
+      return;
+    }
+    
     try {
+      setIsLoadingData(true);
       setIsLoading(true);
       setError(null);
 
-      const [userResponse, coursesResponse, enrolledResponse] = await Promise.all([
-        apiClient.getCurrentUser(),
+      // Check if we're in offline mode and user is a learner
+      if ((isOfflineMode || !navigator.onLine) && authUser?.role === 'learner') {
+        console.log('🔄 Loading cached courses for dashboard (offline mode)');
+        setIsOffline(true);
+        
+        try {
+          // Use the new learner-specific offline function
+          const enrolledCourses = await getEnrolledCoursesOffline();
+          console.log('📚 Loaded enrolled courses for offline dashboard:', enrolledCourses.length);
+          
+          if (enrolledCourses.length > 0) {
+            setEnrolledCourses(enrolledCourses);
+            setCourses([]); // No available courses in offline mode
+            setError(null);
+            
+            // Show offline status
+            const offlineStatus = await getLearnerOfflineStatus();
+            console.log('📱 Learner offline status:', offlineStatus);
+          } else {
+            setError('No enrolled courses available offline. Please enroll in courses when online.');
+          }
+        } catch (cacheError) {
+          console.error('Failed to load cached courses for dashboard:', cacheError);
+          setError('Failed to load cached courses');
+        }
+        
+        return;
+      }
+
+      // Online mode - fetch from API
+      setIsOffline(false);
+      console.log('🌐 Loading dashboard data from API (online mode)');
+      
+      const [coursesResponse, enrolledResponse] = await Promise.all([
         apiClient.getPublishedCourses(),
         apiClient.getEnrolledCourses()
       ]);
 
-      if (userResponse.success) {
-        setUser(userResponse.data);
-      }
-
       if (coursesResponse.success) {
-        setCourses(coursesResponse.data.courses || []);
+        const courses = coursesResponse.data.courses || [];
+        setCourses(courses);
+        
+        // Cache all courses for offline access (learners only)
+        if (authUser?.role === 'learner') {
+          try {
+            console.log('💾 Caching courses for offline access...');
+            await Promise.all(courses.map((course: any) => cacheCourse(course)));
+            console.log(`✅ Cached ${courses.length} courses successfully`);
+          } catch (cacheError) {
+            console.warn('Failed to cache some courses:', cacheError);
+          }
+        } else {
+          console.log('🔄 Skipping course cache - user is not a learner');
+        }
       }
 
       if (enrolledResponse.success) {
-        setEnrolledCourses(enrolledResponse.data.courses || []);
+        const enrolledCourses = enrolledResponse.data.courses || [];
+        setEnrolledCourses(enrolledCourses);
+        
+        // Cache enrolled courses for offline access (learners only)
+        if (authUser?.role === 'learner') {
+          try {
+            console.log('💾 Caching enrolled courses for offline access...');
+            await Promise.all(enrolledCourses.map((course: any) => cacheCourse(course)));
+            console.log(`✅ Cached ${enrolledCourses.length} enrolled courses successfully`);
+            
+            // Cache complete learner data for offline access
+            if (authUser) {
+              await cacheLearnerData(authUser, enrolledCourses);
+              console.log('💾 Learner data cached for offline access');
+            }
+          } catch (cacheError) {
+            console.warn('Failed to cache some enrolled courses:', cacheError);
+          }
+        } else {
+          console.log('🔄 Skipping enrolled course cache - user is not a learner');
+        }
       }
     } catch (err: any) {
+      console.error('Error loading dashboard data:', err);
+      
+      // If online request fails, try to load cached courses (learners only)
+      if (!isOfflineMode && navigator.onLine && authUser?.role === 'learner') {
+        console.log('🔄 Online request failed, trying cached courses...');
+        try {
+          const enrolledCourses = await getEnrolledCoursesOffline();
+          if (enrolledCourses.length > 0) {
+            console.log('📚 Fallback to cached enrolled courses:', enrolledCourses.length);
+            setEnrolledCourses(enrolledCourses);
+            setCourses([]);
+            setIsOffline(true);
+            setError(null);
+            return;
+          }
+        } catch (cacheError) {
+          console.error('Failed to load cached courses as fallback:', cacheError);
+        }
+      }
+      
       setError(err.message || 'Failed to load dashboard data');
     } finally {
       setIsLoading(false);
+      setIsLoadingData(false);
     }
-  }, []);
+  }, [isOfflineMode]); // Removed isLoadingData to prevent dependency loop
 
   // Handle enrollment change - update local state immediately
   const handleEnrollmentChange = useCallback((updatedCourse?: any) => {
@@ -78,10 +181,35 @@ const LearnerDashboard: React.FC = () => {
     }
   }, []);
 
-  // Load data on mount
+  // Manual sync function
+  const handleManualSync = async () => {
+    if (isSyncing || !navigator.onLine) {
+      return;
+    }
+
+    try {
+      setIsSyncing(true);
+      console.log('🔄 Manual sync initiated...');
+      await performOneTimeSync();
+      console.log('✅ Manual sync completed');
+      
+      // Reload dashboard data after sync
+      await loadDashboardData();
+    } catch (error) {
+      console.error('❌ Manual sync failed:', error);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // Load data on mount with debounce
   useEffect(() => {
-    loadDashboardData();
-  }, [loadDashboardData]);
+    const timeoutId = setTimeout(() => {
+      loadDashboardData();
+    }, 500); // Increased delay to prevent rapid successive calls
+    
+    return () => clearTimeout(timeoutId);
+  }, []); // Empty dependency array - only run once on mount
 
   // Listen for global enrollment events
   useEffect(() => {
@@ -99,7 +227,7 @@ const LearnerDashboard: React.FC = () => {
       window.removeEventListener('courseEnrollmentUpdated', handleEnrollmentEvent);
       window.removeEventListener('courseProgressUpdated', handleEnrollmentEvent);
     };
-  }, [loadDashboardData]);
+  }, []); // Empty dependency array - listeners should only be set up once
 
   // Calculate simple dashboard statistics
   const dashboardStats = useMemo(() => {
@@ -207,11 +335,39 @@ const LearnerDashboard: React.FC = () => {
       <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-8">
         <div className="max-w-4xl">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            {t('Welcome back')}, {user?.name || t('Learner')}!
+                            {t('Welcome back')}, {authUser?.name || t('Learner')}!
           </h1>
-          <p className="text-gray-700 text-lg">
-            {t('Continue your learning journey with our latest courses')}
-          </p>
+                      <div className="flex items-center justify-between">
+              <p className="text-gray-700 text-lg">
+                {t('Continue your learning journey with our latest courses')}
+              </p>
+              <div className="flex items-center gap-4">
+                <OfflineStatus />
+                {navigator.onLine && (
+                  <Button
+                    onClick={handleManualSync}
+                    disabled={isSyncing}
+                    size="sm"
+                    variant="outline"
+                    className="flex items-center gap-2"
+                  >
+                    {isSyncing ? (
+                      <>
+                        <LoadingSpinner size="sm" />
+                        {t('Syncing...')}
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        {t('Sync')}
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+            </div>
           
           {/* Quick Stats */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">

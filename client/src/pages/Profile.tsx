@@ -8,6 +8,7 @@ import ProfilePictureUpload from '../components/ui/ProfilePictureUpload';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { apiClient } from '../utils/api';
+import { cacheUser, updateCachedUser, getCachedUser } from '../offline/cacheService';
 import { 
   User,
   Mail,
@@ -130,6 +131,16 @@ const Profile: React.FC = () => {
           location: profileData.location,
           avatar: profileData.avatar
         });
+        
+        // Cache user data for offline access (learners only)
+        if (user.role === 'learner') {
+          try {
+            await cacheUser(user);
+            console.log('✅ Profile data cached for offline access');
+          } catch (cacheError) {
+            console.warn('Failed to cache profile data:', cacheError);
+          }
+        }
       }
     } catch (error) {
       console.error('Failed to load profile:', error);

@@ -47,11 +47,11 @@ try {
   // Get the default bucket
   bucket = firebaseStorage.bucket();
   
-  console.log('✅ Firebase initialized successfully');
-  console.log('📦 Storage bucket:', bucket.name);
+  console.log('Firebase initialized successfully');
+  console.log('Storage bucket:', bucket.name);
   
 } catch (error) {
-  console.error('❌ Firebase initialization failed:', (error as Error).message);
+  console.error('Firebase initialization failed:', (error as Error).message);
   
   // Set to null to prevent crashes
   firebaseApp = null;

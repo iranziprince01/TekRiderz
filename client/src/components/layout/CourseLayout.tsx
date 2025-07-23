@@ -10,13 +10,15 @@ interface CourseLayoutProps {
   courseTitle?: string;
   courseProgress?: number;
   permissions?: CoursePermissions;
+  isOffline?: boolean;
 }
 
 const CourseLayout: React.FC<CourseLayoutProps> = ({ 
   children, 
   courseTitle,
   courseProgress,
-  permissions 
+  permissions,
+  isOffline = false
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('home');
@@ -115,6 +117,7 @@ const CourseLayout: React.FC<CourseLayoutProps> = ({
         courseTitle={courseTitle}
         courseProgress={courseProgress}
         permissions={permissions}
+        isOffline={isOffline}
       />
       
       {/* Main content area - adjusted for both sidebars */}

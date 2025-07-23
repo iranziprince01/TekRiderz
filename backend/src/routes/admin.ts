@@ -7,7 +7,14 @@ import { progressModel } from '../models/Progress';
 import { courseWorkflowService } from '../services/courseWorkflowService';
 import { emailService } from '../services/emailService';
 import { logger } from '../utils/logger';
-import { adminRateLimiter } from '../middleware/rateLimiter';
+import { createRateLimiter } from '../middleware/rateLimiter';
+
+// Create admin-specific rate limiter
+const adminRateLimiter = createRateLimiter({
+  windowMs: 60 * 1000, // 1 minute
+  maxRequests: 200, // 200 requests per minute for admin operations
+  message: 'Too many admin operations, please slow down.'
+});
 import { config } from '../config/config';
 import { User, Course, Enrollment, Progress, CourseStatus, CourseCategory, CourseLevel, CourseWorkflowHistory, UserRole, UserStatus } from '../types';
 import { body } from 'express-validator';

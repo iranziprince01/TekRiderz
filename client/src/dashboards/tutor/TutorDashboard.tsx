@@ -508,26 +508,26 @@ const TutorDashboard: React.FC = () => {
       )}
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <button 
           onClick={() => navigate('/dashboard/courses')}
           className="text-left group"
         >
-          <Card className="p-6 hover:shadow-xl hover:scale-105 transition-all duration-200 cursor-pointer border-2 hover:border-blue-300 dark:hover:border-blue-600">
+          <Card className="p-4 hover:shadow-lg transition-all duration-200 cursor-pointer border hover:border-blue-300 dark:hover:border-blue-600">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                   {t('tutor.dashboard.totalCourses')}
                 </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
+                <p className="text-xl font-bold text-gray-900 dark:text-white group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
                   {stats.totalCourses}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
                   {stats.publishedCourses} {t('tutor.dashboard.published')}
                 </p>
               </div>
-              <div className="bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900/20 dark:to-blue-800/20 p-3 rounded-xl group-hover:from-blue-200 group-hover:to-blue-300 dark:group-hover:from-blue-800/30 dark:group-hover:to-blue-700/30 transition-all">
-                <BookOpen className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              <div className="bg-blue-100 dark:bg-blue-900/20 p-2 rounded-lg group-hover:bg-blue-200 dark:group-hover:bg-blue-800/30 transition-all">
+                <BookOpen className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               </div>
             </div>
           </Card>
@@ -537,21 +537,21 @@ const TutorDashboard: React.FC = () => {
           onClick={() => navigate('/dashboard/courses')}
           className="text-left group"
         >
-          <Card className="p-6 hover:shadow-xl hover:scale-105 transition-all duration-200 cursor-pointer border-2 hover:border-blue-300 dark:hover:border-blue-600">
+          <Card className="p-4 hover:shadow-lg transition-all duration-200 cursor-pointer border hover:border-blue-300 dark:hover:border-blue-600">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                   {t('tutor.dashboard.totalStudents')}
                 </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
+                <p className="text-xl font-bold text-gray-900 dark:text-white group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
                   {stats.totalStudents}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
                   {t('tutor.dashboard.acrossAllCourses')}
                 </p>
               </div>
-              <div className="bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900/20 dark:to-blue-800/20 p-3 rounded-xl group-hover:from-blue-200 group-hover:to-blue-300 dark:group-hover:from-blue-800/30 dark:group-hover:to-blue-700/30 transition-all">
-                <Users className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              <div className="bg-blue-100 dark:bg-blue-900/20 p-2 rounded-lg group-hover:bg-blue-200 dark:group-hover:bg-blue-800/30 transition-all">
+                <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               </div>
             </div>
           </Card>
@@ -561,21 +561,21 @@ const TutorDashboard: React.FC = () => {
           onClick={() => navigate('/dashboard/courses')}
           className="text-left group"
         >
-          <Card className="p-6 hover:shadow-xl hover:scale-105 transition-all duration-200 cursor-pointer border-2 hover:border-blue-300 dark:hover:border-blue-600">
+          <Card className="p-4 hover:shadow-lg transition-all duration-200 cursor-pointer border hover:border-blue-300 dark:hover:border-blue-600">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                   {t('tutor.dashboard.avgRating')}
                 </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
+                <p className="text-xl font-bold text-gray-900 dark:text-white group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
                   {stats.avgRating.toFixed(1)}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
                   {t('tutor.dashboard.outOf')}
                 </p>
               </div>
-              <div className="bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900/20 dark:to-blue-800/20 p-3 rounded-xl group-hover:from-blue-200 group-hover:to-blue-300 dark:group-hover:from-blue-800/30 dark:group-hover:to-blue-700/30 transition-all">
-                <Star className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              <div className="bg-blue-100 dark:bg-blue-900/20 p-2 rounded-lg group-hover:bg-blue-200 dark:group-hover:bg-blue-800/30 transition-all">
+                <Star className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               </div>
             </div>
           </Card>
@@ -585,21 +585,45 @@ const TutorDashboard: React.FC = () => {
           onClick={() => navigate('/dashboard/courses')}
           className="text-left group"
         >
-          <Card className="p-6 hover:shadow-xl hover:scale-105 transition-all duration-200 cursor-pointer border-2 hover:border-blue-300 dark:hover:border-blue-600">
+          <Card className="p-4 hover:shadow-lg transition-all duration-200 cursor-pointer border hover:border-blue-300 dark:hover:border-blue-600">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                   {t('tutor.dashboard.pendingReview')}
                 </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
+                <p className="text-xl font-bold text-gray-900 dark:text-white group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
                   {stats.pendingCourses}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
                   {t('tutor.dashboard.awaitingApproval')}
                 </p>
               </div>
-              <div className="bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900/20 dark:to-blue-800/20 p-3 rounded-xl group-hover:from-blue-200 group-hover:to-blue-300 dark:group-hover:from-blue-800/30 dark:group-hover:to-blue-700/30 transition-all">
-                <Clock className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              <div className="bg-blue-100 dark:bg-blue-900/20 p-2 rounded-lg group-hover:bg-blue-200 dark:group-hover:bg-blue-800/30 transition-all">
+                <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+            </div>
+          </Card>
+        </button>
+
+        <button 
+          onClick={() => navigate('/dashboard/analytics')}
+          className="text-left group"
+        >
+          <Card className="p-4 hover:shadow-lg transition-all duration-200 cursor-pointer border hover:border-purple-300 dark:hover:border-purple-600">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                  Course Analytics
+                </p>
+                <p className="text-xl font-bold text-gray-900 dark:text-white group-hover:text-purple-700 dark:group-hover:text-purple-300 transition-colors">
+                  View
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Detailed insights
+                </p>
+              </div>
+              <div className="bg-purple-100 dark:bg-purple-900/20 p-2 rounded-lg group-hover:bg-purple-200 dark:group-hover:bg-purple-800/30 transition-all">
+                <BarChart3 className="h-5 w-5 text-purple-600 dark:text-purple-400" />
               </div>
             </div>
           </Card>

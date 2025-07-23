@@ -194,9 +194,16 @@ class ApiClient {
   private baseURL: string;
   private token: string | null;
   private tokenStorage: TokenStorage;
+  private isRefreshing: boolean = false;
+  private refreshPromise: Promise<boolean> | null = null;
+  private requestQueue: Array<() => void> = [];
+  private lastRequestTime: number = 0;
+  private requestCount: number = 0;
+  private rateLimitWindow: number = 60000; // 1 minute
+  private maxRequestsPerWindow: number = 100;
 
   constructor() {
-    this.baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+    this.baseURL = import.meta.env.VITE_API_URL || '/api/v1';
     this.token = null;
     this.tokenStorage = new TokenStorage();
     this.initializeToken();
@@ -204,6 +211,33 @@ class ApiClient {
 
   private async initializeToken(): Promise<void> {
     this.token = await this.tokenStorage.getToken();
+  }
+
+  // Rate limiting to prevent API spam
+  private checkRateLimit(): boolean {
+    const now = Date.now();
+    
+    // Reset counter if window has passed
+    if (now - this.lastRequestTime > this.rateLimitWindow) {
+      this.requestCount = 0;
+      this.lastRequestTime = now;
+    }
+    
+    // Check if we're within rate limits
+    if (this.requestCount >= this.maxRequestsPerWindow) {
+      console.warn('Rate limit exceeded, request blocked');
+      return false;
+    }
+    
+    this.requestCount++;
+    return true;
+  }
+
+  // Request deduplication to prevent duplicate requests
+  private getRequestKey(endpoint: string, options: RequestInit): string {
+    const method = options.method || 'GET';
+    const body = options.body ? JSON.stringify(options.body) : '';
+    return `${method}:${endpoint}:${body}`;
   }
 
   // Token management methods for AuthContext integration
@@ -254,17 +288,24 @@ class ApiClient {
     retryCount: number = 0
   ): Promise<ApiResponse<T>> {
     try {
+      // Check rate limiting
+      if (!this.checkRateLimit()) {
+        return {
+          success: false,
+          error: 'Rate limit exceeded. Please try again later.',
+        };
+      }
+
       const url = `${this.baseURL}${endpoint}`;
       
-      // Log the request details for debugging
-      console.log('API Request:', {
-        method: options.method || 'GET',
-        url: url,
-        endpoint: endpoint,
-        hasAuth: !!(await this.getToken()),
-        retryCount: retryCount,
-        isOnline: navigator.onLine
-      });
+      // Prevent excessive logging in development
+      if (process.env.NODE_ENV === 'development' && retryCount === 0) {
+        console.log('API Request:', {
+          method: options.method || 'GET',
+          endpoint: endpoint,
+          retryCount: retryCount,
+        });
+      }
       
       const response = await fetch(url, {
         ...options,
@@ -280,22 +321,58 @@ class ApiClient {
       if (response.status === 401 && retryCount === 0) {
         console.log('Token expired, attempting to refresh...');
         
-        const refreshSuccess = await this.attemptTokenRefresh();
-        if (refreshSuccess) {
-          console.log('Token refreshed successfully, retrying request...');
-          // Retry the original request with the new token
-          return this.makeRequest(endpoint, options, retryCount + 1);
+        // Prevent multiple simultaneous refresh attempts
+        if (this.isRefreshing) {
+          // Wait for the ongoing refresh to complete
+          if (this.refreshPromise) {
+            const refreshSuccess = await this.refreshPromise;
+            if (refreshSuccess) {
+              return this.makeRequest(endpoint, options, retryCount + 1);
+            }
+          }
         } else {
-          console.error('Token refresh failed, redirecting to login...');
-          this.handleAuthFailure();
-          return {
-            success: false,
-            error: 'Authentication failed. Please login again.',
-          };
+          const refreshSuccess = await this.attemptTokenRefresh();
+          if (refreshSuccess) {
+            console.log('Token refreshed successfully, retrying request...');
+            // Retry the original request with the new token
+            return this.makeRequest(endpoint, options, retryCount + 1);
+          }
         }
+        
+        // If refresh failed or we're already refreshing, handle auth failure
+        console.error('Token refresh failed, redirecting to login...');
+        this.handleAuthFailure();
+        return {
+          success: false,
+          error: 'Authentication failed. Please login again.',
+        };
       }
 
       if (!response.ok) {
+        // Handle 403 Forbidden specifically
+        if (response.status === 403) {
+          // Reduced logging to prevent console spam - 403 is expected when not authenticated
+          // console.error('403 Forbidden - Access denied. Token may be invalid or expired.');
+          // Clear stored tokens on 403 error
+          await this.tokenStorage.clear();
+          return {
+            success: false,
+            error: 'Access denied. Please login again.',
+            data: { status: 403, message: 'Forbidden' } as any
+          };
+        }
+        
+        // Handle 401 Unauthorized
+        if (response.status === 401) {
+          // Reduced logging to prevent console spam - 401 is expected when not authenticated
+          // console.error('401 Unauthorized - Token may be expired.');
+          return {
+            success: false,
+            error: 'Authentication required. Please login again.',
+            data: { status: 401, message: 'Unauthorized' } as any
+          };
+        }
+        
         // Try to parse the error response from the backend
         let errorMessage = `HTTP error! status: ${response.status}`;
         let errorData = null;
@@ -366,6 +443,25 @@ class ApiClient {
   }
 
   private async attemptTokenRefresh(): Promise<boolean> {
+    // If already refreshing, return the existing promise
+    if (this.isRefreshing && this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
+    // Set refreshing flag and create promise
+    this.isRefreshing = true;
+    this.refreshPromise = this.performTokenRefresh();
+
+    try {
+      const result = await this.refreshPromise;
+      return result;
+    } finally {
+      this.isRefreshing = false;
+      this.refreshPromise = null;
+    }
+  }
+
+  private async performTokenRefresh(): Promise<boolean> {
     try {
       const refreshToken = await this.tokenStorage.getRefreshToken();
       if (!refreshToken) {
@@ -980,6 +1076,44 @@ class ApiClient {
   async healthCheck(): Promise<ApiResponse> {
     return this.makeRequest('/health');
   }
+
+  // Certificate methods
+  async generateCertificate(courseId: string, templateId?: string): Promise<ApiResponse> {
+    return this.makeRequest(`/certificates/generate/${courseId}`, {
+      method: 'POST',
+      body: JSON.stringify({ templateId })
+    });
+  }
+
+  async getUserCertificates(userId: string): Promise<ApiResponse> {
+    return this.makeRequest(`/certificates/user/${userId}`);
+  }
+
+  async verifyCertificate(certificateId: string): Promise<ApiResponse> {
+    return this.makeRequest(`/certificates/verify/${certificateId}`);
+  }
+
+  async downloadCertificate(certificateId: string): Promise<Blob> {
+    const response = await fetch(`${this.baseURL}/certificates/download/${certificateId}`, {
+      headers: await this.getAuthHeaders()
+    });
+    return response.blob();
+  }
+
+  // Analytics methods
+  async getAnalytics(): Promise<ApiResponse> {
+    return this.makeRequest('/analytics');
+  }
+
+  async getAdminAnalytics(period?: string): Promise<ApiResponse> {
+    const params = period ? `?period=${period}` : '';
+    return this.makeRequest(`/analytics/admin${params}`);
+  }
+
+  async getTutorAnalytics(period?: string): Promise<ApiResponse> {
+    const params = period ? `?period=${period}` : '';
+    return this.makeRequest(`/analytics/tutor${params}`);
+  }
 }
 
 export const apiClient = new ApiClient();
@@ -1081,6 +1215,15 @@ export const getLearnerAchievements = (params?: any) => apiClient.getLearnerAchi
 
 export const healthCheck = () => apiClient.healthCheck();
 
+// Certificate functions
+export const generateCertificate = (courseId: string, templateId?: string) => apiClient.generateCertificate(courseId, templateId);
+export const getUserCertificates = (userId: string) => apiClient.getUserCertificates(userId);
+export const verifyCertificate = (certificateId: string) => apiClient.verifyCertificate(certificateId);
+export const downloadCertificate = (certificateId: string) => apiClient.downloadCertificate(certificateId);
+export const getAnalytics = () => apiClient.getAnalytics();
+export const getAdminAnalytics = (period?: string) => apiClient.getAdminAnalytics(period);
+export const getTutorAnalytics = (period?: string) => apiClient.getTutorAnalytics(period);
+
 // File URL Service with comprehensive handling
 class FileUrlService {
   private baseUrl: string;
@@ -1112,25 +1255,26 @@ class FileUrlService {
       this.baseUrl = this.baseUrl.slice(0, -1);
     }
     
-    // Only log in development mode
-    if (import.meta.env.DEV) {
-      console.log('FileUrlService initialized:', { 
-        apiUrl: this.apiUrl, 
-        baseUrl: this.baseUrl,
-        env: import.meta.env.VITE_API_URL,
-        origin: window.location.origin,
-        mode: import.meta.env.MODE
-      });
-    }
+    // Only log in development mode - disabled to reduce console spam
+    // if (import.meta.env.DEV) {
+    //   console.log('FileUrlService initialized:', { 
+    //     apiUrl: this.apiUrl, 
+    //     baseUrl: this.baseUrl,
+    //     env: import.meta.env.VITE_API_URL,
+    //     origin: window.location.origin,
+    //     mode: import.meta.env.MODE
+    //   });
+    // }
   }
 
   /**
    * Get a validated file URL with fallback handling
    */
   getFileUrl(filePath?: string | null, fileType: 'thumbnail' | 'video' | 'avatar' | 'document' | 'material' = 'thumbnail'): string {
-    if (import.meta.env.DEV) {
-      console.log('Getting file URL for:', { filePath, fileType, baseUrl: this.baseUrl });
-    }
+    // Disable excessive logging in development to prevent performance issues
+    // if (import.meta.env.DEV) {
+    //   console.log('Getting file URL for:', { filePath, fileType, baseUrl: this.baseUrl });
+    // }
     
     // Enhanced validation for garbage data
     if (!filePath || filePath === 'undefined' || filePath === 'null' || filePath.trim() === '') {
@@ -1179,17 +1323,19 @@ class FileUrlService {
     }
     if (this.urlCache.has(cacheKey)) {
       const cachedUrl = this.urlCache.get(cacheKey)!;
-      if (import.meta.env.DEV) {
-        console.log('💾 Returning cached URL:', cachedUrl);
-      }
+      // Disable excessive logging
+      // if (import.meta.env.DEV) {
+      //   console.log('💾 Returning cached URL:', cachedUrl);
+      // }
       return cachedUrl;
     }
 
     // Check if this URL has failed before
     if (this.failedUrls.has(cleanFilePath)) {
-      if (import.meta.env.DEV) {
-        console.log('URL has failed before, returning placeholder:', cleanFilePath);
-      }
+      // Disable excessive logging
+      // if (import.meta.env.DEV) {
+      //   console.log('URL has failed before, returning placeholder:', cleanFilePath);
+      // }
       return this.getPlaceholderUrl(fileType);
     }
 
@@ -1288,7 +1434,7 @@ class FileUrlService {
   clearFailedUrls(): void {
     this.failedUrls.clear();
     if (import.meta.env.DEV) {
-      console.log('🔄 Cleared failed URLs cache');
+      console.log('Cleared failed URLs cache');
     }
   }
 
@@ -1682,7 +1828,7 @@ const handleApiResponse = async (response: Response) => {
 export const submitQuiz = async (courseId: string, quizId: string, answers: any[], timeSpent: number = 0) => {
   try {
     const token = await apiClient.getToken();
-    console.log('🔐 Submit quiz with token:', token ? 'Token found' : 'No token');
+    console.log('Submit quiz with token:', token ? 'Token found' : 'No token');
     
     const response = await fetch(`${import.meta.env.VITE_API_URL || '/api/v1'}/courses/${courseId}/quizzes/${quizId}/submit`, {
       method: 'POST',

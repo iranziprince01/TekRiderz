@@ -19,13 +19,15 @@ interface CourseSidebarProps {
   courseTitle?: string;
   courseProgress?: number;
   permissions?: CoursePermissions;
+  isOffline?: boolean;
 }
 
 const CourseSidebar: React.FC<CourseSidebarProps> = ({ 
   isOpen = false, 
   onClose,
   courseTitle = "Course Title",
-  permissions
+  permissions,
+  isOffline = false
 }) => {
   const { language } = useLanguage();
   const location = useLocation();
@@ -111,6 +113,13 @@ const CourseSidebar: React.FC<CourseSidebarProps> = ({
                 <h2 className="text-sm font-semibold text-foreground truncate">
                   {courseTitle}
                 </h2>
+                {isOffline && (
+                  <div className="mt-1">
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                      📱 {language === 'rw' ? 'Offline' : 'Offline'}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </div>

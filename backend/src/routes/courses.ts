@@ -5,6 +5,7 @@ import {
   normalizeCourseResponse,
   handleCourseFormData
 } from './compatibility';
+import { progressRateLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
 
@@ -97,7 +98,7 @@ router.get('/:id/grades', authenticate, courseController.getCourseGrades);
 router.get('/:id/home', optionalAuth, courseController.getCourseHome);
 
 // Get course progress
-router.get('/:id/progress', authenticate, courseController.getCourseProgress);
+router.get('/:id/progress', authenticate, progressRateLimiter, courseController.getCourseProgress);
 
 // Update course progress
 router.put('/:id/progress', authenticate, courseController.updateCourseProgress);

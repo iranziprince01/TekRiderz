@@ -135,6 +135,8 @@ const Landing: React.FC = () => {
       {/* Header */}
       <Header showAuth={true} />
 
+
+
       {/* Hero Section */}
       <section className="relative py-16 lg:py-24 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 overflow-hidden">
         {/* Background Pattern */}
@@ -177,19 +179,15 @@ const Landing: React.FC = () => {
               </div>
 
               {/* Trust Indicators */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
-                                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                    <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-                    <span>{t('landing.trust.freeCourses')}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                    <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-    
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                    <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-                    <span>{t('landing.trust.instructors')}</span>
-                  </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
+                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                  <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+                  <span>{t('landing.trust.freeCourses')}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                  <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+                  <span>{t('landing.trust.instructors')}</span>
+                </div>
               </div>
             </div>
 

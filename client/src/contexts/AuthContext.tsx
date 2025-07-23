@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../utils/api';
+import { cacheUser, removeCachedUser, updateCachedUser, getCachedUser, getAllCachedUsers } from '../offline/cacheService';
+import { clearOfflineData } from '../offline/syncManager';
 
 // Types
 interface User {
@@ -47,6 +49,7 @@ interface AuthContextType {
   otpSent: boolean;
   tempEmail: string | null;
   isAuthenticated: boolean;
+  isOfflineMode: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (name: string, email: string, password: string, role: 'learner' | 'tutor') => Promise<{ message: string }>;
   verifyOtp: (email: string, otp: string) => Promise<void>;
@@ -310,15 +313,36 @@ class SecureAuthService {
         } 
       }));
       
+      // Handle 403 Forbidden specifically
+      if (response.status === 403) {
+        console.error('403 Forbidden - Access denied. Token may be invalid or expired.');
+        // Clear stored tokens on 403 error
+        await this.storage.clear();
+        const error = new Error('Access denied. Please login again.');
+        (error as any).status = 403;
+        throw error;
+      }
+      
+      // Handle 401 Unauthorized
+      if (response.status === 401) {
+        console.error('401 Unauthorized - Token may be expired.');
+        const error = new Error('Authentication required. Please login again.');
+        (error as any).status = 401;
+        throw error;
+      }
+      
       // Handle new error format from backend
       if (errorData.error) {
         const error = new Error(errorData.error.message || 'Request failed');
         (error as any).details = errorData.error;
+        (error as any).status = response.status;
         throw error;
       }
       
       // Handle legacy error format
-      throw new Error(errorData.message || `HTTP ${response.status}`);
+      const error = new Error(errorData.message || `HTTP ${response.status}`);
+      (error as any).status = response.status;
+      throw error;
     }
 
     return response.json();
@@ -451,6 +475,27 @@ class SecureAuthService {
 
 const authService = new SecureAuthService();
 
+// Utility function to check internet connectivity
+const checkInternetConnection = async (): Promise<boolean> => {
+  try {
+    // Try to fetch a small resource with a timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+    
+    await fetch('/favicon.ico', { 
+      method: 'HEAD',
+      signal: controller.signal,
+      cache: 'no-cache'
+    });
+    
+    clearTimeout(timeoutId);
+    return true;
+  } catch (error) {
+    console.log('No internet connection detected');
+    return false;
+  }
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
   const [authState, setAuthState] = useState<AuthState>({
@@ -463,7 +508,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     tempUserData: null,
   });
 
-  // Initialize auth state from secure storage
+  // Initialize auth state from secure storage with offline authentication support
+  // This useEffect handles:
+  // 1. Normal online authentication with stored tokens
+  // 2. Offline authentication using cached user data when no internet is available
+  // 3. Fallback authentication when secure storage fails but cached user exists
   useEffect(() => {
     const initAuth = async () => {
       try {
@@ -485,10 +534,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             // Set token in apiClient for API requests
             await apiClient.setToken(storedToken);
             
-            // Store user data for immediate app functionality
-            localStorage.setItem('currentUserId', storedUser.id);
-            localStorage.setItem('userRole', storedUser.role);
-            localStorage.setItem('userEmail', storedUser.email);
+            // Store user data in PouchDB for offline access
+            await cacheUser(storedUser);
             
             setAuthState(prev => ({
               ...prev,
@@ -501,12 +548,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.log('Auth state restored from storage');
             
             // Verify token in background (don't block initialization)
+            // Temporarily disabled to prevent refresh loops
+            /*
             setTimeout(async () => {
               try {
                 await authService.getCurrentUser();
                 console.log('Token verified in background');
               } catch (error) {
-                                  console.warn('Background token verification failed, user needs to login again');
+                console.warn('Background token verification failed, user needs to login again');
                 await storage.clear();
                 await apiClient.setToken(null);
                 setAuthState(prev => ({ 
@@ -516,9 +565,76 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 }));
               }
             }, 1000);
+            */
             
           } else {
             console.log('ℹ️ No stored credentials found');
+            
+            // Check for offline authentication or cached user fallback
+            const hasInternet = await checkInternetConnection();
+            if (!hasInternet) {
+              console.log('🔌 No internet connection detected, checking for cached user...');
+              
+              // Try to get cached user from PouchDB
+              try {
+                // Get all cached users and find the most recent one
+                const allCachedUsers = await getAllCachedUsers();
+                console.log('📱 Found cached users:', allCachedUsers.length);
+                
+                if (allCachedUsers.length > 0) {
+                  const cachedUser = allCachedUsers[0]; // Get the first cached user
+                  console.log('✅ Found cached user for offline access:', cachedUser.name);
+                  
+                  // Set user as authenticated for offline mode
+                  setAuthState(prev => ({
+                    ...prev,
+                    user: cachedUser,
+                    token: null, // No token in offline mode
+                    isInitialized: true,
+                    isLoading: false
+                  }));
+                  
+                  console.log('🔄 User authenticated in offline mode - limited functionality available');
+                  
+                  // Store minimal data in localStorage for immediate access
+                  localStorage.setItem('currentUserId', cachedUser.id);
+                  localStorage.setItem('userRole', cachedUser.role);
+                  
+                  console.log('🔄 Offline authentication successful');
+                  return;
+                }
+              } catch (cacheError) {
+                console.warn('Failed to retrieve cached user:', cacheError);
+              }
+              
+              console.log('ℹ️ No cached user found for offline access');
+            } else {
+              console.log('🌐 Internet connection available, checking for cached user as fallback...');
+              
+              // Even when online, check for cached user as fallback
+              try {
+                const allCachedUsers = await getAllCachedUsers();
+                if (allCachedUsers.length > 0) {
+                  const cachedUser = allCachedUsers[0];
+                  console.log('✅ Found cached user as fallback:', cachedUser.name);
+                  
+                  // Set user as authenticated with cached data
+                  setAuthState(prev => ({
+                    ...prev,
+                    user: cachedUser,
+                    token: null, // Will be updated when online sync happens
+                    isInitialized: true,
+                    isLoading: false
+                  }));
+                  
+                  console.log('🔄 User authenticated with cached data - will sync when online');
+                  return;
+                }
+              } catch (cacheError) {
+                console.warn('Failed to retrieve cached user as fallback:', cacheError);
+              }
+            }
+            
             setAuthState(prev => ({
               ...prev,
               isInitialized: true,
@@ -527,6 +643,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         } catch (storageError: any) {
           console.warn('Storage access failed:', storageError?.message || 'Unknown error');
+          
+          // Even if secure storage fails, try offline authentication
+          try {
+            const hasInternet = await checkInternetConnection();
+            if (!hasInternet) {
+              const lastLoggedInId = localStorage.getItem('currentUserId');
+              if (lastLoggedInId) {
+                const cachedUser = await getCachedUser(lastLoggedInId);
+                if (cachedUser) {
+                  console.log('✅ Found cached user for offline access (fallback):', cachedUser.name);
+                  
+                                     setAuthState(prev => ({
+                     ...prev,
+                     user: cachedUser,
+                     token: null,
+                     isInitialized: true,
+                     isLoading: false
+                   }));
+                   
+                   console.log('🔄 Offline authentication successful (fallback) - limited functionality available');
+                  return;
+                }
+              }
+            }
+          } catch (offlineError) {
+            console.warn('Offline authentication failed:', offlineError);
+          }
+          
           setAuthState(prev => ({
             ...prev,
             isInitialized: true,
@@ -599,6 +743,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Set token in apiClient for API requests
         await apiClient.setToken(token);
         
+        // Cache user for offline access (learners only)
+        if (user.role === 'learner') {
+          try {
+            await cacheUser(user);
+          } catch (cacheError) {
+            console.warn('Failed to cache user for offline access:', cacheError);
+            // Don't block login if caching fails
+          }
+        } else {
+          console.log('🔄 Skipping user cache - user is not a learner');
+        }
+        
         setAuthState(prev => ({
           ...prev,
           user,
@@ -659,10 +815,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Set token in apiClient for API requests
       await apiClient.setToken(token);
       
-      // Store user ID and role in localStorage
-      localStorage.setItem('currentUserId', user.id);
-      localStorage.setItem('userRole', user.role);
-      localStorage.setItem('userEmail', user.email);
+      // Cache user for offline access (learners only)
+      if (user.role === 'learner') {
+        try {
+          await cacheUser(user);
+        } catch (cacheError) {
+          console.warn('Failed to cache user for offline access:', cacheError);
+          // Don't block verification if caching fails
+        }
+      } else {
+        console.log('🔄 Skipping user cache - user is not a learner');
+      }
       
       setAuthState(prev => ({
         ...prev,
@@ -705,13 +868,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Clear token from apiClient
       await apiClient.setToken(null);
       
-      // Clear cached credentials
-      try {
-        localStorage.removeItem('currentUserId');
-        localStorage.removeItem('userRole');
-        localStorage.removeItem('userEmail');
-      } catch (cleanupError) {
-        console.warn('Failed to clean up local storage:', cleanupError);
+      // Clear all offline data (learners only)
+      if (authState.user?.role === 'learner') {
+        try {
+          await clearOfflineData();
+        } catch (cleanupError) {
+          console.warn('Failed to clear offline data:', cleanupError);
+        }
+      } else {
+        console.log('🔄 Skipping offline data cleanup - user is not a learner');
       }
       
       setAuthState({
@@ -726,13 +891,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       navigate('/login', { replace: true });
     } catch (error) {
-      // Even if online logout fails, clear cached data
-      try {
-        localStorage.removeItem('currentUserId');
-        localStorage.removeItem('userRole');
-        localStorage.removeItem('userEmail');
-      } catch (cleanupError) {
-        console.warn('Failed to clean up local storage:', cleanupError);
+      // Even if online logout fails, clear offline data (learners only)
+      if (authState.user?.role === 'learner') {
+        try {
+          await clearOfflineData();
+        } catch (cleanupError) {
+          console.warn('Failed to clear offline data (fallback):', cleanupError);
+        }
+      } else {
+        console.log('🔄 Skipping offline data cleanup (fallback) - user is not a learner');
       }
       
       setAuthState({
@@ -779,6 +946,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     try {
       const updatedUser = await authService.updateProfile(updates);
+      
+      // Update cached user data (learners only)
+      if (updatedUser.role === 'learner') {
+        try {
+          await updateCachedUser(updatedUser);
+        } catch (cacheError) {
+          console.warn('Failed to update cached user:', cacheError);
+          // Don't block profile update if caching fails
+        }
+      } else {
+        console.log('🔄 Skipping user cache update - user is not a learner');
+      }
+      
       setAuthState(prev => ({
         ...prev,
         user: updatedUser,
@@ -797,7 +977,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isInitialized: authState.isInitialized,
     otpSent: authState.otpSent,
     tempEmail: authState.tempEmail,
-    isAuthenticated: !!authState.user && !!authState.token,
+    isAuthenticated: !!authState.user, // Allow authentication without token in offline mode
+    isOfflineMode: !!authState.user && !authState.token, // User is authenticated but has no token (offline mode)
     login,
     signup,
     verifyOtp,

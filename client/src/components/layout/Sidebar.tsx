@@ -9,7 +9,9 @@ import {
   X,
   Users,
   Shield,
-  Award
+  Award,
+  BarChart3,
+  FileText
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -45,6 +47,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
           icon: BookOpen
         },
         { 
+          name: language === 'rw' ? 'Ibipimo' : 'Analytics', 
+          href: '/dashboard/analytics', 
+          icon: BarChart3
+        },
+        { 
           name: language === 'rw' ? 'Umwirondoro' : 'Profile', 
           href: '/dashboard/profile', 
           icon: User
@@ -65,6 +72,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
           icon: Upload
         },
         { 
+          name: language === 'rw' ? 'Ibipimo' : 'Analytics', 
+          href: '/dashboard/analytics', 
+          icon: BarChart3
+        },
+        { 
           name: language === 'rw' ? 'Umwirondoro' : 'Profile', 
           href: '/dashboard/profile', 
           icon: User
@@ -83,6 +95,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
         name: language === 'rw' ? 'Amasomo Yanjye' : 'My Courses', 
         href: '/dashboard/courses', 
         icon: BookOpen
+      },
+      { 
+        name: language === 'rw' ? 'Icyemezo' : 'Certificates', 
+        href: '/certificates', 
+        icon: Award
       },
       { 
         name: language === 'rw' ? 'Umwirondoro' : 'Profile', 

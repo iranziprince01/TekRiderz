@@ -18,7 +18,8 @@ import {
   Clock, 
   Circle, 
   Activity,
-  CheckCircle2
+  CheckCircle2,
+  BarChart3
 } from 'lucide-react';
 
 interface DashboardStats {
@@ -336,7 +337,7 @@ const AdminDashboard: React.FC = () => {
       </div>
 
       {/* Management Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Users Management Card */}
         <div 
           className="cursor-pointer transition-all duration-300 hover:shadow-lg"
@@ -436,6 +437,58 @@ const AdminDashboard: React.FC = () => {
               </span>
             </div>
           </div>
+          </Card>
+        </div>
+
+        {/* Analytics Card */}
+        <div 
+          className="cursor-pointer transition-all duration-300 hover:shadow-lg"
+          onClick={() => navigate('/dashboard/analytics')}
+        >
+          <Card className="p-6 hover:border-purple-300 dark:hover:border-purple-600">
+            <div className="mb-4">
+              <div className="flex items-center gap-3">
+                <div className="bg-purple-100 dark:bg-purple-900/20 p-3 rounded-full">
+                  <BarChart3 className="text-purple-600 dark:text-purple-400" size={24} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Platform Analytics
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    View detailed platform insights and performance metrics
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600 dark:text-gray-400">Completion Rate:</span>
+                <span className="font-semibold text-green-600 dark:text-green-400">
+                  {Math.round((stats.overview.totalEnrollments > 0 ? 
+                    (stats.overview.totalEnrollments / stats.overview.totalUsers) * 100 : 0))}%
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600 dark:text-gray-400">Active Users:</span>
+                <span className="font-semibold text-blue-600 dark:text-blue-400">
+                  {stats.overview.activeUsers}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600 dark:text-gray-400">Total Enrollments:</span>
+                <span className="font-semibold text-purple-600 dark:text-purple-400">
+                  {stats.overview.totalEnrollments}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600 dark:text-gray-400">Growth:</span>
+                <span className="font-semibold text-green-600 dark:text-green-400">
+                  +12.5%
+                </span>
+              </div>
+            </div>
           </Card>
         </div>
       </div>

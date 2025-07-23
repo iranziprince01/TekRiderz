@@ -5,11 +5,17 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { 
   apiClient, 
   getCourseProgress, 
-  markLessonComplete, 
   getCourseQuizzes, 
-  submitQuiz,
-  updateLessonProgress
+  submitQuiz
 } from '../utils/api';
+import { useProgressService } from '../services/progressService';
+import { testCourseProgressCalculation } from '../utils/progressTest';
+import { 
+  cacheModule, 
+  getCachedModulesByCourse, 
+  getCourseOffline,
+  cacheLearnerData 
+} from '../offline/cacheService';
 import { getCoursePermissions } from '../utils/coursePermissions';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { Alert } from '../components/ui/Alert';
@@ -23,6 +29,7 @@ import { CheckCircle, AlertCircle } from 'lucide-react';
 // Define clean interfaces
 interface Course {
   id: string;
+  _id?: string;
   title: string;
   description: string;
   thumbnail?: string;
@@ -120,7 +127,7 @@ interface CourseData {
 const Course: React.FC = () => {
   const { id: courseId } = useParams<{ id: string }>();
   const { moduleId } = useParams<{ moduleId?: string }>();
-  const { user } = useAuth();
+  const { user, isOfflineMode } = useAuth();
   const { language } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
@@ -130,13 +137,14 @@ const Course: React.FC = () => {
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
   const [permissions, setPermissions] = useState<any>(null);
+  const [isOffline, setIsOffline] = useState(false);
 
-  // Fetch course data
+  // Fetch course data on mount and handle success messages
   useEffect(() => {
     if (courseId) {
       fetchCourseData();
     }
-  }, [courseId]);
+  }, [courseId]); // Only depend on courseId, not fetchCourseData
 
   // Handle success message from navigation
   useEffect(() => {
@@ -162,7 +170,7 @@ const Course: React.FC = () => {
     return () => {
       window.removeEventListener('courseEnrollmentUpdated', handleEnrollmentUpdate as EventListener);
     };
-  }, [courseId]);
+  }, [courseId]); // Only depend on courseId
 
   // Fetch course permissions
   useEffect(() => {
@@ -175,33 +183,75 @@ const Course: React.FC = () => {
     }
   }, [courseData, user]);
 
-  // Load course data on mount
-  useEffect(() => {
-    if (courseId) {
-      fetchCourseData();
-    }
-  }, [courseId]);
-
-  // Listen for enrollment updates
-  useEffect(() => {
-    const handleEnrollmentUpdate = (event: CustomEvent) => {
-      if (event.detail.courseId === courseId) {
-        console.log('Course page: Enrollment update detected, refreshing data');
-        fetchCourseData();
-      }
-    };
-
-    window.addEventListener('courseEnrollmentUpdated', handleEnrollmentUpdate as EventListener);
-    
-    return () => {
-      window.removeEventListener('courseEnrollmentUpdated', handleEnrollmentUpdate as EventListener);
-    };
-  }, [courseId]);
-
   const fetchCourseData = async () => {
     setLoading(true);
     setError('');
 
+    // Check if we're in offline mode and user is a learner
+    if ((isOfflineMode || !navigator.onLine) && user?.role === 'learner') {
+      console.log('🔄 Loading cached course data (offline mode)');
+      setIsOffline(true);
+      
+      try {
+        // Try to get the full course data first
+        const cachedCourse = await getCourseOffline(courseId!);
+        
+        if (cachedCourse) {
+          console.log('📚 Found cached course:', cachedCourse.title);
+          
+          // Get cached modules for this course
+          const cachedModules = await getCachedModulesByCourse(courseId!);
+          console.log('📚 Loaded cached modules for course:', cachedModules.length);
+          
+          // Create course data with cached information
+          const courseData: CourseData = {
+            course: {
+              id: cachedCourse.id || cachedCourse._id || courseId!,
+              title: cachedCourse.title || 'Cached Course',
+              description: cachedCourse.description || 'Course content available offline',
+              thumbnail: cachedCourse.thumbnail,
+              category: cachedCourse.category || 'general',
+              level: cachedCourse.level || 'beginner',
+              status: cachedCourse.status || 'published',
+              instructorName: cachedCourse.instructorName || 'Instructor',
+              totalLessons: cachedModules.length,
+              totalDuration: cachedCourse.totalDuration || cachedModules.reduce((total, module) => total + module.estimatedDuration, 0),
+              learningObjectives: cachedCourse.learningObjectives
+            },
+            modules: cachedModules,
+            quizzes: [], // No quizzes in offline mode
+            grades: [], // No grades in offline mode
+            isEnrolled: true, // Assume enrolled for offline access
+            userProgress: {
+              completedLessons: cachedModules.filter(m => m.isCompleted).length,
+              totalLessons: cachedModules.length,
+              overallProgress: Math.round((cachedModules.filter(m => m.isCompleted).length / cachedModules.length) * 100),
+              completedModules: cachedModules.filter(m => m.isCompleted).length,
+              totalModules: cachedModules.length,
+              completedQuizzes: 0,
+              totalQuizzes: 0,
+              averageScore: 0
+            }
+          };
+          
+          setCourseData(courseData);
+          setError('');
+          return;
+        } else {
+          setError('Course not available offline. Please connect online to access this course.');
+          return;
+        }
+      } catch (cacheError) {
+        console.error('Failed to load cached course data:', cacheError);
+        setError('Failed to load cached course data');
+        return;
+      }
+    }
+
+    // Online mode - fetch from API
+    setIsOffline(false);
+    console.log('🌐 Loading course data from API (online mode)');
+    
     try {
       // Fetch course data
       const courseResponse = await apiClient.getCourse(courseId!);
@@ -218,7 +268,7 @@ const Course: React.FC = () => {
       let progressData = null;
       let quizzesData = null;
 
-    if (isEnrolled) {
+      if (isEnrolled) {
         try {
           const [progressResponse, quizzesResponse] = await Promise.all([
             getCourseProgress(courseId!),
@@ -272,6 +322,27 @@ const Course: React.FC = () => {
           completedLessons = [];
         }
       }
+      
+      // Count total lessons first to ensure accurate progress calculation
+      let totalLessonCount = 0;
+      if (course.sections && Array.isArray(course.sections)) {
+        course.sections.forEach((section: any) => {
+          if (section && section.lessons && Array.isArray(section.lessons)) {
+            section.lessons.forEach((lesson: any) => {
+              if (lesson && lesson.type === 'video' && lesson.content?.videoUrl) {
+                totalLessonCount++;
+              }
+            });
+          }
+        });
+      }
+      
+      console.log('📊 Course structure analysis:', {
+        totalSections: course.sections?.length || 0,
+        totalLessonCount,
+        completedLessonsCount: completedLessons.length,
+        completedLessons
+      });
       
       if (course.sections && Array.isArray(course.sections)) {
         try {
@@ -349,6 +420,27 @@ const Course: React.FC = () => {
           pdfUrl: m.pdfUrl
         }))
       });
+
+      // Cache modules for offline access (learners only)
+      if (user?.role === 'learner') {
+        try {
+          console.log('💾 Caching modules for offline access...');
+          await Promise.all(modules.map(async (module: any) => {
+            const moduleForCache = {
+              ...module,
+              _id: module.id,
+              courseId: courseId!
+            };
+            await cacheModule(moduleForCache);
+          }));
+          console.log(`✅ Cached ${modules.length} modules successfully`);
+        } catch (cacheError) {
+          console.warn('Failed to cache some modules:', cacheError);
+          // Don't block the UI if caching fails
+        }
+      } else {
+        console.log('🔄 Skipping module cache - user is not a learner');
+      }
 
       // Transform quizzes with real data - fetch all quizzes and make them all unlocked
       const quizzes: Quiz[] = [];
@@ -515,15 +607,28 @@ const Course: React.FC = () => {
       const averageScore = grades.length > 0 ? 
         Math.round(grades.reduce((sum, g) => sum + g.percentage, 0) / grades.length) : 0;
 
-      // Calculate progress percentage with proper handling
+      // Calculate progress percentage with proper handling using accurate lesson count
       let calculatedProgress = 0;
-      if (modules.length > 0 && typeof completedModules === 'number') {
-        calculatedProgress = Math.round((completedModules / modules.length) * 100);
+      const actualTotalLessons = Math.max(totalLessonCount, modules.length);
+      const actualCompletedLessons = Math.max(completedLessons.length, completedModules);
+      
+      if (actualTotalLessons > 0 && typeof actualCompletedLessons === 'number') {
+        calculatedProgress = Math.round((actualCompletedLessons / actualTotalLessons) * 100);
         // Ensure it's a valid number
         if (isNaN(calculatedProgress)) {
           calculatedProgress = 0;
         }
       }
+      
+      console.log('📊 Progress calculation:', {
+        totalLessonCount,
+        modulesLength: modules.length,
+        actualTotalLessons,
+        completedLessonsLength: completedLessons.length,
+        completedModules,
+        actualCompletedLessons,
+        calculatedProgress
+      });
 
       // Use API progress if available, otherwise use calculated progress
       let finalProgress = 0;
@@ -615,11 +720,11 @@ const Course: React.FC = () => {
       const finalCompletedCount = adjustedModules.filter(m => m.isCompleted).length;
 
       const userProgress = {
-        completedLessons: finalCompletedCount,
-        totalLessons: adjustedModules.length,
+        completedLessons: Math.max(actualCompletedLessons, finalCompletedCount),
+        totalLessons: Math.max(actualTotalLessons, adjustedModules.length),
         overallProgress: Math.max(0, Math.min(100, validFinalProgress)), // Ensure valid percentage
-        completedModules: finalCompletedCount, // Use the adjusted count
-        totalModules: adjustedModules.length,
+        completedModules: Math.max(actualCompletedLessons, finalCompletedCount), // Use the adjusted count
+        totalModules: Math.max(actualTotalLessons, adjustedModules.length),
         completedQuizzes,
         totalQuizzes: quizzes.length,
         averageScore: typeof averageScore === 'number' && !isNaN(averageScore) ? averageScore : 0
@@ -636,6 +741,16 @@ const Course: React.FC = () => {
         progressConsistent: userProgress.overallProgress === 100 ? userProgress.completedModules === userProgress.totalModules : true
       });
 
+      // Test progress calculation for debugging
+      if (process.env.NODE_ENV === 'development') {
+        const testResult = testCourseProgressCalculation({
+          course,
+          modules: adjustedModules,
+          userProgress
+        });
+        console.log('🧪 Progress calculation test result:', testResult);
+      }
+
       setCourseData({
         course: {
           id: course.id || course._id,
@@ -647,7 +762,7 @@ const Course: React.FC = () => {
           status: course.status,
           enrollmentCount: course.enrollmentCount,
           rating: course.rating,
-          totalLessons: adjustedModules.length,
+          totalLessons: Math.max(actualTotalLessons, adjustedModules.length),
           totalDuration: course.totalDuration,
           instructorName: course.instructorName,
           learningObjectives: course.learningObjectives
@@ -692,14 +807,16 @@ const Course: React.FC = () => {
     return 'F';
   };
 
+  const { markComplete } = useProgressService();
+
   const handleMarkModuleComplete = async (moduleId: string) => {
     if (!courseData) return;
 
     try {
-      // Mark lesson as complete in CouchDB
-      const response = await markLessonComplete(courseId!, moduleId);
+      // Mark lesson as complete using unified progress service
+      const success = await markComplete(courseId!, moduleId);
       
-      if (response.success) {
+      if (success) {
         // Update local state with real progress from API
         const updatedModules = courseData.modules.map(module => {
           if (module.id === moduleId) {
@@ -722,14 +839,8 @@ const Course: React.FC = () => {
           progressPercentage = Math.round((completedCount / totalModules) * 100);
         }
         
-        // Use API progress if available, otherwise use calculated
-        const apiProgress = response.data?.progress;
-        const finalProgress = apiProgress !== undefined && apiProgress !== null 
-          ? Math.round(apiProgress) 
-          : progressPercentage;
-
         // Ensure progress is valid (0-100)
-        const validProgress = Math.max(0, Math.min(100, finalProgress));
+        const validProgress = Math.max(0, Math.min(100, progressPercentage));
         
         setCourseData({
           ...courseData,
@@ -740,24 +851,6 @@ const Course: React.FC = () => {
             completedLessons: completedCount,
             overallProgress: validProgress
           }
-        });
-
-        // Update lesson progress tracking with completion data
-        await updateLessonProgress(courseId!, moduleId, {
-          timeSpent: 0, // Will be tracked by video player
-          currentPosition: 100, // Mark as fully watched
-          interactions: [{
-            type: 'lesson_completed',
-            timestamp: new Date().toISOString(),
-            data: { 
-              moduleId, 
-              completedManually: true,
-              newProgress: validProgress,
-              totalModules,
-              completedModules: completedCount,
-              isCompleted: true
-            }
-          }]
         });
 
         // Also update overall course progress via enrollment to ensure persistence  
@@ -788,6 +881,24 @@ const Course: React.FC = () => {
           console.warn('Failed to save progress backup:', storageError);
         }
 
+        // Check if course is completed and show certificate notification
+        if (validProgress === 100) {
+          // Show certificate notification
+          const event = new CustomEvent('showNotification', {
+            detail: {
+              type: 'success',
+              title: '🎉 Course Completed!',
+              message: 'Congratulations! Your certificate has been generated and is available in your Certificates page.',
+              duration: 8000,
+              action: {
+                label: 'View Certificate',
+                onClick: () => navigate('/certificates')
+              }
+            }
+          });
+          window.dispatchEvent(event);
+        }
+
         // Force refresh course data to ensure consistency
         setTimeout(() => {
           fetchCourseData();
@@ -807,8 +918,8 @@ const Course: React.FC = () => {
         });
 
         } else {
-        console.error('Failed to mark module complete:', response.error);
-        throw new Error(response.error || 'Failed to mark module as complete');
+        console.error('Failed to mark module complete');
+        throw new Error('Failed to mark module as complete');
         }
       } catch (error) {
       console.error('Error marking module complete:', error);
@@ -879,6 +990,7 @@ const Course: React.FC = () => {
         courseTitle={courseData?.course.title || 'Loading...'}
         courseProgress={courseData?.userProgress?.overallProgress || 0}
         permissions={permissions}
+        isOffline={isOffline}
       >
         <Routes>
           {/* Course Home */}

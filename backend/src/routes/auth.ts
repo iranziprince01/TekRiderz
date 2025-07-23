@@ -4,7 +4,32 @@ import { authController } from '../controllers/authController';
 import { authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validation';
 import { config } from '../config/config';
-import { loginRateLimiter, registerRateLimiter, otpRateLimiter, passwordResetRateLimiter } from '../middleware/rateLimiter';
+import { authRateLimiter, createRateLimiter } from '../middleware/rateLimiter';
+
+// Create specific rate limiters for auth routes
+const registerRateLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  maxRequests: 3, // 3 registration attempts per 15 minutes
+  message: 'Too many registration attempts, please try again later.'
+});
+
+const otpRateLimiter = createRateLimiter({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  maxRequests: 5, // 5 OTP attempts per 5 minutes
+  message: 'Too many OTP attempts, please try again later.'
+});
+
+const loginRateLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  maxRequests: 5, // 5 login attempts per 15 minutes
+  message: 'Too many login attempts, please try again later.'
+});
+
+const passwordResetRateLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  maxRequests: 3, // 3 password reset attempts per 15 minutes
+  message: 'Too many password reset attempts, please try again later.'
+});
 
 const router = express.Router();
 

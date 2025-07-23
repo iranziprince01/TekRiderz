@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { updateLessonProgress } from '../../utils/api';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
@@ -48,12 +49,14 @@ export const ModulePage: React.FC<ModulePageProps> = ({
   const navigate = useNavigate();
   const { language } = useLanguage();
   const { theme } = useTheme();
+  const { isOfflineMode } = useAuth();
   const [isCompleting, setIsCompleting] = useState(false);
   const [localCompleted, setLocalCompleted] = useState(module.isCompleted);
   const [videoLoaded, setVideoLoaded] = useState(false);
   const [watchTime, setWatchTime] = useState(0);
   const [lastProgressUpdate, setLastProgressUpdate] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [isOffline, setIsOffline] = useState(false);
 
   // Extract YouTube video ID from URL
   const extractYouTubeId = (url: string): string => {
@@ -77,6 +80,26 @@ export const ModulePage: React.FC<ModulePageProps> = ({
   useEffect(() => {
     setLocalCompleted(module.isCompleted);
   }, [module.isCompleted]);
+
+  // Detect offline mode
+  useEffect(() => {
+    const checkOfflineMode = () => {
+      const offline = isOfflineMode || !navigator.onLine;
+      setIsOffline(offline);
+      if (offline) {
+        console.log('📱 Module page in offline mode');
+      }
+    };
+    
+    checkOfflineMode();
+    window.addEventListener('online', checkOfflineMode);
+    window.addEventListener('offline', checkOfflineMode);
+    
+    return () => {
+      window.removeEventListener('online', checkOfflineMode);
+      window.removeEventListener('offline', checkOfflineMode);
+    };
+  }, [isOfflineMode]);
 
   // Debug logging for module data
   useEffect(() => {
@@ -343,7 +366,19 @@ export const ModulePage: React.FC<ModulePageProps> = ({
         <Card className="overflow-hidden">
           <div className="relative">
             <div className="w-full bg-gray-900 rounded-lg overflow-hidden" style={{ aspectRatio: '16/9', minHeight: '400px' }}>
-              {videoId && module.videoProvider === 'youtube' ? (
+              {isOffline ? (
+                <div className="flex items-center justify-center h-full text-white" style={{ minHeight: '400px' }}>
+                  <div className="text-center">
+                    <Video className="w-16 h-16 mx-auto mb-4 opacity-60" />
+                    <p className="text-lg opacity-80 mb-2">
+                      {language === 'rw' ? 'Reconnect to view video' : 'Reconnect to view video'}
+                    </p>
+                    <p className="text-sm opacity-60">
+                      {language === 'rw' ? 'Video content requires internet connection' : 'Video content requires internet connection'}
+                    </p>
+                  </div>
+                </div>
+              ) : videoId && module.videoProvider === 'youtube' ? (
                 <iframe
                   src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&controls=1&showinfo=0&fs=1`}
                   title={module.title}
@@ -393,7 +428,11 @@ export const ModulePage: React.FC<ModulePageProps> = ({
                     {language === 'rw' ? 'Inyandiko z\'Isomo' : 'Lecture Notes'}
                   </h3>
                   <p className="text-xs text-gray-600 mt-1">
-                    {module.pdfUrl ? (
+                    {isOffline ? (
+                      language === 'rw' 
+                        ? 'Reconnect to view PDF'
+                        : 'Reconnect to view PDF'
+                    ) : module.pdfUrl ? (
                       language === 'rw' 
                         ? 'Fata inyandiko z\'isomo'
                         : 'Download lecture notes'
@@ -407,7 +446,15 @@ export const ModulePage: React.FC<ModulePageProps> = ({
               </div>
               <Button
                 onClick={async () => {
-                  const validUrl = getValidPdfUrl(module.pdfUrl);
+                  if (isOffline) {
+                    setError(language === 'rw' 
+                      ? 'PDF content requires internet connection. Please reconnect to download.'
+                      : 'PDF content requires internet connection. Please reconnect to download.'
+                    );
+                    return;
+                  }
+                  
+                                    const validUrl = getValidPdfUrl(module.pdfUrl);
                   if (validUrl) {
                     console.log('Downloading PDF URL:', validUrl);
                     
@@ -641,7 +688,7 @@ export const ModulePage: React.FC<ModulePageProps> = ({
                 <Button
                   onClick={handleComplete}
                   variant="primary"
-                  disabled={isCompleting}
+                  disabled={isCompleting || isOffline}
                   className="flex items-center gap-2"
                 >
                   {isCompleting ? (

@@ -159,7 +159,7 @@ const EnhancedCourseCard: React.FC<EnhancedCourseCardProps> = ({
     if (isEnrolled) {
       return (
         <Link to={`/course/${course.id || course._id}`} onClick={handleCourseAccess}>
-          <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white transition-colors duration-200">
+          <Button className="w-full bg-blue-500 hover:bg-blue-600 text-white transition-colors duration-200">
             {isCompleted ? (
               <>
                 <Award className="w-4 h-4 mr-2" />

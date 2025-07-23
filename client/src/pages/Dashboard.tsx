@@ -8,9 +8,11 @@ import DashboardLayout from '../components/layout/DashboardLayout';
 import AdminDashboard from '../dashboards/admin/AdminDashboard';
 import AdminCourses from '../dashboards/admin/AdminCourses';
 import AdminUsers from '../dashboards/admin/AdminUsers';
+import AdminAnalytics from '../dashboards/admin/AdminAnalytics';
 import Profile from './Profile';
 import TutorDashboard from '../dashboards/tutor/TutorDashboard';
 import TutorCourses from '../dashboards/tutor/TutorCourses';
+import TutorAnalytics from '../dashboards/tutor/TutorAnalytics';
 import CourseCreation from '../dashboards/tutor/CourseCreation';
 import LearnerDashboard from '../dashboards/learner/LearnerDashboard';
 import LearnerCourses from '../dashboards/learner/LearnerCourses';
@@ -36,6 +38,7 @@ const Dashboard = () => {
             <Route path="/" element={<AdminDashboard />} />
             <Route path="/courses" element={<AdminCourses />} />
             <Route path="/users" element={<AdminUsers />} />
+            <Route path="/analytics" element={<AdminAnalytics />} />
             <Route path="/profile" element={<Profile />} />
           </>
         )}
@@ -45,6 +48,7 @@ const Dashboard = () => {
           <>
             <Route path="/" element={<TutorDashboard />} />
             <Route path="/courses" element={<TutorCourses />} />
+            <Route path="/analytics" element={<TutorAnalytics />} />
             <Route path="/courses/new" element={<CourseCreation />} />
             <Route path="/courses/edit/:id" element={<CourseCreation />} />
             <Route path="/profile" element={<Profile />} />

@@ -9,22 +9,27 @@ export default defineConfig({
   ],
   optimizeDeps: {
     exclude: ['lucide-react'],
-    include: ['bcryptjs']
+    include: ['bcryptjs'],
+    esbuildOptions: {
+      define: {
+        global: 'globalThis'
+      }
+    }
   },
   server: {
     proxy: {
       '/api/v1': {
-        target: 'http://localhost:3000',
+        target: process.env.VITE_API_URL || 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
       },
       '/api': {
-        target: 'http://localhost:3000',
+        target: process.env.VITE_API_URL || 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
       },
       '/uploads': {
-        target: 'http://localhost:3000',
+        target: process.env.VITE_API_URL || 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
       },

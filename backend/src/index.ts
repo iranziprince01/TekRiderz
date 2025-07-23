@@ -22,7 +22,10 @@ import { cleanupService } from './services/cleanupService';
 
 
 import speechRoutes from './routes/speech';
-import { globalRateLimiter, getRateLimitStatus, clearRateLimit } from './middleware/rateLimiter';
+import { certificateRoutes } from './routes/certificates';
+import analyticsRoutes from './routes/analytics';
+import { apiRateLimiter, progressRateLimiter, courseRateLimiter, dynamicRateLimiter } from './middleware/rateLimiter';
+import { dbUrlsRoutes } from './routes/db-urls';
 
 const app = express();
 const server = createServer(app);
@@ -59,8 +62,8 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
-// Apply global rate limiting
-app.use(globalRateLimiter);
+// Apply dynamic rate limiting based on environment
+app.use(dynamicRateLimiter);
 
 // Upload CORS middleware removed - no local file serving
 
@@ -80,13 +83,23 @@ app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/upload', uploadRoutes);
 app.use('/api/v1/firebase-pdf', firebasePdfRoutes);
 app.use('/api/v1/speech', speechRoutes);
+app.use('/api/v1/certificates', certificateRoutes);
+app.use('/api/v1/analytics', analyticsRoutes);
 app.use('/api/v1/cleanup', cleanupRoutes);
+app.use('/api/v1/db-urls', dbUrlsRoutes);
 
 
 
-// Rate limiting status endpoint
-app.get('/api/v1/rate-limit/status', getRateLimitStatus);
-app.post('/api/v1/rate-limit/clear', clearRateLimit);
+// Rate limiting status endpoint (development only)
+if (process.env.NODE_ENV === 'development') {
+  app.get('/api/v1/rate-limit/status', (req, res) => {
+    res.json({
+      message: 'Rate limiting is active',
+      environment: process.env.NODE_ENV,
+      timestamp: new Date().toISOString()
+    });
+  });
+}
 
 // Health check endpoint
 app.get('/api/v1/health', (req, res) => {
@@ -306,7 +319,7 @@ const startServer = async () => {
       logger.info(`Environment: ${config.server.nodeEnv}`);
       logger.info(`API Base URL: http://localhost:${PORT}/api/v1`);
       logger.info(`External services: Cloudinary (images) + YouTube (videos)`);
-      logger.info(`🧹 Scheduled cleanup enabled (every 30 minutes)`);
+      logger.info(`Scheduled cleanup enabled (every 30 minutes)`);
       
       if (config.server.isDevelopment) {
         logger.info(`Development mode - CORS enabled for: ${config.cors.allowedOrigins.join(', ')}`);

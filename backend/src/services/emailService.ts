@@ -683,7 +683,7 @@ View status at: ${config.cors.frontendUrl}/tutor/courses
         </div>
         
         <div style="background: #F8FAFC; border-radius: 12px; padding: 30px; margin: 20px 0; border-left: 4px solid #6B7280;">
-          <h2 style="color: #374151; margin: 0 0 20px 0;">📢 Course Status Update</h2>
+          <h2 style="color: #374151; margin: 0 0 20px 0;">Course Status Update</h2>
           <p style="color: #4B5563; line-height: 1.6; margin: 0 0 20px 0;">
             Your course "<strong>${course.title}</strong>" status has been updated to: <strong>${newStatus.toUpperCase()}</strong>
           </p>

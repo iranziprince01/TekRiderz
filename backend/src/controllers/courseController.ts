@@ -2,9 +2,11 @@ import { Request, Response, NextFunction } from 'express';
 import { courseModel } from '../models/Course';
 import { enrollmentModel } from '../models/Enrollment';
 import { progressModel } from '../models/Progress';
+import { userModel } from '../models/User';
 import { logger } from '../utils/logger';
 import { ApiResponse, Progress } from '../types';
 import { quizGradingService } from '../services/quizGradingService';
+import { certificateService } from '../services/certificateService';
 
 export class CourseController {
   // Get all published courses
@@ -2443,13 +2445,57 @@ export class CourseController {
       const progressPercentage = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
 
       // Update enrollment progress
+      let enrollment = null;
       try {
-        const enrollment = await enrollmentModel.findByUserAndCourse(req.user.id, courseId);
+        enrollment = await enrollmentModel.findByUserAndCourse(req.user.id, courseId);
         if (enrollment) {
           await enrollmentModel.updateProgress(enrollment._id!, progressPercentage);
         }
       } catch (enrollmentError) {
         logger.warn('Failed to update enrollment progress:', enrollmentError);
+      }
+
+      // Auto-generate certificate when course is 100% complete
+      let certificateGenerated = false;
+      if (progressPercentage >= 100 && enrollment) {
+        try {
+          // Mark enrollment as completed
+          await enrollmentModel.completeEnrollment(enrollment._id!);
+          
+          // Get course and user data for certificate
+          const course = await courseModel.findById(courseId);
+          if (!course) {
+            throw new Error('Course not found');
+          }
+          
+          const [student, instructor] = await Promise.all([
+            userModel.findById(req.user.id),
+            userModel.findById(course.instructorId)
+          ]);
+
+          if (course && student && instructor) {
+            // Create certificate data
+            const certificateData = certificateService.createCertificateData(
+              enrollment,
+              course,
+              student,
+              instructor
+            );
+
+            // Generate certificate
+            await certificateService.generateCertificate(certificateData);
+            
+            certificateGenerated = true;
+            
+            logger.info('Certificate auto-generated for course completion:', {
+              userId: req.user.id,
+              courseId,
+              certificateId: certificateData.certificateId
+            });
+          }
+        } catch (certError) {
+          logger.error('Failed to auto-generate certificate:', certError);
+        }
       }
 
       const response: ApiResponse = {
@@ -2460,7 +2506,8 @@ export class CourseController {
           lessonId,
           progress: progressPercentage,
           completedLessons,
-          totalLessons
+          totalLessons,
+          certificateGenerated
         }
       };
 
