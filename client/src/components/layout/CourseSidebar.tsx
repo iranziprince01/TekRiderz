@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useLocation, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft,
   BookOpen,
@@ -31,6 +31,7 @@ const CourseSidebar: React.FC<CourseSidebarProps> = ({
 }) => {
   const { language } = useLanguage();
   const location = useLocation();
+  const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
 
   // Generate navigation items based on permissions
@@ -76,7 +77,7 @@ const CourseSidebar: React.FC<CourseSidebarProps> = ({
   };
 
   const handleBackToDashboard = () => {
-    window.history.back();
+    navigate('/dashboard');
   };
 
   return (
@@ -92,25 +93,25 @@ const CourseSidebar: React.FC<CourseSidebarProps> = ({
       {/* Course Sidebar - Fixed position with full height */}
       <div className={`
         fixed top-16 left-16 z-40 w-64 h-[calc(100vh-4rem)] 
-        bg-card/95 backdrop-blur-xl border-r border-border/50 
+        bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border-r border-gray-200/50 dark:border-gray-700/50 
         shadow-xl transform transition-all duration-300 ease-out
         lg:translate-x-0
         ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
         <div className="flex flex-col h-full">
           {/* Course Header */}
-          <div className="p-4 border-b border-border/50">
+          <div className="p-4 border-b border-gray-200/50 dark:border-gray-700/50">
             <div className="flex items-center gap-3">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handleBackToDashboard}
-                className="hover:bg-accent/50 flex-shrink-0"
+                className="hover:bg-gray-100/50 dark:hover:bg-gray-700/50 flex-shrink-0"
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
               <div className="flex-1 min-w-0">
-                <h2 className="text-sm font-semibold text-foreground truncate">
+                <h2 className="text-sm font-semibold text-gray-900 dark:text-white truncate">
                   {courseTitle}
                 </h2>
                 {isOffline && (
@@ -139,8 +140,8 @@ const CourseSidebar: React.FC<CourseSidebarProps> = ({
                         group flex items-center w-full px-4 py-3 text-sm font-medium rounded-xl 
                         transition-all duration-300 ease-out relative overflow-hidden
                         ${isActive(item.href)
-                          ? 'bg-primary-500/10 text-primary-600 dark:text-primary-400 shadow-lg shadow-primary-500/20'
-                          : 'text-foreground/80 hover:text-foreground hover:bg-accent/50'
+                          ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 shadow-lg shadow-blue-500/20'
+                          : 'text-gray-700/80 dark:text-gray-300/80 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/50 dark:hover:bg-gray-700/50'
                         }
                         hover:scale-[1.02] hover:shadow-md
                         transform-gpu text-left no-underline
@@ -149,9 +150,9 @@ const CourseSidebar: React.FC<CourseSidebarProps> = ({
                       <IconComponent className="w-4 h-4 mr-3 flex-shrink-0" />
                       <span className="flex-1 font-medium">{item.name}</span>
                       {isActive(item.href) && (
-                        <div className="absolute right-2 w-1 h-6 bg-primary-500 rounded-full" />
+                        <div className="absolute right-2 w-1 h-6 bg-blue-500 rounded-full" />
                       )}
-                      <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-r from-primary-500/10 to-secondary-500/10" />
+                      <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-r from-blue-500/10 to-purple-500/10" />
                     </Link>
                   );
                 })}

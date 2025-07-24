@@ -1,0 +1,236 @@
+/* Theme Transitions for Admin Pages */
+
+/* Smooth transitions for all theme-related properties */
+* {
+  transition: 
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+/* Ensure proper theme application on page load */
+html {
+  transition: none; /* Prevent flash on initial load */
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+html.light {
+  color-scheme: light;
+}
+
+/* Smooth transitions for specific components */
+.card,
+.button,
+.input,
+.select,
+.modal,
+.sidebar,
+.header {
+  transition: 
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    color 0.3s ease,
+    box-shadow 0.3s ease,
+    transform 0.2s ease;
+}
+
+/* Theme-specific animations */
+.theme-transition {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Loading states during theme/language changes */
+.theme-loading {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.language-loading {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* Ensure proper contrast during transitions */
+.theme-transition * {
+  transition: 
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+/* Prevent layout shifts during theme changes */
+img,
+svg,
+.icon {
+  transition: filter 0.3s ease;
+}
+
+/* Dark mode specific adjustments */
+.dark img {
+  filter: brightness(0.9) contrast(1.1);
+}
+
+.dark svg {
+  filter: brightness(0.9);
+}
+
+/* Ensure proper focus states during theme changes */
+*:focus {
+  transition: 
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    color 0.3s ease,
+    box-shadow 0.3s ease,
+    outline-color 0.3s ease;
+}
+
+/* Smooth transitions for form elements */
+input,
+textarea,
+select,
+button {
+  transition: 
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+/* Ensure proper hover states during transitions */
+*:hover {
+  transition: 
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    color 0.3s ease,
+    box-shadow 0.3s ease,
+    transform 0.2s ease;
+}
+
+/* Prevent flash of unstyled content */
+.no-flash {
+  visibility: hidden;
+}
+
+.theme-ready .no-flash {
+  visibility: visible;
+}
+
+/* Ensure proper z-index during theme changes */
+.modal,
+.dropdown,
+.tooltip {
+  transition: 
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    color 0.3s ease,
+    box-shadow 0.3s ease,
+    opacity 0.3s ease;
+}
+
+/* Smooth transitions for data tables */
+table,
+tr,
+td,
+th {
+  transition: 
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    color 0.3s ease;
+}
+
+/* Ensure proper badge and status indicator transitions */
+.badge,
+.status-indicator {
+  transition: 
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    color 0.3s ease;
+}
+
+/* Smooth transitions for navigation elements */
+.nav-item,
+.nav-link,
+.sidebar-item {
+  transition: 
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    color 0.3s ease;
+}
+
+/* Ensure proper chart and graph transitions */
+.chart,
+.graph,
+.analytics-widget {
+  transition: 
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    color 0.3s ease;
+}
+
+/* Prevent layout shifts for fixed elements */
+.fixed,
+.sticky {
+  transition: 
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+/* Ensure proper transitions for loading states */
+.loading,
+.skeleton {
+  transition: 
+    background-color 0.3s ease,
+    opacity 0.3s ease;
+}
+
+/* Smooth transitions for error and success states */
+.error,
+.success,
+.warning,
+.info {
+  transition: 
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    color 0.3s ease;
+}
+
+/* Ensure proper transitions for responsive elements */
+@media (max-width: 768px) {
+  * {
+    transition: 
+      background-color 0.2s ease,
+      border-color 0.2s ease,
+      color 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+  
+  .theme-transition {
+    transition: none !important;
+  }
+}
+
+/* Ensure proper theme application on print */
+@media print {
+  * {
+    transition: none !important;
+  }
+  
+  .dark * {
+    background-color: white !important;
+    color: black !important;
+  }
+} 

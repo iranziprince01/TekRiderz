@@ -151,6 +151,117 @@ export const QuizTaker: React.FC<QuizTakerProps> = ({
   const [showInstructions, setShowInstructions] = useState(true);
   const [usedHints, setUsedHints] = useState<{ [questionId: string]: number }>({});
 
+  // Accessibility event listeners
+  useEffect(() => {
+    const handleStartCurrentQuiz = () => {
+      console.log('🎯 Accessibility: Starting current quiz');
+      if (showInstructions) {
+        setShowInstructions(false);
+      }
+    };
+
+    const handleSubmitCurrentQuiz = () => {
+      console.log('🎯 Accessibility: Submitting current quiz');
+      if (!showInstructions && !showResults && !isSubmitting) {
+        handleSubmitQuiz();
+      }
+    };
+
+    const handleNextQuestionEvent = () => {
+      console.log('🎯 Accessibility: Moving to next question');
+      if (!showInstructions && !showResults) {
+        handleNextQuestion();
+      }
+    };
+
+    const handlePreviousQuestionEvent = () => {
+      console.log('🎯 Accessibility: Moving to previous question');
+      if (!showInstructions && !showResults) {
+        handlePreviousQuestion();
+      }
+    };
+
+    // Add event listeners
+    window.addEventListener('startCurrentQuiz', handleStartCurrentQuiz);
+    window.addEventListener('submitCurrentQuiz', handleSubmitCurrentQuiz);
+    window.addEventListener('continueNextQuestion', handleNextQuestionEvent);
+    window.addEventListener('continuePreviousQuestion', handlePreviousQuestionEvent);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('startCurrentQuiz', handleStartCurrentQuiz);
+      window.removeEventListener('submitCurrentQuiz', handleSubmitCurrentQuiz);
+      window.removeEventListener('continueNextQuestion', handleNextQuestionEvent);
+      window.removeEventListener('continuePreviousQuestion', handlePreviousQuestionEvent);
+    };
+  }, [showInstructions, showResults, isSubmitting]);
+
+  // Keyboard navigation for quiz interactions
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Only handle keyboard shortcuts when quiz is active (not in instructions or results)
+      if (showInstructions || showResults) return;
+
+      switch (event.key) {
+        case 'ArrowRight':
+        case 'n':
+          event.preventDefault();
+          if (currentQuestionIndex < quiz.questions.length - 1) {
+            handleNextQuestion();
+          }
+          break;
+        case 'ArrowLeft':
+        case 'p':
+          event.preventDefault();
+          if (currentQuestionIndex > 0) {
+            handlePreviousQuestion();
+          }
+          break;
+        case 'Enter':
+          event.preventDefault();
+          if (event.ctrlKey) {
+            // Ctrl+Enter submits the quiz
+            if (!isSubmitting) {
+              handleSubmitQuiz();
+            }
+          }
+          break;
+        case ' ':
+          event.preventDefault();
+          // Space toggles flag on current question
+          toggleQuestionFlag(quiz.questions[currentQuestionIndex].id);
+          break;
+        case 'h':
+          event.preventDefault();
+          // 'h' key uses hint if available
+          const currentQuestion = quiz.questions[currentQuestionIndex];
+          if (currentQuestion.hints && currentQuestion.hints.length > 0) {
+            useHint(currentQuestion.id);
+          }
+          break;
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+          event.preventDefault();
+          // Number keys navigate to specific questions
+          const questionIndex = parseInt(event.key) - 1;
+          if (questionIndex >= 0 && questionIndex < quiz.questions.length) {
+            handleQuestionNavigation(questionIndex);
+          }
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentQuestionIndex, showInstructions, showResults, isSubmitting, quiz.questions]);
+
   const currentQuestion = quiz.questions[currentQuestionIndex];
   const totalQuestions = quiz.questions.length;
   const isLastQuestion = currentQuestionIndex === totalQuestions - 1;
@@ -576,6 +687,8 @@ export const QuizTaker: React.FC<QuizTakerProps> = ({
               <Button
                 onClick={() => setShowInstructions(false)}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3"
+                aria-label={language === 'rw' ? 'Tangira ikizamini (Ctrl+S)' : 'Start Quiz (Ctrl+S)'}
+                title={language === 'rw' ? 'Tangira ikizamini (Ctrl+S)' : 'Start Quiz (Ctrl+S)'}
               >
                 {language === 'rw' ? 'Tangira ikizamini' : 'Start Quiz'}
                 <ArrowRight className="w-5 h-5 ml-2" />
@@ -585,10 +698,12 @@ export const QuizTaker: React.FC<QuizTakerProps> = ({
                 onClick={onCancel}
                 variant="outline"
                 className="px-8 py-3"
+                aria-label={language === 'rw' ? 'Guca (Ctrl+B)' : 'Cancel (Ctrl+B)'}
+                title={language === 'rw' ? 'Guca (Ctrl+B)' : 'Cancel (Ctrl+B)'}
               >
                 {language === 'rw' ? 'Guca' : 'Cancel'}
               </Button>
-                         </div>
+            </div>
            </Card>
        </div>
      );
@@ -650,6 +765,12 @@ export const QuizTaker: React.FC<QuizTakerProps> = ({
                 <button
                   key={question.id}
                   onClick={() => handleQuestionNavigation(index)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleQuestionNavigation(index);
+                    }
+                  }}
                   className={`p-2 text-sm font-medium rounded transition-colors relative ${
                     index === currentQuestionIndex
                       ? 'bg-blue-600 text-white'
@@ -657,6 +778,9 @@ export const QuizTaker: React.FC<QuizTakerProps> = ({
                       ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
                       : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
                   }`}
+                  aria-label={`${language === 'rw' ? 'Ikibazo' : 'Question'} ${index + 1}${flaggedQuestions.has(question.id) ? `, ${language === 'rw' ? 'gifashwe' : 'flagged'}` : ''}`}
+                  title={`${language === 'rw' ? 'Ikibazo' : 'Question'} ${index + 1} (${index + 1})`}
+                  tabIndex={0}
                 >
                   {index + 1}
                   {flaggedQuestions.has(question.id) && (
@@ -724,6 +848,8 @@ export const QuizTaker: React.FC<QuizTakerProps> = ({
                       variant="outline"
                       size="sm"
                       disabled={(usedHints[currentQuestion.id] || 0) >= currentQuestion.hints.length}
+                      aria-label={language === 'rw' ? 'Koresha ubufasha (h)' : 'Use hint (h)'}
+                      title={language === 'rw' ? 'Koresha ubufasha (h)' : 'Use hint (h)'}
                     >
                       <Lightbulb className="w-4 h-4" />
                     </Button>
@@ -734,6 +860,8 @@ export const QuizTaker: React.FC<QuizTakerProps> = ({
                     variant="outline"
                     size="sm"
                     className={flaggedQuestions.has(currentQuestion.id) ? 'text-orange-600 border-orange-600' : ''}
+                    aria-label={language === 'rw' ? 'Fata ikibazo (Space)' : 'Flag question (Space)'}
+                    title={language === 'rw' ? 'Fata ikibazo (Space)' : 'Flag question (Space)'}
                   >
                     <Flag className="w-4 h-4" />
                   </Button>
@@ -767,6 +895,8 @@ export const QuizTaker: React.FC<QuizTakerProps> = ({
                   onClick={handlePreviousQuestion}
                   disabled={currentQuestionIndex === 0}
                   variant="outline"
+                  aria-label={language === 'rw' ? 'Inyuma (Ctrl+Left)' : 'Previous (Ctrl+Left)'}
+                  title={language === 'rw' ? 'Inyuma (Ctrl+Left)' : 'Previous (Ctrl+Left)'}
                 >
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   {language === 'rw' ? 'Inyuma' : 'Previous'}
@@ -778,6 +908,8 @@ export const QuizTaker: React.FC<QuizTakerProps> = ({
                       onClick={handleSubmitQuiz}
                       disabled={isSubmitting}
                       className="bg-green-600 hover:bg-green-700 text-white"
+                      aria-label={language === 'rw' ? 'Hera ikizamini (Ctrl+Enter)' : 'Submit Quiz (Ctrl+Enter)'}
+                      title={language === 'rw' ? 'Hera ikizamini (Ctrl+Enter)' : 'Submit Quiz (Ctrl+Enter)'}
                     >
                       {isSubmitting ? (
                         <LoadingSpinner size="sm" />
@@ -792,6 +924,8 @@ export const QuizTaker: React.FC<QuizTakerProps> = ({
                     <Button
                       onClick={handleNextQuestion}
                       className="bg-blue-600 hover:bg-blue-700 text-white"
+                      aria-label={language === 'rw' ? 'Komeza (Ctrl+Right)' : 'Next (Ctrl+Right)'}
+                      title={language === 'rw' ? 'Komeza (Ctrl+Right)' : 'Next (Ctrl+Right)'}
                     >
                       {language === 'rw' ? 'Komeza' : 'Next'}
                       <ArrowRight className="w-4 h-4 ml-2" />

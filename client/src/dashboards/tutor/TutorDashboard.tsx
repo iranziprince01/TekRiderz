@@ -7,6 +7,7 @@ import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { Alert } from '../../components/ui/Alert';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useStableThemeLanguage } from '../../hooks/useStableThemeLanguage';
 import { apiClient, getFileUrl } from '../../utils/api';
 import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 import { useCourseStore } from '../../stores/courseStore';
@@ -76,6 +77,8 @@ interface TutorStats {
 const TutorDashboard: React.FC = () => {
   const { user } = useAuth();
   const { t } = useLanguage();
+  // Initialize stable theme and language
+  useStableThemeLanguage();
   const navigate = useNavigate();
   const { myCourses, setMyCourses } = useCourseStore();
   

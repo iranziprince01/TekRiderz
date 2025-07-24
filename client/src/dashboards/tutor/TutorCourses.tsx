@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useStableThemeLanguage } from '../../hooks/useStableThemeLanguage';
 import { useCourseStore } from '../../stores/courseStore';
 import { apiClient, getFileUrl, cleanInstructorName } from '../../utils/api';
 import { handleApiError, handleCatchError, getErrorMessage } from '../../utils/errorHandler';
@@ -65,6 +66,8 @@ interface CourseStats {
 const TutorCourses: React.FC = () => {
   const { user } = useAuth();
   const { language, t } = useLanguage();
+  // Initialize stable theme and language
+  useStableThemeLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   const { myCourses, setMyCourses } = useCourseStore();

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useStableThemeLanguage } from '../../hooks/useStableThemeLanguage';
 import { Button } from '../ui/Button';
 import Avatar from '../ui/Avatar';
 
@@ -29,7 +30,8 @@ const Header: React.FC<HeaderProps> = ({
 }) => {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const { language, setLanguage, t } = useLanguage();
+  const { language, setLanguage, t, isLoading } = useLanguage();
+  const { setLanguage: stableSetLanguage } = useStableThemeLanguage();
   const navigate = useNavigate();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showLangMenu, setShowLangMenu] = useState(false);
@@ -43,7 +45,7 @@ const Header: React.FC<HeaderProps> = ({
   };
 
   const handleLanguageChange = (lang: 'en' | 'rw') => {
-    setLanguage(lang);
+    stableSetLanguage(lang);
     setShowLangMenu(false);
   };
 

@@ -9,6 +9,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import OfflineStatus from './components/common/OfflineStatus';
 import { performOneTimeSync, checkSyncNeeded, clearOfflineData } from './offline/syncManager';
 import { localDB } from './offline/db';
+import { initializeOfflineEssentials, cleanupOfflineEssentials, getEssentialOfflineStatus } from './offline/offlineEssentials';
 
 
 
@@ -132,6 +133,19 @@ function App() {
         } catch (error) {
           console.warn('⚠️ Failed to initialize local database:', error);
           // Continue without database - app will work with basic functionality
+        }
+
+        // Initialize offline essentials
+        try {
+          console.log('🔧 Initializing offline essentials...');
+          const offlineInit = await initializeOfflineEssentials();
+          if (offlineInit.success) {
+            console.log('✅ Offline essentials initialized:', offlineInit.message);
+          } else {
+            console.warn('⚠️ Offline essentials initialization failed:', offlineInit.message);
+          }
+        } catch (error) {
+          console.warn('⚠️ Failed to initialize offline essentials:', error);
         }
 
         console.log('App initialization completed successfully');

@@ -18,6 +18,7 @@ import {
   FileText,
   Download
 } from 'lucide-react';
+import { saveOfflineProgress, completeOfflineModule, handleOfflineError } from '../../offline/offlineEssentials';
 
 interface Module {
   id: string;
@@ -142,20 +143,35 @@ export const ModulePage: React.FC<ModulePageProps> = ({
               100
             );
 
-            await updateLessonProgress(courseId, module.id, {
-              timeSpent: newWatchTime,
-              currentPosition: progressPercentage,
-              interactions: [{
-                type: 'video_progress',
-                timestamp: new Date().toISOString(),
-                data: { 
-                  position: progressPercentage,
+            // Check if we're in offline mode
+            if (isOffline || isOfflineMode) {
+              // Use essential offline progress tracking
+              const userId = localStorage.getItem('currentUserId');
+              if (userId) {
+                await saveOfflineProgress(userId, courseId, module.id, {
+                  percentage: progressPercentage,
                   timeSpent: newWatchTime,
-                  moduleId: module.id,
-                  courseId
-                }
-              }]
-            });
+                  isCompleted: false,
+                  currentPosition: progressPercentage
+                });
+              }
+            } else {
+              // Online mode - use existing API
+              await updateLessonProgress(courseId, module.id, {
+                timeSpent: newWatchTime,
+                currentPosition: progressPercentage,
+                interactions: [{
+                  type: 'video_progress',
+                  timestamp: new Date().toISOString(),
+                  data: { 
+                    position: progressPercentage,
+                    timeSpent: newWatchTime,
+                    moduleId: module.id,
+                    courseId
+                  }
+                }]
+              });
+            }
 
             setLastProgressUpdate(newWatchTime);
             
@@ -167,10 +183,17 @@ export const ModulePage: React.FC<ModulePageProps> = ({
             console.log('Progress updated:', {
               moduleId: module.id,
               timeSpent: newWatchTime,
-              progress: progressPercentage
+              progress: progressPercentage,
+              mode: isOffline || isOfflineMode ? 'offline' : 'online'
             });
           } catch (error) {
             console.error('Error updating progress:', error);
+            
+            // Handle offline errors gracefully
+            if (isOffline || isOfflineMode) {
+              const errorInfo = handleOfflineError(error, 'progress_update');
+              console.warn('Offline progress update error:', errorInfo.message);
+            }
           }
         }
       }, 10000); // Update every 10 seconds
@@ -185,32 +208,69 @@ export const ModulePage: React.FC<ModulePageProps> = ({
     if (isCompleting || localCompleted) return;
 
     setIsCompleting(true);
+    setError(null);
+    
     try {
-      await onMarkComplete(module.id);
-      setLocalCompleted(true);
-      
-      // Final progress sync
-      await updateLessonProgress(courseId, module.id, {
-        timeSpent: watchTime,
-        currentPosition: 100,
-        interactions: [{
-          type: 'module_completed',
-          timestamp: new Date().toISOString(),
-          data: { 
-            moduleId: module.id,
-            courseId,
-            totalTimeSpent: watchTime,
-            completedAt: new Date().toISOString()
-          }
-        }]
-      });
-      
-      console.log('Module marked as complete:', {
-        moduleId: module.id,
-        totalWatchTime: watchTime
-      });
+      // Check if we're in offline mode
+      if (isOffline || isOfflineMode) {
+        console.log('📱 Completing module in offline mode:', module.id);
+        
+        // Get current user ID
+        const userId = localStorage.getItem('currentUserId');
+        if (!userId) {
+          throw new Error('No user ID found for offline completion');
+        }
+        
+        // Use essential offline completion
+        const success = await completeOfflineModule(userId, courseId, module.id);
+        
+        if (success) {
+          setLocalCompleted(true);
+          console.log('✅ Module completed successfully in offline mode');
+        } else {
+          throw new Error('Failed to complete module in offline mode');
+        }
+      } else {
+        // Online mode - use existing flow
+        await onMarkComplete(module.id);
+        setLocalCompleted(true);
+        
+        // Final progress sync
+        await updateLessonProgress(courseId, module.id, {
+          timeSpent: watchTime,
+          currentPosition: 100,
+          interactions: [{
+            type: 'module_completed',
+            timestamp: new Date().toISOString(),
+            data: { 
+              moduleId: module.id,
+              courseId,
+              totalTimeSpent: watchTime,
+              completedAt: new Date().toISOString()
+            }
+          }]
+        });
+        
+        console.log('Module marked as complete:', {
+          moduleId: module.id,
+          totalWatchTime: watchTime
+        });
+      }
     } catch (error) {
       console.error('Error completing module:', error);
+      
+      // Handle offline errors gracefully
+      if (isOffline || isOfflineMode) {
+        const errorInfo = handleOfflineError(error, 'module_completion');
+        setError(errorInfo.message);
+        
+        if (errorInfo.canRecover) {
+          console.log('🔄 Attempting to recover from offline error...');
+          // Could implement retry logic here
+        }
+      } else {
+        setError('Failed to complete module. Please try again.');
+      }
     } finally {
       setIsCompleting(false);
     }

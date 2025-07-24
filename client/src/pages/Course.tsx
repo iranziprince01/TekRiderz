@@ -236,14 +236,17 @@ const Course: React.FC = () => {
           
           setCourseData(courseData);
           setError('');
+          setLoading(false);
           return;
         } else {
           setError('Course not available offline. Please connect online to access this course.');
+          setLoading(false);
           return;
         }
       } catch (cacheError) {
         console.error('Failed to load cached course data:', cacheError);
         setError('Failed to load cached course data');
+        setLoading(false);
         return;
       }
     }

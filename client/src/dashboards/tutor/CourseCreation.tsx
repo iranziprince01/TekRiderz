@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useStableThemeLanguage } from '../../hooks/useStableThemeLanguage';
 import { apiClient } from '../../utils/api';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -132,6 +133,8 @@ const STEPS = [
 export const CourseCreation: React.FC = () => {
   const { user } = useAuth();
   const { language, t } = useLanguage();
+  // Initialize stable theme and language
+  useStableThemeLanguage();
   const navigate = useNavigate();
   const { id: courseId } = useParams();
   

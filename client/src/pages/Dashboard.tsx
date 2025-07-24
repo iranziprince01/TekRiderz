@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
 import DashboardLayout from '../components/layout/DashboardLayout';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 
 // Dashboard components
 import AdminDashboard from '../dashboards/admin/AdminDashboard';
@@ -46,22 +47,57 @@ const Dashboard = () => {
         {/* Tutor routes */}
         {user.role === 'tutor' && (
           <>
-            <Route path="/" element={<TutorDashboard />} />
-            <Route path="/courses" element={<TutorCourses />} />
-            <Route path="/analytics" element={<TutorAnalytics />} />
-            <Route path="/courses/new" element={<CourseCreation />} />
-            <Route path="/courses/edit/:id" element={<CourseCreation />} />
-            <Route path="/profile" element={<Profile />} />
+            <Route path="/" element={
+              <ErrorBoundary>
+                <TutorDashboard />
+              </ErrorBoundary>
+            } />
+            <Route path="/courses" element={
+              <ErrorBoundary>
+                <TutorCourses />
+              </ErrorBoundary>
+            } />
+            <Route path="/analytics" element={
+              <ErrorBoundary>
+                <TutorAnalytics />
+              </ErrorBoundary>
+            } />
+            <Route path="/courses/new" element={
+              <ErrorBoundary>
+                <CourseCreation />
+              </ErrorBoundary>
+            } />
+            <Route path="/courses/edit/:id" element={
+              <ErrorBoundary>
+                <CourseCreation />
+              </ErrorBoundary>
+            } />
+            <Route path="/profile" element={
+              <ErrorBoundary>
+                <Profile />
+              </ErrorBoundary>
+            } />
           </>
         )}
 
         {/* Learner routes */}
         {user.role === 'learner' && (
           <>
-            <Route path="/" element={<LearnerDashboard />} />
-            <Route path="/courses" element={<LearnerCourses />} />
-
-            <Route path="/profile" element={<Profile />} />
+            <Route path="/" element={
+              <ErrorBoundary>
+                <LearnerDashboard />
+              </ErrorBoundary>
+            } />
+            <Route path="/courses" element={
+              <ErrorBoundary>
+                <LearnerCourses />
+              </ErrorBoundary>
+            } />
+            <Route path="/profile" element={
+              <ErrorBoundary>
+                <Profile />
+              </ErrorBoundary>
+            } />
           </>
         )}
 

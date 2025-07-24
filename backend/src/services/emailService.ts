@@ -297,7 +297,7 @@ Visit your dashboard: ${config.cors.frontendUrl}/dashboard
   }
 
   // Send course approval notification
-  async sendCourseApprovalEmail(email: string, courseName: string, approved: boolean, reason?: string, feedback?: any): Promise<boolean> {
+  async sendCourseApprovalEmail(email: string, courseName: string, courseId: string, approved: boolean, reason?: string, feedback?: any): Promise<boolean> {
     const subject = approved 
       ? `Your course "${courseName}" has been approved!`
       : `Course submission requires changes - "${courseName}"`;
@@ -324,7 +324,7 @@ Visit your dashboard: ${config.cors.frontendUrl}/dashboard
             </div>
           ` : ''}
           <div style="text-align: center; margin: 30px 0;">
-            <a href="${config.cors.frontendUrl}/tutor/courses" 
+            <a href="${config.cors.frontendUrl}/course/${courseId}" 
                style="background: #4F46E5; color: white; text-decoration: none; 
                       padding: 15px 30px; border-radius: 8px; font-weight: bold; display: inline-block;">
               View Course
@@ -393,7 +393,7 @@ Visit your dashboard: ${config.cors.frontendUrl}/dashboard
     `;
 
     const text = approved 
-      ? `Course Approved! Your course "${courseName}" is now live on TekRiders.`
+      ? `Course Approved! Your course "${courseName}" is now live on TekRiders. View it at: ${config.cors.frontendUrl}/course/${courseId}`
       : `Course Update Required: Your course "${courseName}" needs changes before publication. ${reason || ''}`;
 
     return await this.sendEmail({

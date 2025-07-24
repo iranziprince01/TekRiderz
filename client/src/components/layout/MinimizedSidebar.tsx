@@ -10,7 +10,8 @@ import {
   BarChart3,
   Shield,
   Activity,
-  Sparkles
+  Sparkles,
+  Award
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -48,10 +49,16 @@ const MinimizedSidebar: React.FC<MinimizedSidebarProps> = ({ isOpen = false, onC
           gradient: 'from-orange-500 to-red-500'
         },
         { 
+          name: language === 'rw' ? 'Ibipimo' : 'Analytics', 
+          href: '/dashboard/analytics', 
+          icon: BarChart3,
+          gradient: 'from-purple-500 to-indigo-500'
+        },
+        { 
           name: language === 'rw' ? 'Umwirondoro' : 'Profile', 
           href: '/dashboard/profile', 
           icon: User,
-          gradient: 'from-purple-500 to-pink-500'
+          gradient: 'from-pink-500 to-rose-500'
         }
       ];
     }
@@ -71,10 +78,16 @@ const MinimizedSidebar: React.FC<MinimizedSidebarProps> = ({ isOpen = false, onC
           gradient: 'from-green-500 to-emerald-500'
         },
         { 
+          name: language === 'rw' ? 'Ibipimo' : 'Analytics', 
+          href: '/dashboard/analytics', 
+          icon: BarChart3,
+          gradient: 'from-purple-500 to-indigo-500'
+        },
+        { 
           name: language === 'rw' ? 'Umwirondoro' : 'Profile', 
           href: '/dashboard/profile', 
           icon: User,
-          gradient: 'from-purple-500 to-pink-500'
+          gradient: 'from-pink-500 to-rose-500'
         }
       ];
     }
@@ -94,10 +107,16 @@ const MinimizedSidebar: React.FC<MinimizedSidebarProps> = ({ isOpen = false, onC
         gradient: 'from-orange-500 to-red-500'
       },
       { 
+        name: language === 'rw' ? 'Icyemezo' : 'Certificates', 
+        href: '/certificates', 
+        icon: Award,
+        gradient: 'from-yellow-500 to-orange-500'
+      },
+      { 
         name: language === 'rw' ? 'Umwirondoro' : 'Profile', 
         href: '/dashboard/profile', 
         icon: User,
-        gradient: 'from-purple-500 to-pink-500'
+        gradient: 'from-pink-500 to-rose-500'
       }
     ];
   };
@@ -137,10 +156,10 @@ const MinimizedSidebar: React.FC<MinimizedSidebarProps> = ({ isOpen = false, onC
   return (
     <>
       {/* Minimized Sidebar - Fixed position with icon-only layout */}
-      <div className="fixed top-16 left-0 z-50 w-16 h-[calc(100vh-4rem)] bg-card/95 backdrop-blur-xl border-r border-border/50 shadow-lg">
+      <div className="fixed top-16 left-0 z-50 w-16 h-[calc(100vh-4rem)] bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border-r border-gray-200/50 dark:border-gray-700/50 shadow-lg">
         <div className="flex flex-col h-full">
           {/* User Role Icon */}
-          <div className="p-2 border-b border-border/50">
+          <div className="p-2 border-b border-gray-200/50 dark:border-gray-700/50">
             <div className={`
               w-10 h-10 rounded-xl bg-gradient-to-r ${roleConfig.gradient} 
               flex items-center justify-center shadow-lg
@@ -162,8 +181,8 @@ const MinimizedSidebar: React.FC<MinimizedSidebarProps> = ({ isOpen = false, onC
                     group flex items-center justify-center w-10 h-10 rounded-xl 
                     transition-all duration-300 ease-out relative
                     ${isActive(item.href)
-                      ? 'bg-primary-500/10 shadow-lg shadow-primary-500/20'
-                      : 'hover:bg-accent/50'
+                      ? 'bg-blue-500/10 shadow-lg shadow-blue-500/20'
+                      : 'hover:bg-gray-100/50 dark:hover:bg-gray-700/50'
                     }
                     hover:scale-110 transform-gpu
                   `}
@@ -173,7 +192,7 @@ const MinimizedSidebar: React.FC<MinimizedSidebarProps> = ({ isOpen = false, onC
                     flex items-center justify-center w-8 h-8 rounded-lg
                     ${isActive(item.href) 
                       ? `bg-gradient-to-r ${item.gradient} shadow-md`
-                      : 'bg-accent/30 group-hover:bg-accent/50'
+                      : 'bg-gray-100/30 dark:bg-gray-700/30 group-hover:bg-gray-200/50 dark:group-hover:bg-gray-600/50'
                     }
                     transition-all duration-300
                   `}>
@@ -182,7 +201,7 @@ const MinimizedSidebar: React.FC<MinimizedSidebarProps> = ({ isOpen = false, onC
                         h-4 w-4 transition-all duration-300
                         ${isActive(item.href) 
                           ? 'text-white' 
-                          : 'text-foreground/60 group-hover:text-foreground'
+                          : 'text-gray-600/60 dark:text-gray-400/60 group-hover:text-gray-700 dark:group-hover:text-gray-300'
                         }
                       `}
                     />
@@ -190,7 +209,7 @@ const MinimizedSidebar: React.FC<MinimizedSidebarProps> = ({ isOpen = false, onC
                   
                   {/* Active indicator */}
                   {isActive(item.href) && (
-                    <div className="absolute right-0 w-1 h-6 bg-primary-500 rounded-l-full" />
+                    <div className="absolute right-0 w-1 h-6 bg-blue-500 rounded-l-full" />
                   )}
                 </Link>
               ))}
@@ -198,17 +217,17 @@ const MinimizedSidebar: React.FC<MinimizedSidebarProps> = ({ isOpen = false, onC
           </div>
 
           {/* Logout button - Icon only */}
-          <div className="flex-shrink-0 border-t border-border/50 p-2">
+          <div className="flex-shrink-0 border-t border-gray-200/50 dark:border-gray-700/50 p-2">
             <button
               onClick={() => {
                 logout();
                 handleLinkClick();
               }}
               title="Logout"
-              className="group flex items-center justify-center w-10 h-10 rounded-xl hover:bg-destructive/10 transition-all duration-300 hover:scale-110"
+              className="group flex items-center justify-center w-10 h-10 rounded-xl hover:bg-red-500/10 transition-all duration-300 hover:scale-110"
             >
-              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-destructive/20 group-hover:bg-destructive/30 transition-all duration-300">
-                <LogOut className="h-4 w-4 text-destructive" />
+              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-red-500/20 group-hover:bg-red-500/30 transition-all duration-300">
+                <LogOut className="h-4 w-4 text-red-500" />
               </div>
             </button>
           </div>
@@ -216,7 +235,7 @@ const MinimizedSidebar: React.FC<MinimizedSidebarProps> = ({ isOpen = false, onC
 
         {/* Subtle background pattern */}
         <div className="absolute inset-0 pointer-events-none opacity-5">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary-500/10 via-transparent to-secondary-500/10" />
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-transparent to-purple-500/10" />
         </div>
       </div>
     </>

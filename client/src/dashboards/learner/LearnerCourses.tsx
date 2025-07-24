@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useStableThemeLanguage } from '../../hooks/useStableThemeLanguage';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -33,6 +34,8 @@ import { useAuth } from '../../contexts/AuthContext';
 
 const LearnerCourses: React.FC = () => {
   const { t } = useLanguage();
+  // Initialize stable theme and language
+  useStableThemeLanguage();
   const { isOfflineMode } = useAuth();
   const [user, setUser] = useState<any>(null);
   const [enrolledCourses, setEnrolledCourses] = useState<any[]>([]);
@@ -94,13 +97,26 @@ const LearnerCourses: React.FC = () => {
         // Cache courses for offline access (learners only)
         if (user?.role === 'learner') {
           try {
-            console.log('💾 Caching courses for offline access...');
-            await Promise.all(courses.map((course: any) => cacheCourse(course)));
-            console.log(`✅ Cached ${courses.length} courses successfully`);
+            console.log('💾 Caching enrolled courses for offline access...');
+            // Mark courses as enrolled before caching
+            const enrolledCoursesForCache = courses.map((course: any) => ({
+              ...course,
+              isEnrolled: true,
+              enrollment: course.enrollment || {
+                id: `enrollment_${course._id || course.id}`,
+                enrolledAt: new Date().toISOString(),
+                progress: course.progress?.overallProgress || 0,
+                status: 'active'
+              },
+              offlineAccessible: true
+            }));
+            
+            await Promise.all(enrolledCoursesForCache.map((course: any) => cacheCourse(course)));
+            console.log(`✅ Cached ${courses.length} enrolled courses successfully`);
             
             // Cache complete learner data for offline access
             if (user) {
-              await cacheLearnerData(user, courses);
+              await cacheLearnerData(user, enrolledCoursesForCache);
             }
           } catch (cacheError) {
             console.warn('Failed to cache some courses:', cacheError);
@@ -168,8 +184,21 @@ const LearnerCourses: React.FC = () => {
         // Cache the refreshed courses (learners only)
         if (user?.role === 'learner') {
           try {
-            await Promise.all(courses.map((course: any) => cacheCourse(course)));
-            console.log(`✅ Cached ${courses.length} refreshed courses`);
+            // Mark courses as enrolled before caching
+            const enrolledCoursesForCache = courses.map((course: any) => ({
+              ...course,
+              isEnrolled: true,
+              enrollment: course.enrollment || {
+                id: `enrollment_${course._id || course.id}`,
+                enrolledAt: new Date().toISOString(),
+                progress: course.progress?.overallProgress || 0,
+                status: 'active'
+              },
+              offlineAccessible: true
+            }));
+            
+            await Promise.all(enrolledCoursesForCache.map((course: any) => cacheCourse(course)));
+            console.log(`✅ Cached ${courses.length} refreshed enrolled courses`);
           } catch (cacheError) {
             console.warn('Failed to cache refreshed courses:', cacheError);
           }

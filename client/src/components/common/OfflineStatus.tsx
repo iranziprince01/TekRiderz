@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getLearnerOfflineStatus } from '../../offline/cacheService';
+import { getEssentialOfflineStatus } from '../../offline/offlineEssentials';
 
 interface CacheStatus {
   staticCache: boolean;
@@ -18,6 +19,7 @@ const OfflineStatus: React.FC<OfflineStatusProps> = ({ showDetails = false }) =>
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [cacheStatus, setCacheStatus] = useState<CacheStatus | null>(null);
   const [learnerStatus, setLearnerStatus] = useState<any>(null);
+  const [essentialStatus, setEssentialStatus] = useState<any>(null);
   const [isExpanded, setIsExpanded] = useState(showDetails);
 
   useEffect(() => {
@@ -51,12 +53,23 @@ const OfflineStatus: React.FC<OfflineStatusProps> = ({ showDetails = false }) =>
       }
     };
 
+    const checkEssentialStatus = () => {
+      try {
+        const status = getEssentialOfflineStatus();
+        setEssentialStatus(status);
+      } catch (error) {
+        console.error('Failed to check essential status:', error);
+      }
+    };
+
     checkCacheStatus();
     checkLearnerStatus();
+    checkEssentialStatus();
 
     const interval = setInterval(() => {
       checkCacheStatus();
       checkLearnerStatus();
+      checkEssentialStatus();
     }, 30000); // Check every 30 seconds
 
     return () => clearInterval(interval);
@@ -159,6 +172,34 @@ const OfflineStatus: React.FC<OfflineStatusProps> = ({ showDetails = false }) =>
                     <span className="text-gray-600 dark:text-gray-300">Last Sync:</span>
                     <span className="font-medium text-gray-800 dark:text-gray-200">
                       {new Date(learnerStatus.lastSync).toLocaleTimeString()}
+                    </span>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Essential Status */}
+            {essentialStatus && (
+              <>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600 dark:text-gray-300">Local Data:</span>
+                  <span className={`font-medium ${essentialStatus.hasLocalData ? 'text-green-600' : 'text-red-600'}`}>
+                    {essentialStatus.hasLocalData ? 'Available' : 'Not Available'}
+                  </span>
+                </div>
+                
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600 dark:text-gray-300">Course Access:</span>
+                  <span className={`font-medium ${essentialStatus.canAccessCourses ? 'text-green-600' : 'text-yellow-600'}`}>
+                    {essentialStatus.canAccessCourses ? 'Ready' : 'Limited'}
+                  </span>
+                </div>
+                
+                {essentialStatus.lastSync && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600 dark:text-gray-300">Last Activity:</span>
+                    <span className="font-medium text-gray-800 dark:text-gray-200">
+                      {essentialStatus.lastSync}
                     </span>
                   </div>
                 )}

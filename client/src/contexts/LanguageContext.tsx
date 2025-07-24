@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 
 type Language = 'en' | 'rw';
 
@@ -6,6 +6,7 @@ interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
   t: (key: string) => string;
+  isLoading: boolean;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
@@ -209,12 +210,27 @@ const translations = {
 
     // Admin Courses
     'admin.courses.title': 'Course Management',
-    'admin.courses.subtitle': 'Review and manage all platform courses',
-    'admin.courses.searchPlaceholder': 'Search courses by title or tutor...',
-    'admin.courses.allStatus': 'All Status',
-    'admin.courses.allCategories': 'All Categories',
-    'admin.courses.allLevels': 'All Levels',
-    'admin.courses.tutor': 'Tutor',
+    'admin.courses.description': 'Review and manage all platform courses',
+    'admin.courses.refresh': 'Refresh',
+    'admin.courses.totalCourses': 'Total Courses',
+    'admin.courses.published': 'Published',
+    'admin.courses.pending': 'Pending',
+    'admin.courses.draft': 'Draft',
+    'admin.courses.search': 'Search',
+    'admin.courses.status': 'Status',
+    'admin.courses.category': 'Category',
+    'admin.courses.level': 'Level',
+    'admin.courses.clearFilters': 'Clear Filters',
+    'admin.courses.course': 'Course',
+    'admin.courses.instructor': 'Instructor',
+    'admin.courses.enrollments': 'Enrollments',
+    'admin.courses.rating': 'Rating',
+    'admin.courses.created': 'Created',
+    'admin.courses.actions': 'Actions',
+    'admin.courses.approve': 'Approve',
+    'admin.courses.reject': 'Reject',
+    'admin.courses.delete': 'Delete',
+    'admin.courses.cancel': 'Cancel',
     'admin.courses.approveCourse': 'Approve Course',
     'admin.courses.rejectCourse': 'Reject Course',
     'admin.courses.viewCourse': 'View Course',
@@ -230,6 +246,15 @@ const translations = {
     'admin.courses.rejectModal.reason': 'Reason for rejection',
     'admin.courses.rejectModal.reasonPlaceholder': 'Please provide a reason for rejection...',
     'admin.courses.rejectModal.reject': 'Reject Course',
+    'admin.courses.approveCourseDesc': 'Are you sure you want to approve the course',
+    'admin.courses.rejectCourseDesc': 'Are you sure you want to reject the course',
+    'admin.courses.approvalFeedbackPlaceholder': 'Add feedback for the instructor (optional)...',
+    'admin.courses.rejectionReasonPlaceholder': 'Please provide a reason for rejection...',
+    'admin.courses.searchPlaceholder': 'Search courses by title or tutor...',
+    'admin.courses.allStatuses': 'All Statuses',
+    'admin.courses.allCategories': 'All Categories',
+    'admin.courses.allLevels': 'All Levels',
+    'admin.courses.tutor': 'Tutor',
     'admin.courses.status.draft': 'Draft',
     'admin.courses.status.pending': 'Pending',
     'admin.courses.status.submitted': 'Under Review',
@@ -245,10 +270,24 @@ const translations = {
 
     // Admin Users
     'admin.users.title': 'User Management',
-    'admin.users.subtitle': 'Manage all platform users and their permissions',
+    'admin.users.description': 'Manage all platform users and their permissions',
+    'admin.users.refresh': 'Refresh',
+    'admin.users.totalUsers': 'Total Users',
+    'admin.users.admins': 'Admins',
+    'admin.users.tutors': 'Tutors',
+    'admin.users.learners': 'Learners',
+    'admin.users.search': 'Search',
+    'admin.users.role': 'Role',
+    'admin.users.status': 'Status',
+    'admin.users.clearFilters': 'Clear Filters',
+    'admin.users.user': 'User',
+    'admin.users.actions': 'Actions',
+    'admin.users.roleManagement': 'Role Management',
+    'admin.users.roleWarning': 'Changing user roles affects their permissions. Are you sure?',
+    'admin.users.updateRole': 'Update Role',
     'admin.users.searchPlaceholder': 'Search users by name or email...',
     'admin.users.allRoles': 'All Roles',
-    'admin.users.allStatus': 'All Status',
+    'admin.users.allStatuses': 'All Statuses',
     'admin.users.admin': 'Admin',
     'admin.users.tutor': 'Tutor',
     'admin.users.learner': 'Learner',
@@ -261,7 +300,7 @@ const translations = {
     'admin.users.deactivateUser': 'Deactivate User',
     'admin.users.deleteUser': 'Delete User',
     'admin.users.joined': 'Joined',
-    'admin.users.lastLogin': 'Last login',
+    'admin.users.lastLogin': 'Last Login',
     'admin.users.userDetails': 'User Details',
     'admin.users.accountInfo': 'Account Info',
     'admin.users.userId': 'User ID',
@@ -732,12 +771,27 @@ const translations = {
 
     // Admin Courses
     'admin.courses.title': 'Gucunga Amasomo',
-    'admin.courses.subtitle': 'Suzuma ugacunge amasomo yose y\'urubuga',
-    'admin.courses.searchPlaceholder': 'Shakisha amasomo ukoresha izina cyangwa umwarimu...',
-    'admin.courses.allStatus': 'Uburyo Bwose',
-    'admin.courses.allCategories': 'Ibyiciro Byose',
-    'admin.courses.allLevels': 'Amashuri Yose',
-    'admin.courses.tutor': 'Umwarimu',
+    'admin.courses.description': 'Suzuma ugacunge amasomo yose y\'urubuga',
+    'admin.courses.refresh': 'Shyira mu buryo',
+    'admin.courses.totalCourses': 'Amasomo Yose',
+    'admin.courses.published': 'Byatangajwe',
+    'admin.courses.pending': 'Bitegereje',
+    'admin.courses.draft': 'Igishushanyo',
+    'admin.courses.search': 'Shakisha',
+    'admin.courses.status': 'Uburyo',
+    'admin.courses.category': 'Icyiciro',
+    'admin.courses.level': 'Urwego',
+    'admin.courses.clearFilters': 'Siba Ibishishikira',
+    'admin.courses.course': 'Isomo',
+    'admin.courses.instructor': 'Umwarimu',
+    'admin.courses.enrollments': 'Ibiyandikisho',
+    'admin.courses.rating': 'Amanota',
+    'admin.courses.created': 'Byakozwe',
+    'admin.courses.actions': 'Ibikorwa',
+    'admin.courses.approve': 'Emeza',
+    'admin.courses.reject': 'Anga',
+    'admin.courses.delete': 'Siba',
+    'admin.courses.cancel': 'Kuraguza',
     'admin.courses.approveCourse': 'Emeza Isomo',
     'admin.courses.rejectCourse': 'Anga Isomo',
     'admin.courses.viewCourse': 'Reba Isomo',
@@ -753,6 +807,15 @@ const translations = {
     'admin.courses.rejectModal.reason': 'Impamvu yo kwanga',
     'admin.courses.rejectModal.reasonPlaceholder': 'Nyamuneka tanga impamvu yo kwanga...',
     'admin.courses.rejectModal.reject': 'Anga Isomo',
+    'admin.courses.approveCourseDesc': 'Wizeye ko ushaka kwemeza isomo',
+    'admin.courses.rejectCourseDesc': 'Wizeye ko ushaka kwanga isomo',
+    'admin.courses.approvalFeedbackPlaceholder': 'Ongeraho inyuze ku mwarimu (ntabwo byangombwa)...',
+    'admin.courses.rejectionReasonPlaceholder': 'Nyamuneka tanga impamvu yo kwanga...',
+    'admin.courses.searchPlaceholder': 'Shakisha amasomo ukoresha izina cyangwa umwarimu...',
+    'admin.courses.allStatuses': 'Uburyo Bwose',
+    'admin.courses.allCategories': 'Ibyiciro Byose',
+    'admin.courses.allLevels': 'Amashuri Yose',
+    'admin.courses.tutor': 'Umwarimu',
     'admin.courses.status.draft': 'Igishushanyo',
     'admin.courses.status.pending': 'Bitegereje',
     'admin.courses.status.submitted': 'Mu Gusuzuma',
@@ -768,10 +831,24 @@ const translations = {
 
     // Admin Users
     'admin.users.title': 'Gucunga Abakoresha',
-    'admin.users.subtitle': 'Gucunga abakoresha bose b\'urubuga n\'uburenganzira bwabo',
+    'admin.users.description': 'Gucunga abakoresha bose b\'urubuga n\'uburenganzira bwabo',
+    'admin.users.refresh': 'Shyira mu buryo',
+    'admin.users.totalUsers': 'Abakoresha Bose',
+    'admin.users.admins': 'Abayobozi',
+    'admin.users.tutors': 'Abarimu',
+    'admin.users.learners': 'Abanyeshuri',
+    'admin.users.search': 'Shakisha',
+    'admin.users.role': 'Inshingano',
+    'admin.users.status': 'Uburyo',
+    'admin.users.clearFilters': 'Siba Ibishishikira',
+    'admin.users.user': 'Umukoresha',
+    'admin.users.actions': 'Ibikorwa',
+    'admin.users.roleManagement': 'Gucunga Inshingano',
+    'admin.users.roleWarning': 'Guhindura inshingano z\'umukoresha bigira ingaruka ku burenganzira bwe. Wizeye?',
+    'admin.users.updateRole': 'Hindura Inshingano',
     'admin.users.searchPlaceholder': 'Shakisha abakoresha ukoresha amazina cyangwa email...',
     'admin.users.allRoles': 'Inshingano Zose',
-    'admin.users.allStatus': 'Uburyo Bwose',
+    'admin.users.allStatuses': 'Uburyo Bwose',
     'admin.users.admin': 'Umuyobozi',
     'admin.users.tutor': 'Umwarimu',
     'admin.users.learner': 'Umunyeshuri',
@@ -1073,24 +1150,83 @@ interface LanguageProviderProps {
 }
 
 export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) => {
-  const [language, setLanguage] = useState<Language>(() => {
+  const [language, setLanguageState] = useState<Language>(() => {
     if (typeof window !== 'undefined') {
-      return (localStorage.getItem('language') as Language) || 'rw'; // Default to Kinyarwanda
+      try {
+        const savedLanguage = localStorage.getItem('language') as Language;
+        if (savedLanguage && (savedLanguage === 'en' || savedLanguage === 'rw')) {
+          return savedLanguage;
+        }
+      } catch (error) {
+        console.warn('Failed to load language from localStorage:', error);
+      }
     }
-    return 'rw';
+    return 'rw'; // Default to Kinyarwanda
   });
 
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Save language to localStorage
+  const saveLanguage = useCallback((newLanguage: Language) => {
+    try {
+      localStorage.setItem('language', newLanguage);
+    } catch (error) {
+      console.warn('Failed to save language to localStorage:', error);
+    }
+  }, []);
+
+  // Save language when it changes
   useEffect(() => {
-    localStorage.setItem('language', language);
+    saveLanguage(language);
+  }, [language, saveLanguage]);
+
+  // Enhanced translation function with better error handling
+  const t = useCallback((key: string): string => {
+    try {
+      const translation = translations[language][key as keyof typeof translations['en']];
+      if (translation) {
+        return translation;
+      }
+      
+      // Fallback to English if translation not found in current language
+      if (language !== 'en') {
+        const englishTranslation = translations['en'][key as keyof typeof translations['en']];
+        if (englishTranslation) {
+          console.warn(`Translation missing for key "${key}" in ${language}, falling back to English`);
+          return englishTranslation;
+        }
+      }
+      
+      // Return the key if no translation found
+      console.warn(`Translation missing for key "${key}" in both ${language} and English`);
+      return key;
+    } catch (error) {
+      console.error('Translation error:', error);
+      return key;
+    }
   }, [language]);
 
-  const t = (key: string): string => {
-    const translation = translations[language][key as keyof typeof translations['en']];
-    return translation || key;
-  };
+  // Memoized setLanguage function
+  const setLanguage = useCallback((newLanguage: Language) => {
+    if (newLanguage === 'en' || newLanguage === 'rw') {
+      setIsLoading(true);
+      setLanguageState(newLanguage);
+      // Small delay to ensure smooth transition
+      setTimeout(() => setIsLoading(false), 100);
+    } else {
+      console.warn('Invalid language:', newLanguage);
+    }
+  }, []);
+
+  const value = useMemo(() => ({
+    language,
+    setLanguage,
+    t,
+    isLoading
+  }), [language, setLanguage, t, isLoading]);
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t }}>
+    <LanguageContext.Provider value={value}>
       {children}
     </LanguageContext.Provider>
   );

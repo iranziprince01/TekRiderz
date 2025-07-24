@@ -824,7 +824,7 @@ export class CourseWorkflowService {
     try {
       const instructor = await userModel.findById(course.instructorId);
       if (instructor) {
-        await emailService.sendCourseApprovalEmail(instructor.email, course.title, true, undefined, feedback);
+        await emailService.sendCourseApprovalEmail(instructor.email, course.title, course._id!, true, undefined, feedback);
       }
     } catch (error) {
       logger.error('Failed to notify instructor of approval:', error);
@@ -835,7 +835,7 @@ export class CourseWorkflowService {
     try {
       const instructor = await userModel.findById(course.instructorId);
       if (instructor) {
-        await emailService.sendCourseApprovalEmail(instructor.email, course.title, false, reason, feedback);
+        await emailService.sendCourseApprovalEmail(instructor.email, course.title, course._id!, false, reason, feedback);
       }
     } catch (error) {
       logger.error('Failed to notify instructor of rejection:', error);

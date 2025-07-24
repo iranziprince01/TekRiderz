@@ -23,7 +23,10 @@ import {
   RefreshCw,
   AlertCircle,
   BarChart3,
-  TrendingUp
+  TrendingUp,
+  Target,
+  Eye,
+  Lock
 } from 'lucide-react';
 
 interface Quiz {
@@ -83,15 +86,124 @@ export const CourseAssessments: React.FC<CourseAssessmentsProps> = ({
   const { language } = useLanguage();
   const { theme } = useTheme();
   
-  // State management
   const [quizzes, setQuizzes] = useState<Quiz[]>(initialQuizzes);
   const [grades, setGrades] = useState<QuizGrade[]>([]);
+  const [course, setCourse] = useState<any>(null);
   const [userProgress, setUserProgress] = useState(initialUserProgress);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
-  const [currentQuiz, setCurrentQuiz] = useState<Quiz | null>(null);
+  const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
   const [showQuizTaker, setShowQuizTaker] = useState(false);
+  const [highlightedQuiz, setHighlightedQuiz] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Handle accessibility events
+  useEffect(() => {
+    const handleHighlightQuiz = (event: CustomEvent) => {
+      const { action } = event.detail;
+      // Find the first available quiz to highlight
+      const availableQuiz = quizzes.find(q => q.isUnlocked && !q.isCompleted);
+      if (availableQuiz) {
+        setHighlightedQuiz(availableQuiz.id);
+        setTimeout(() => {
+          const quizElement = document.getElementById(`quiz-${availableQuiz.id}`);
+          if (quizElement) {
+            quizElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            quizElement.classList.add('ring-2', 'ring-blue-500', 'ring-opacity-50');
+            setTimeout(() => {
+              quizElement.classList.remove('ring-2', 'ring-blue-500', 'ring-opacity-50');
+            }, 3000);
+          }
+        }, 500);
+      }
+    };
+
+    const handleHighlightFinalQuiz = (event: CustomEvent) => {
+      const { action } = event.detail;
+      // Find the final quiz
+      const finalQuiz = quizzes.find(q => q.type === 'final');
+      if (finalQuiz) {
+        setHighlightedQuiz(finalQuiz.id);
+        setTimeout(() => {
+          const quizElement = document.getElementById(`quiz-${finalQuiz.id}`);
+          if (quizElement) {
+            quizElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            quizElement.classList.add('ring-2', 'ring-blue-500', 'ring-opacity-50');
+            setTimeout(() => {
+              quizElement.classList.remove('ring-2', 'ring-blue-500', 'ring-opacity-50');
+            }, 3000);
+          }
+        }, 500);
+      }
+    };
+
+    const handleContinueNextQuiz = () => {
+      const nextQuiz = quizzes.find(q => q.isUnlocked && !q.isCompleted);
+      if (nextQuiz) {
+        handleTakeQuiz(nextQuiz.id);
+      } else {
+        // If no next quiz, go back to modules or course home
+        navigate(`/course/${courseId}/modules`);
+      }
+    };
+
+    const handleStartCurrentQuiz = () => {
+      if (selectedQuiz) {
+        setShowQuizTaker(true);
+      }
+    };
+
+    const handleSubmitCurrentQuiz = () => {
+      // This would be handled in the QuizTaker component
+      console.log('Submit current quiz event received');
+    };
+
+    // Add event listeners
+    window.addEventListener('highlightQuiz', handleHighlightQuiz as EventListener);
+    window.addEventListener('highlightFinalQuiz', handleHighlightFinalQuiz as EventListener);
+    window.addEventListener('continueNextQuiz', handleContinueNextQuiz);
+    window.addEventListener('startCurrentQuiz', handleStartCurrentQuiz);
+    window.addEventListener('submitCurrentQuiz', handleSubmitCurrentQuiz);
+
+    return () => {
+      window.removeEventListener('highlightQuiz', handleHighlightQuiz as EventListener);
+      window.removeEventListener('highlightFinalQuiz', handleHighlightFinalQuiz as EventListener);
+      window.removeEventListener('continueNextQuiz', handleContinueNextQuiz);
+      window.removeEventListener('startCurrentQuiz', handleStartCurrentQuiz);
+      window.removeEventListener('submitCurrentQuiz', handleSubmitCurrentQuiz);
+    };
+  }, [quizzes, selectedQuiz, courseId, navigate]);
+
+  // Enhanced quiz navigation with accessibility support
+  const handleQuizAction = (quiz: Quiz, action: 'take' | 'review' | 'retake') => {
+    switch (action) {
+      case 'take':
+        if (quiz.isUnlocked && !quiz.isCompleted) {
+          handleTakeQuiz(quiz.id);
+        }
+        break;
+      case 'review':
+        if (quiz.isCompleted) {
+          handleTakeQuiz(quiz.id);
+        }
+        break;
+      case 'retake':
+        if (quiz.isCompleted && quiz.attempts < quiz.maxAttempts) {
+          handleTakeQuiz(quiz.id);
+        }
+        break;
+    }
+  };
+
+  // Keyboard navigation support for quizzes
+  const handleQuizKeyDown = (event: React.KeyboardEvent, quiz: Quiz) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      if (quiz.isUnlocked) {
+        handleTakeQuiz(quiz.id);
+      }
+    }
+  };
 
   // Fetch all quizzes, course data, and grades
   const fetchAssessmentsData = async (showLoading = true) => {
@@ -434,7 +546,7 @@ export const CourseAssessments: React.FC<CourseAssessmentsProps> = ({
   const handleTakeQuiz = (quizId: string) => {
     const quiz = quizzes.find(q => q.id === quizId);
     if (quiz) {
-      setCurrentQuiz(quiz);
+      setSelectedQuiz(quiz);
       setShowQuizTaker(true);
     }
   };
@@ -449,10 +561,10 @@ export const CourseAssessments: React.FC<CourseAssessmentsProps> = ({
       const percentage = typeof result?.percentage === 'number' ? result.percentage : score;
       
       // Update quiz status in local state immediately
-      if (currentQuiz) {
+      if (selectedQuiz) {
         setQuizzes(prevQuizzes =>
           prevQuizzes.map(q =>
-            q.id === currentQuiz.id
+            q.id === selectedQuiz.id
               ? {
                   ...q,
                   isCompleted: passed || q.isCompleted,
@@ -464,10 +576,10 @@ export const CourseAssessments: React.FC<CourseAssessmentsProps> = ({
         );
         
         console.log('✅ Local quiz state updated successfully:', {
-          quizId: currentQuiz.id,
+          quizId: selectedQuiz.id,
           score: percentage,
           passed,
-          attempts: (currentQuiz.attempts || 0) + 1
+          attempts: (selectedQuiz.attempts || 0) + 1
         });
       }
 
@@ -490,18 +602,36 @@ export const CourseAssessments: React.FC<CourseAssessmentsProps> = ({
 
   const handleCancelQuiz = () => {
     setShowQuizTaker(false);
-    setCurrentQuiz(null);
+    setSelectedQuiz(null);
   };
 
   const getQuizStatus = (quiz: Quiz) => {
     if (quiz.isCompleted) {
       if (quiz.bestScore && quiz.bestScore >= quiz.passingScore) {
-        return { status: 'passed', color: 'success', text: language === 'rw' ? 'Byarangiye' : 'Passed' };
+        return { 
+          status: 'passed', 
+          color: 'success', 
+          text: language === 'rw' ? 'Byarangiye' : 'Passed',
+          icon: <CheckCircle className="w-4 h-4 text-green-600" />,
+          variant: 'success' as const
+        };
       } else {
-        return { status: 'failed', color: 'warning', text: language === 'rw' ? 'Ongera' : 'Retry' };
+        return { 
+          status: 'failed', 
+          color: 'warning', 
+          text: language === 'rw' ? 'Ongera' : 'Retry',
+          icon: <XCircle className="w-4 h-4 text-red-600" />,
+          variant: 'error' as const
+        };
       }
     } else {
-      return { status: 'available', color: 'default', text: language === 'rw' ? 'Biteguye' : 'Ready' };
+      return { 
+        status: 'available', 
+        color: 'default', 
+        text: language === 'rw' ? 'Biteguye' : 'Ready',
+        icon: <Clock className="w-4 h-4 text-blue-600" />,
+        variant: 'default' as const
+      };
     }
   };
 
@@ -510,7 +640,7 @@ export const CourseAssessments: React.FC<CourseAssessmentsProps> = ({
     return grades.find(grade => grade.id === quizId);
   };
 
-  if (showQuizTaker && currentQuiz) {
+  if (showQuizTaker && selectedQuiz) {
     return (
       <ErrorBoundary
         fallback={
@@ -530,7 +660,7 @@ export const CourseAssessments: React.FC<CourseAssessmentsProps> = ({
                 <Button
                   onClick={() => {
                     setShowQuizTaker(false);
-                    setCurrentQuiz(null);
+                    setSelectedQuiz(null);
                   }}
                   className="bg-blue-600 hover:bg-blue-700 text-white"
                 >
@@ -549,10 +679,10 @@ export const CourseAssessments: React.FC<CourseAssessmentsProps> = ({
       >
         <QuizTaker
           quiz={{
-            ...currentQuiz,
-            settings: currentQuiz.settings || {
-              passingScore: currentQuiz.passingScore,
-              maxAttempts: currentQuiz.maxAttempts,
+            ...selectedQuiz,
+            settings: selectedQuiz.settings || {
+              passingScore: selectedQuiz.passingScore,
+              maxAttempts: selectedQuiz.maxAttempts,
               showCorrectAnswers: true,
               showScoreImmediately: true
             }
@@ -560,7 +690,7 @@ export const CourseAssessments: React.FC<CourseAssessmentsProps> = ({
           courseId={courseId}
           onQuizComplete={handleQuizComplete}
           onCancel={handleCancelQuiz}
-          currentAttempt={(currentQuiz.attempts || 0) + 1}
+          currentAttempt={(selectedQuiz.attempts || 0) + 1}
         />
       </ErrorBoundary>
     );
@@ -605,202 +735,170 @@ export const CourseAssessments: React.FC<CourseAssessmentsProps> = ({
 
   const QuizCard = ({ quiz }: { quiz: Quiz }) => {
     const status = getQuizStatus(quiz);
-    const canTake = quiz.isUnlocked && (quiz.attempts < quiz.maxAttempts);
-    const maxAttemptsReached = quiz.attempts >= quiz.maxAttempts;
     const grade = getQuizGrade(quiz.id);
+    const canTake = quiz.isUnlocked && !quiz.isCompleted;
+    const canRetake = quiz.isCompleted && quiz.attempts < quiz.maxAttempts;
     
     return (
-      <Card className="p-6 hover:shadow-lg transition-shadow">
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-start gap-4 flex-1">
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-              quiz.type === 'final' 
-                ? 'bg-purple-100 dark:bg-purple-900' 
-                : 'bg-blue-100 dark:bg-blue-900'
-            }`}>
-              {quiz.type === 'final' ? (
-                <Trophy className={`w-6 h-6 ${
+      <div 
+        id={`quiz-${quiz.id}`}
+        className={`transition-all duration-300 ${
+          highlightedQuiz === quiz.id ? 'ring-2 ring-blue-500 ring-opacity-50 rounded-lg' : ''
+        }`}
+      >
+        <div
+          onClick={() => handleQuizAction(quiz, 'take')}
+          onKeyDown={(event: React.KeyboardEvent) => handleQuizKeyDown(event, quiz)}
+          role="button"
+          tabIndex={0}
+          className="cursor-pointer"
+        >
+          <Card className="p-6 hover:shadow-lg transition-shadow">
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-start gap-4 flex-1">
+              {/* Quiz Icon */}
+              <div className="flex-shrink-0">
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
                   quiz.type === 'final' 
-                    ? 'text-purple-600 dark:text-purple-400' 
-                    : 'text-blue-600 dark:text-blue-400'
-                }`} />
-              ) : (
-                <ClipboardList className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-              )}
+                    ? 'bg-purple-100 dark:bg-purple-900/20' 
+                    : 'bg-blue-100 dark:bg-blue-900/20'
+                }`}>
+                  {quiz.type === 'final' ? (
+                    <Trophy className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                  ) : (
+                    <ClipboardList className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                  )}
+                </div>
+              </div>
+
+              {/* Quiz Info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-2">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
+                    {quiz.title}
+                  </h3>
+                  {quiz.type === 'final' && (
+                    <Badge variant="default" className="bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300">
+                      {language === 'rw' ? 'Ikizamini cya Nyuma' : 'Final'}
+                    </Badge>
+                  )}
+                </div>
+                
+                <p className="text-gray-600 dark:text-gray-400 text-sm mb-3 line-clamp-2">
+                  {quiz.description}
+                </p>
+
+                {/* Quiz Stats */}
+                <div className="flex items-center gap-4 text-sm text-gray-500">
+                  <div className="flex items-center gap-1">
+                    <Clock className="w-4 h-4" />
+                    <span>{quiz.questions.length} {language === 'rw' ? 'ibibazo' : 'questions'}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Target className="w-4 h-4" />
+                    <span>{quiz.passingScore}% {language === 'rw' ? 'kugirango uhagaze' : 'to pass'}</span>
+                  </div>
+                  {quiz.attempts > 0 && (
+                    <div className="flex items-center gap-1">
+                      <RotateCcw className="w-4 h-4" />
+                      <span>{quiz.attempts}/{quiz.maxAttempts} {language === 'rw' ? 'igerageza' : 'attempts'}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
-            
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {quiz.title}
-                </h3>
-                <Badge variant={status.color as any}>
+
+            {/* Status & Actions */}
+            <div className="flex flex-col items-end gap-3">
+              {/* Status Badge */}
+              <div className="flex items-center gap-2">
+                {status.icon}
+                <Badge variant={status.variant} className="text-xs">
                   {status.text}
                 </Badge>
-                {quiz.type === 'final' && (
-                  <Badge variant="info">
-                    {language === 'rw' ? 'Ikizamini cya nyuma' : 'Final'}
-                  </Badge>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2">
+                {canTake ? (
+                  <Button
+                    onClick={() => handleQuizAction(quiz, 'take')}
+                    className={`${
+                      quiz.type === 'final'
+                        ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                        : 'bg-blue-600 hover:bg-blue-700 text-white'
+                    }`}
+                    aria-label={language === 'rw' ? 'Tangira ikizamini' : 'Start quiz'}
+                  >
+                    <Play className="w-4 h-4 mr-2" />
+                    {language === 'rw' ? 'Tangira' : 'Start'}
+                  </Button>
+                ) : quiz.isCompleted ? (
+                  <div className="flex items-center gap-2">
+                    {canRetake && (
+                      <Button
+                        onClick={() => handleQuizAction(quiz, 'retake')}
+                        variant="outline"
+                        className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                        aria-label={language === 'rw' ? 'Subiramo ikizamini' : 'Retake quiz'}
+                      >
+                        <RotateCcw className="w-4 h-4 mr-2" />
+                        {language === 'rw' ? 'Subiramo' : 'Retake'}
+                      </Button>
+                    )}
+                    <Button
+                      onClick={() => handleQuizAction(quiz, 'review')}
+                      variant="outline"
+                      className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                      aria-label={language === 'rw' ? 'Reba ikizamini' : 'Review quiz'}
+                    >
+                      <Eye className="w-4 h-4 mr-2" />
+                      {language === 'rw' ? 'Reba' : 'Review'}
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    disabled
+                    variant="outline"
+                    className="border-gray-300 text-gray-400 cursor-not-allowed"
+                  >
+                    <Lock className="w-4 h-4 mr-2" />
+                    {language === 'rw' ? 'Ntibikora' : 'Locked'}
+                  </Button>
                 )}
               </div>
-              
-              {quiz.moduleTitle && (
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                  {language === 'rw' ? 'Igice:' : 'Module:'} {quiz.moduleTitle}
-                </p>
-              )}
-              
-              <p className="text-gray-600 dark:text-gray-300 mb-4">
-                {quiz.description}
-              </p>
-              
-              {/* Quiz Stats */}
-              <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400 mb-4">
-                <div className="flex items-center gap-1">
-                  <ClipboardList className="w-4 h-4" />
-                  {quiz.questions.length} {language === 'rw' ? 'ibibazo' : 'questions'}
-                </div>
-                
-                <div className="flex items-center gap-1">
-                  <Star className="w-4 h-4" />
-                  {quiz.passingScore}% {language === 'rw' ? 'ntagomba kurangiza' : 'to pass'}
-                </div>
-                
-                <div className="flex items-center gap-1">
-                  <RotateCcw className="w-4 h-4" />
-                  {quiz.attempts}/{quiz.maxAttempts} {language === 'rw' ? 'ibigeragezo' : 'attempts'}
-                </div>
-              </div>
-              
-              {/* Enhanced Grade Display */}
-              {grade ? (
-                <div className="space-y-3">
-                  {/* Main Score Display */}
-                  <div className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        {grade.passed ? (
-                          <CheckCircle className="w-5 h-5 text-green-600" />
-                        ) : (
-                          <XCircle className="w-5 h-5 text-red-600" />
-                        )}
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                          {language === 'rw' ? 'Amanota ya nyuma:' : 'Final Grade:'}
-                        </span>
-                      </div>
-                      <span className={`text-xl font-bold ${
-                        grade.passed 
-                          ? 'text-green-600' 
-                          : 'text-red-600'
-                      }`}>
-                        {Math.round(grade.percentage)}%
-                      </span>
-                    </div>
-                    
-                    {/* Additional Grade Details */}
-                    <div className="grid grid-cols-2 gap-4 text-xs text-gray-600 dark:text-gray-400">
-                      <div className="flex items-center gap-1">
-                        <BarChart3 className="w-3 h-3" />
-                        <span>{grade.score}/{grade.maxScore} {language === 'rw' ? 'points' : 'points'}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        <span>{grade.timeSpent} {language === 'rw' ? 'iminota' : 'min'}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <TrendingUp className="w-3 h-3" />
-                        <span>{grade.attempts} {language === 'rw' ? 'igerageza' : 'attempts'}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Trophy className="w-3 h-3" />
-                        <span className={grade.passed ? 'text-green-600' : 'text-red-600'}>
-                          {grade.passed ? (language === 'rw' ? 'Byarangiye' : 'Passed') : (language === 'rw' ? 'Ntibyarangiye' : 'Failed')}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    {/* Completion Date */}
-                    <div className="mt-2 pt-2 border-t border-blue-200 dark:border-blue-700">
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {language === 'rw' ? 'Byarangiye ku ya:' : 'Completed on:'} {' '}
-                        {new Date(grade.completedAt).toLocaleDateString(language === 'rw' ? 'rw' : 'en-US', {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ) : quiz.isCompleted && quiz.bestScore !== undefined ? (
-                // Fallback to basic score display if no detailed grade data
-                <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      {language === 'rw' ? 'Amanota meza:' : 'Best Score:'}
-                    </span>
-                    <span className={`text-lg font-bold ${
-                      quiz.bestScore >= quiz.passingScore 
-                        ? 'text-green-600' 
-                        : 'text-orange-600'
-                    }`}>
-                      {quiz.bestScore}%
-                    </span>
-                  </div>
-                </div>
-              ) : null}
-
-              {/* Max Attempts Message */}
-              {maxAttemptsReached && (
-                <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                  <p className="text-sm text-red-700 dark:text-red-300">
-                    {language === 'rw' 
-                      ? 'Warangije ibigeragezo byose byemewe'
-                      : 'You have used all available attempts'
-                    }
-                  </p>
-                </div>
-              )}
             </div>
           </div>
-        </div>
 
-        {/* Action Button */}
-        <div className="flex justify-end">
-          {canTake ? (
-            <Button
-              onClick={() => handleTakeQuiz(quiz.id)}
-              className={`${
-                quiz.type === 'final'
-                  ? 'bg-purple-600 hover:bg-purple-700'
-                  : 'bg-blue-600 hover:bg-blue-700'
-              } text-white`}
-            >
-              {quiz.isCompleted ? (
-                <>
-                  <RotateCcw className="w-4 h-4 mr-2" />
-                  {language === 'rw' ? 'Ongera ukingize' : 'Retake Quiz'}
-                </>
-              ) : (
-                <>
-                  <Play className="w-4 h-4 mr-2" />
-                  {language === 'rw' ? 'Tangira ikizamini' : 'Start Quiz'}
-                </>
-              )}
-            </Button>
-          ) : (
-            <Button disabled variant="outline">
-              {maxAttemptsReached ? (
-                language === 'rw' ? 'Nta gerageza risigaye' : 'No attempts left'
-              ) : (
-                language === 'rw' ? 'Ntikigufunguye' : 'Not available'
-              )}
-            </Button>
+          {/* Grade Display */}
+          {grade && (
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4 text-gray-500" />
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    {language === 'rw' ? 'Amanota yawe:' : 'Your score:'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-lg font-semibold ${
+                    grade.passed ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                  }`}>
+                    {grade.percentage}%
+                  </span>
+                  <Badge variant={grade.passed ? 'success' : 'error'} className="text-xs">
+                    {grade.passed 
+                      ? (language === 'rw' ? 'Uheze' : 'Passed')
+                      : (language === 'rw' ? 'Ntibyageze' : 'Failed')
+                    }
+                  </Badge>
+                </div>
+              </div>
+            </div>
           )}
+          </Card>
         </div>
-      </Card>
+      </div>
     );
   };
 

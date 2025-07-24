@@ -11,9 +11,16 @@ import {
   CheckCircle, 
   XCircle, 
   Trash2, 
-  X
+  X,
+  BookOpen,
+  Search,
+  RefreshCw,
+  Clock,
+  Star,
+  Users,
+  Calendar
 } from 'lucide-react';
-import { apiClient, cleanInstructorName } from '../../utils/api';
+import { apiClient, cleanInstructorName, getFileUrl } from '../../utils/api';
 
 interface CourseData {
   id: string;
@@ -74,7 +81,7 @@ const AdminCourses: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const [courses, setCourses] = useState<CourseData[]>([]);
-  const [loading, setLoading] = useState(false); // Changed from true to false
+  const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [categoryFilter, setCategoryFilter] = useState<string>('');
@@ -126,104 +133,80 @@ const AdminCourses: React.FC = () => {
 
   const setCachedData = (courseData: CourseData[], paginationData: any, statsData: CourseStats) => {
     try {
-      sessionStorage.setItem(CACHE_KEY, JSON.stringify({
-        data: { courses: courseData, pagination: paginationData, stats: statsData },
+      const cacheData = {
+        courses: courseData,
+        pagination: paginationData,
+        stats: statsData,
         timestamp: Date.now()
-      }));
+      };
+      sessionStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
     } catch (error) {
       console.warn('Failed to cache courses data:', error);
     }
   };
 
-  useEffect(() => {
-    // Try to load from cache first
-    const cachedData = getCachedData();
-    if (cachedData) {
-      setCourses(cachedData.courses || []);
-      setPagination(cachedData.pagination || { page: 1, limit: 12, total: 0, pages: 0 });
-      setStats(cachedData.stats || {
-        total: 0, draft: 0, submitted: 0, approved: 0,
-        published: 0, rejected: 0, archived: 0, pendingApproval: 0
-      });
-      // Refresh in background without showing loader
-      loadCourses(1, false);
-    } else {
-      // Only show loading if no cached data
-      loadCourses();
-    }
-  }, []);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setPagination(prev => ({ ...prev, page: 1 }));
-      loadCourses(1);
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [searchTerm, statusFilter, categoryFilter, levelFilter]);
-
   const addToast = (toast: Omit<ToastNotification, 'id'>) => {
     const id = Date.now().toString();
-    const newToast = { ...toast, id };
-    setToasts(prev => [...prev, newToast]);
-    
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id));
-    }, toast.duration || 4000);
+    setToasts(prev => [...prev, { ...toast, id }]);
+    setTimeout(() => removeToast(id), toast.duration || 5000);
   };
 
   const removeToast = (id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
+    setToasts(prev => prev.filter(toast => toast.id !== id));
   };
 
   const loadCourses = async (page = 1, showLoader = true) => {
     try {
-      if (showLoader && courses.length === 0) { // Only show loader if no existing data
-        setLoading(true);
+      if (showLoader) setLoading(true);
+      
+      // Check cache first
+      const cached = getCachedData();
+      if (cached && page === 1) {
+        setCourses(cached.courses);
+        setPagination(cached.pagination);
+        setStats(cached.stats);
+        return;
       }
 
-      const params: any = { page, limit: pagination.limit };
-      if (searchTerm.trim()) params.search = searchTerm.trim();
-      if (statusFilter) params.status = statusFilter;
-      if (categoryFilter) params.category = categoryFilter;
-      if (levelFilter) params.level = levelFilter;
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: pagination.limit.toString(),
+        ...(statusFilter && { status: statusFilter }),
+        ...(categoryFilter && { category: categoryFilter }),
+        ...(levelFilter && { level: levelFilter }),
+        ...(searchTerm && { search: searchTerm })
+      });
 
       const response = await apiClient.getAdminCourses(params);
+      
+      if (response.success) {
+        const courseData = response.data.courses || [];
+        const paginationData = response.data.pagination || {};
+        const statsData = response.data.stats || {};
 
-      if (response.success && response.data) {
-        const { courses: courseData, pagination: paginationData } = response.data;
-        
-        setCourses(courseData || []);
-        setPagination({
-          page: paginationData.currentPage || paginationData.page || 1,
-          limit: paginationData.itemsPerPage || paginationData.limit || 12,
-          total: paginationData.totalItems || paginationData.total || 0,
-          pages: paginationData.totalPages || paginationData.pages || 0
-        });
-        
-        // Calculate stats
-        const safeCourseData = Array.isArray(courseData) ? courseData : [];
-        const statsData: CourseStats = {
-          total: paginationData.totalItems || paginationData.total || 0,
-          draft: safeCourseData.filter((c: CourseData) => c.status === 'draft').length,
-          submitted: safeCourseData.filter((c: CourseData) => c.status === 'submitted' || c.status === 'pending').length,
-          approved: safeCourseData.filter((c: CourseData) => c.status === 'approved').length,
-          published: safeCourseData.filter((c: CourseData) => c.status === 'published').length,
-          rejected: safeCourseData.filter((c: CourseData) => c.status === 'rejected').length,
-          archived: safeCourseData.filter((c: CourseData) => c.status === 'archived').length,
-                      pendingApproval: safeCourseData.filter((c: CourseData) => c.status === 'submitted' || c.status === 'pending').length
+        // Calculate stats from course data if not provided by backend
+        const calculatedStats = {
+          total: statsData.total || courseData.length,
+          draft: statsData.draft || courseData.filter((c: CourseData) => c.status === 'draft').length,
+          submitted: statsData.submitted || courseData.filter((c: CourseData) => c.status === 'submitted').length,
+          approved: statsData.approved || courseData.filter((c: CourseData) => c.status === 'approved').length,
+          published: statsData.published || courseData.filter((c: CourseData) => c.status === 'published').length,
+          rejected: statsData.rejected || courseData.filter((c: CourseData) => c.status === 'rejected').length,
+          archived: statsData.archived || courseData.filter((c: CourseData) => c.status === 'archived').length,
+          pendingApproval: statsData.pendingApproval || courseData.filter((c: CourseData) => c.status === 'pending' || c.status === 'submitted').length,
         };
-        setStats(statsData);
+
+        setCourses(courseData);
+        setPagination(paginationData);
+        setStats(calculatedStats);
 
         // Cache the data
-        setCachedData(courseData || [], paginationData, statsData);
+        setCachedData(courseData || [], paginationData, calculatedStats);
+      } else {
+        addToast({ type: 'error', title: 'Error', message: response.error || 'Failed to load courses' });
       }
     } catch (err: any) {
-      addToast({
-        type: 'error',
-        title: 'Error',
-        message: 'Failed to load courses'
-      });
+      addToast({ type: 'error', title: 'Error', message: err.message || 'Failed to load courses' });
     } finally {
       setLoading(false);
     }
@@ -302,9 +285,7 @@ const AdminCourses: React.FC = () => {
             );
             
             if (forceDelete) {
-              response = await apiClient.deleteAdminCourse(actualCourseId, true);
-            } else {
-              setActionLoading('');
+              handleCourseAction(courseId, 'delete');
               return;
             }
           }
@@ -312,48 +293,29 @@ const AdminCourses: React.FC = () => {
       }
 
       if (response.success) {
-        const messages = {
-          approve: 'Course approved & published',
-          reject: 'Course rejected',
-          delete: 'Course deleted'
-        };
         addToast({
           type: 'success',
           title: 'Success',
-          message: messages[action as keyof typeof messages] || `Course ${action}d`
+          message: `Course ${action}d successfully!`
         });
         
+        // Reset modals
         setShowApprovalModal(false);
         setShowRejectModal(false);
+        setSelectedCourse(null);
         setApprovalFeedback('');
         setRejectionReason('');
-        setSelectedCourse(null);
         
-        // Reload courses to show updated status
         loadCourses(pagination.page);
       } else {
-        const errorMessages = {
-          approve: 'Failed to approve course',
-          reject: 'Failed to reject course', 
-          delete: 'Failed to delete course'
-        };
         addToast({
           type: 'error',
           title: 'Error',
-          message: errorMessages[action as keyof typeof errorMessages] || `Action failed`
+          message: response.error || `Failed to ${action} course`
         });
       }
     } catch (err: any) {
-      const errorMessages = {
-        approve: 'Failed to approve course',
-        reject: 'Failed to reject course',
-        delete: 'Failed to delete course'
-      };
-      addToast({
-        type: 'error',
-        title: 'Error',
-        message: errorMessages[action as keyof typeof errorMessages] || `Action failed`
-      });
+      addToast({ type: 'error', title: 'Error', message: err.message || `Failed to ${action} course` });
     } finally {
       setActionLoading('');
     }
@@ -364,378 +326,474 @@ const AdminCourses: React.FC = () => {
   };
 
   const getStatusBadge = (status: string) => {
-    const configs = {
-      draft: { variant: 'default' as const, label: t('admin.courses.status.draft') },
-      submitted: { variant: 'default' as const, label: t('admin.courses.status.submitted') },
-      pending: { variant: 'default' as const, label: t('admin.courses.status.pending') },
-      approved: { variant: 'default' as const, label: t('admin.courses.status.approved') },
-      published: { variant: 'default' as const, label: t('admin.courses.status.published') },
-      rejected: { variant: 'default' as const, label: t('admin.courses.status.rejected') },
-      archived: { variant: 'default' as const, label: t('admin.courses.status.archived') }
+    const statusConfigs = {
+      published: { 
+        label: 'Published', 
+        className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+      },
+      approved: { 
+        label: 'Approved', 
+        className: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+      },
+      pending: { 
+        label: 'Pending', 
+        className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+      },
+      submitted: { 
+        label: 'Submitted', 
+        className: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
+      },
+      rejected: { 
+        label: 'Rejected', 
+        className: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+      },
+      draft: { 
+        label: 'Draft', 
+        className: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+      },
+      archived: { 
+        label: 'Archived', 
+        className: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+      }
     };
-
-    const config = configs[status as keyof typeof configs] || configs.draft;
-
+    
+    const config = statusConfigs[status as keyof typeof statusConfigs] || statusConfigs.draft;
+    
     return (
-      <Badge variant={config.variant} className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+      <Badge variant="default" className={config.className}>
         {config.label}
       </Badge>
     );
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <LoadingSpinner size="lg" />
-            </div>
-    );
-  }
+  const formatDate = (dateString: string) => {
+    if (!dateString) return 'N/A';
+    
+    const date = new Date(dateString);
+    
+    // Check if date is valid and not in the future
+    if (isNaN(date.getTime()) || date > new Date()) {
+      // If date is invalid or in the future, return a fallback
+      return 'N/A';
+    }
+    
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  useEffect(() => {
+    loadCourses();
+  }, [statusFilter, categoryFilter, levelFilter, searchTerm]);
+
+  const filteredCourses = courses.filter(course => {
+    const matchesSearch = !searchTerm || 
+      course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      course.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      cleanInstructorName(course.instructorName).toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = !statusFilter || course.status === statusFilter;
+    const matchesCategory = !categoryFilter || course.category === categoryFilter;
+    const matchesLevel = !levelFilter || course.level === levelFilter;
+    return matchesSearch && matchesStatus && matchesCategory && matchesLevel;
+  });
 
   return (
     <div className="space-y-6">
-      {/* Improved Toast Notifications */}
-      <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 space-y-2">
-        {toasts.map((toast) => (
+      {/* Toast Notifications */}
+      <div className="fixed top-4 right-4 z-50 space-y-2">
+        {toasts.map(toast => (
           <div
             key={toast.id}
-            className="flex items-center px-4 py-3 rounded-lg shadow-lg border-l-4 transition-all duration-300 ease-in-out transform translate-y-0 opacity-100 max-w-md w-auto min-w-80 bg-blue-50 dark:bg-blue-900/20 border-blue-400 text-blue-800 dark:text-blue-200"
+            className={`p-4 rounded-lg shadow-lg max-w-sm transform transition-all duration-300 ${
+              toast.type === 'success' ? 'bg-green-500 text-white' :
+              toast.type === 'error' ? 'bg-red-500 text-white' :
+              toast.type === 'warning' ? 'bg-yellow-500 text-white' :
+              'bg-blue-500 text-white'
+            }`}
           >
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">
-                {toast.message}
-              </p>
-            </div>
-
-            <button
-              onClick={() => removeToast(toast.id)}
-              className="ml-3 flex-shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-            >
-              ×
-            </button>
+            <div className="font-semibold">{toast.title}</div>
+            <div className="text-sm opacity-90">{toast.message}</div>
           </div>
         ))}
       </div>
 
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          {t('admin.courses.title')}
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-1">
-          {t('admin.courses.subtitle')}
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            {t('admin.courses.title')}
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
+            {t('admin.courses.description')}
+          </p>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => loadCourses(pagination.page, true)}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            {t('admin.courses.refresh')}
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <div 
-          className="cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => {
-            setStatusFilter('');
-            setCategoryFilter('');
-            setLevelFilter('');
-            setSearchTerm('');
-          }}
-        >
-          <Card className="p-4 h-24 flex items-center justify-center">
-            <div className="text-center w-full">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1 h-4">{t('admin.courses.stats.total')}</p>
-              <p className="text-xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('admin.courses.totalCourses')}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
             </div>
-          </Card>
-        </div>
+            <BookOpen className="w-8 h-8 text-blue-500" />
+          </div>
+        </Card>
         
-
-        
-        <div 
-          className="cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => { setStatusFilter('pending'); setCategoryFilter(''); setLevelFilter(''); setSearchTerm(''); }}
-        >
-          <Card className="p-4 h-24 flex items-center justify-center">
-            <div className="text-center w-full">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1 h-4">{t('admin.courses.status.pending')}</p>
-              <p className="text-xl font-bold text-blue-500">{stats.submitted}</p>
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('admin.courses.published')}</p>
+              <p className="text-2xl font-bold text-green-600">{stats.published}</p>
             </div>
-          </Card>
-        </div>
+            <CheckCircle className="w-8 h-8 text-green-500" />
+          </div>
+        </Card>
         
-        <div 
-          className="cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => { setStatusFilter('approved'); setCategoryFilter(''); setLevelFilter(''); setSearchTerm(''); }}
-        >
-          <Card className="p-4 h-24 flex items-center justify-center">
-            <div className="text-center w-full">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1 h-4">{t('admin.courses.status.approved')}</p>
-              <p className="text-xl font-bold text-blue-400">{stats.approved}</p>
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('admin.courses.pending')}</p>
+              <p className="text-2xl font-bold text-yellow-600">{stats.pendingApproval}</p>
             </div>
-          </Card>
-        </div>
+            <Clock className="w-8 h-8 text-yellow-500" />
+          </div>
+        </Card>
         
-        <div 
-          className="cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => { setStatusFilter('published'); setCategoryFilter(''); setLevelFilter(''); setSearchTerm(''); }}
-        >
-          <Card className="p-4 h-24 flex items-center justify-center">
-            <div className="text-center w-full">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1 h-4">{t('admin.courses.status.published')}</p>
-              <p className="text-xl font-bold text-blue-600">{stats.published}</p>
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('admin.courses.draft')}</p>
+              <p className="text-2xl font-bold text-gray-600">{stats.draft}</p>
             </div>
-          </Card>
-        </div>
-        
-        <div 
-          className="cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => { setStatusFilter('rejected'); setCategoryFilter(''); setLevelFilter(''); setSearchTerm(''); }}
-        >
-          <Card className="p-4 h-24 flex items-center justify-center">
-            <div className="text-center w-full">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1 h-4">{t('admin.courses.status.rejected')}</p>
-              <p className="text-xl font-bold text-blue-300">{stats.rejected}</p>
-            </div>
-          </Card>
-        </div>
-        
-        <div 
-          className="cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => { setStatusFilter('archived'); setCategoryFilter(''); setLevelFilter(''); setSearchTerm(''); }}
-        >
-          <Card className="p-4 h-24 flex items-center justify-center">
-            <div className="text-center w-full">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1 h-4">{t('admin.courses.status.archived')}</p>
-              <p className="text-xl font-bold text-gray-600">{stats.archived}</p>
-            </div>
-          </Card>
-        </div>
-
-
+            <BookOpen className="w-8 h-8 text-gray-500" />
+          </div>
+        </Card>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="flex-1">
-          <Input
-            type="text"
-            placeholder={t('admin.courses.searchPlaceholder')}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full"
-          />
+      <Card className="p-4">
+        <div className="flex flex-col md:flex-row gap-4 items-end">
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              {t('admin.courses.search')}
+            </label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                type="text"
+                placeholder={t('admin.courses.searchPlaceholder')}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+          </div>
+          
+          <div className="flex gap-6">
+            <div className="w-48">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                {t('admin.courses.status')}
+              </label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              >
+                <option value="">{t('admin.courses.allStatuses')}</option>
+                <option value="published">{t('admin.courses.published')}</option>
+                <option value="approved">{t('admin.courses.approved')}</option>
+                <option value="pending">{t('admin.courses.pending')}</option>
+                <option value="submitted">{t('admin.courses.submitted')}</option>
+                <option value="rejected">{t('admin.courses.rejected')}</option>
+                <option value="draft">{t('admin.courses.draft')}</option>
+              </select>
+            </div>
+            
+            <div className="w-48">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                {t('admin.courses.category')}
+              </label>
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              >
+                <option value="">{t('admin.courses.allCategories')}</option>
+                <option value="technology">Technology</option>
+                <option value="business">Business</option>
+                <option value="design">Design</option>
+                <option value="marketing">Marketing</option>
+                <option value="lifestyle">Lifestyle</option>
+              </select>
+            </div>
+            
+            <div className="w-48">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                {t('admin.courses.level')}
+              </label>
+              <select
+                value={levelFilter}
+                onChange={(e) => setLevelFilter(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              >
+                <option value="">{t('admin.courses.allLevels')}</option>
+                <option value="beginner">Beginner</option>
+                <option value="intermediate">Intermediate</option>
+                <option value="advanced">Advanced</option>
+              </select>
+            </div>
+          </div>
         </div>
-        
-        <div className="flex gap-4">
-          <div className="relative">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full h-12 px-4 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white min-w-32 appearance-none [&::-ms-expand]:hidden"
-            >
-              <option value="">{t('admin.courses.allStatus')}</option>
-              <option value="draft">{t('admin.courses.status.draft')}</option>
-              <option value="pending">{t('admin.courses.status.pending')}</option>
-              <option value="submitted">{t('admin.courses.status.submitted')}</option>
-              <option value="approved">{t('admin.courses.status.approved')}</option>
-              <option value="published">{t('admin.courses.status.published')}</option>
-              <option value="rejected">{t('admin.courses.status.rejected')}</option>
-              <option value="archived">{t('admin.courses.status.archived')}</option>
-            </select>
-            <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none">
-              <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </div>
-          </div>
+      </Card>
 
-          <div className="relative">
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="w-full h-12 px-4 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white min-w-36 appearance-none [&::-ms-expand]:hidden"
-            >
-              <option value="">{t('admin.courses.allCategories')}</option>
-              <option value="programming">{t('courses.programming')}</option>
-              <option value="design">{t('courses.design')}</option>
-              <option value="business-tech">{t('courses.businessTech')}</option>
-              <option value="general-it">{t('courses.generalIT')}</option>
-            </select>
-            <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none">
-              <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </div>
-          </div>
-
-          <div className="relative">
-            <select
-              value={levelFilter}
-              onChange={(e) => setLevelFilter(e.target.value)}
-              className="w-full h-12 px-4 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white min-w-28 appearance-none [&::-ms-expand]:hidden"
-            >
-              <option value="">{t('admin.courses.allLevels')}</option>
-              <option value="beginner">{t('courses.beginner')}</option>
-              <option value="intermediate">{t('courses.intermediate')}</option>
-              <option value="advanced">{t('courses.advanced')}</option>
-            </select>
-            <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none">
-              <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </div>
-          </div>
+      {/* Courses Table */}
+      {loading ? (
+        <div className="flex justify-center items-center py-12">
+          <LoadingSpinner size="lg" />
         </div>
-      </div>
-
-      {/* Simple Course Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {courses.map((course) => (
-          <Card key={course.id} className="p-4 hover:shadow-lg transition-shadow">
-            <div className="space-y-4">
-              {/* Course Title */}
-              <div>
-                <h3 
-                  className="font-semibold text-lg text-gray-900 dark:text-white line-clamp-2 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                  onClick={() => openCoursePage(course._id || course.id)}
-                >
-                  {course.title}
-                </h3>
-              </div>
-
-              {/* Tutor/Owner */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">{t('admin.courses.tutor')}</p>
-                  <p className="font-medium text-gray-900 dark:text-white">{cleanInstructorName(course.instructorName)}</p>
-                </div>
-                <div>
-                  {getStatusBadge(course.status)}
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex justify-end gap-2">
-                {(course.status === 'pending' || course.status === 'submitted') && (
-                  <>
-                    <div className="relative">
-                      <button
-                        onClick={() => {
-                          setSelectedCourse(course);
-                          setShowApprovalModal(true);
-                        }}
-                        disabled={actionLoading.includes(course.id)}
-                        className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors disabled:opacity-50"
-                        onMouseEnter={() => setHoveredButton(`approve-${course.id}`)}
-                        onMouseLeave={() => setHoveredButton('')}
-                      >
-                        {actionLoading === `approve-${course.id}` ? (
-                          <LoadingSpinner size="sm" />
-                        ) : (
-                          <CheckCircle className="w-4 h-4" />
-                        )}
-                      </button>
-                      {hoveredButton === `approve-${course.id}` && (
-                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded whitespace-nowrap z-10">
-                          {t('admin.courses.approveCourse')}
-                          <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-gray-900 dark:border-t-gray-100"></div>
+      ) : (
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 dark:bg-gray-800">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    {t('admin.courses.course')}
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    {t('admin.courses.instructor')}
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    {t('admin.courses.status')}
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    {t('admin.courses.enrollments')}
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    {t('admin.courses.rating')}
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    {t('admin.courses.created')}
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    {t('admin.courses.actions')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                {filteredCourses.map((course) => (
+                  <tr key={course.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        {course.thumbnail ? (
+                          <img
+                            src={getFileUrl(course.thumbnail, 'thumbnail')}
+                            alt={course.title}
+                            className="w-12 h-12 rounded-lg object-cover"
+                            onError={(e) => {
+                              // Fallback to icon if image fails to load
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              target.nextElementSibling?.classList.remove('hidden');
+                            }}
+                          />
+                        ) : null}
+                        <div className={`w-12 h-12 bg-gradient-to-br from-green-500 to-blue-600 rounded-lg flex items-center justify-center text-white font-semibold text-sm ${course.thumbnail ? 'hidden' : ''}`}>
+                          <BookOpen className="w-6 h-6" />
                         </div>
-                      )}
-                    </div>
-                    
-                    <div className="relative">
-                      <button
-                        onClick={() => {
-                          setSelectedCourse(course);
-                          setShowRejectModal(true);
-                        }}
-                        disabled={actionLoading.includes(course.id)}
-                        className="p-2 text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors disabled:opacity-50"
-                        onMouseEnter={() => setHoveredButton(`reject-${course.id}`)}
-                        onMouseLeave={() => setHoveredButton('')}
-                      >
-                        {actionLoading === `reject-${course.id}` ? (
-                          <LoadingSpinner size="sm" />
-                        ) : (
-                          <XCircle className="w-4 h-4" />
-                        )}
-                      </button>
-                      {hoveredButton === `reject-${course.id}` && (
-                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded whitespace-nowrap z-10">
-                          {t('admin.courses.rejectCourse')}
-                          <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-gray-900 dark:border-t-gray-100"></div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900 dark:text-white max-w-xs truncate">
+                            {course.title}
+                          </div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400 max-w-xs truncate">
+                            {course.description}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs text-gray-500 dark:text-gray-400">{course.category}</span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">•</span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">{course.level}</span>
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  </>
-                )}
-                
-                {(course.status !== 'pending' && course.status !== 'submitted') && (
-                  <div className="relative">
-                    <button
-                      onClick={() => openCoursePage(course._id || course.id)}
-                      className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-                      onMouseEnter={() => setHoveredButton(`view-${course.id}`)}
-                      onMouseLeave={() => setHoveredButton('')}
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
-                    {hoveredButton === `view-${course.id}` && (
-                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded whitespace-nowrap z-10">
-                        {t('admin.courses.viewCourse')}
-                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-gray-900 dark:border-t-gray-100"></div>
                       </div>
-                    )}
-                  </div>
-                )}
-                
-                <div className="relative">
-                  <button
-                    onClick={() => handleCourseAction(course.id, 'delete')}
-                    disabled={actionLoading.includes(course.id)}
-                    className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
-                    onMouseEnter={() => setHoveredButton(`delete-${course.id}`)}
-                    onMouseLeave={() => setHoveredButton('')}
-                  >
-                    {actionLoading === `delete-${course.id}` ? (
-                      <LoadingSpinner size="sm" />
-                    ) : (
-                      <Trash2 className="w-4 h-4" />
-                    )}
-                  </button>
-                  {hoveredButton === `delete-${course.id}` && (
-                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded whitespace-nowrap z-10">
-                      {t('admin.courses.deleteCourse')}
-                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-gray-900 dark:border-t-gray-100"></div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900 dark:text-white">
+                        {cleanInstructorName(course.instructorName)}
+                      </div>
+                      {course.instructorEmail && (
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                          {course.instructorEmail}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {getStatusBadge(course.status)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-1">
+                        <Users className="w-4 h-4 text-gray-400" />
+                        <span className="text-sm text-gray-900 dark:text-white">
+                          {course.enrollments || course.enrollmentCount || 0}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-1">
+                        <Star className="w-4 h-4 text-yellow-400" />
+                        <span className="text-sm text-gray-900 dark:text-white">
+                          {course.rating?.toFixed(1) || '0.0'}
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          ({course.totalRatings || 0})
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {formatDate(course.createdAt)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex items-center gap-2">
+                        <div className="relative">
+                          <button
+                            onClick={() => openCoursePage(course._id || course.id)}
+                            className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                            onMouseEnter={() => setHoveredButton(`view-${course.id}`)}
+                            onMouseLeave={() => setHoveredButton('')}
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          {hoveredButton === `view-${course.id}` && (
+                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded whitespace-nowrap z-10">
+                              {t('admin.courses.viewCourse')}
+                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-gray-900 dark:border-t-gray-100"></div>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {(course.status === 'submitted' || course.status === 'pending') && (
+                          <div className="relative">
+                            <button
+                              onClick={() => {
+                                setSelectedCourse(course);
+                                setShowApprovalModal(true);
+                              }}
+                              disabled={actionLoading === `approve-${course.id}`}
+                              className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors disabled:opacity-50"
+                              onMouseEnter={() => setHoveredButton(`approve-${course.id}`)}
+                              onMouseLeave={() => setHoveredButton('')}
+                            >
+                              {actionLoading === `approve-${course.id}` ? (
+                                <LoadingSpinner size="sm" />
+                              ) : (
+                                <CheckCircle className="w-4 h-4" />
+                              )}
+                            </button>
+                            {hoveredButton === `approve-${course.id}` && (
+                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded whitespace-nowrap z-10">
+                                {t('admin.courses.approve')}
+                                <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-gray-900 dark:border-t-gray-100"></div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        
+                        {(course.status === 'submitted' || course.status === 'pending') && (
+                          <div className="relative">
+                            <button
+                              onClick={() => {
+                                setSelectedCourse(course);
+                                setShowRejectModal(true);
+                              }}
+                              disabled={actionLoading === `reject-${course.id}`}
+                              className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
+                              onMouseEnter={() => setHoveredButton(`reject-${course.id}`)}
+                              onMouseLeave={() => setHoveredButton('')}
+                            >
+                              {actionLoading === `reject-${course.id}` ? (
+                                <LoadingSpinner size="sm" />
+                              ) : (
+                                <XCircle className="w-4 h-4" />
+                              )}
+                            </button>
+                            {hoveredButton === `reject-${course.id}` && (
+                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded whitespace-nowrap z-10">
+                                {t('admin.courses.reject')}
+                                <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-gray-900 dark:border-t-gray-100"></div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        
+                        <div className="relative">
+                          <button
+                            onClick={() => handleCourseAction(course.id, 'delete')}
+                            disabled={actionLoading === `delete-${course.id}`}
+                            className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
+                            onMouseEnter={() => setHoveredButton(`delete-${course.id}`)}
+                            onMouseLeave={() => setHoveredButton('')}
+                          >
+                            {actionLoading === `delete-${course.id}` ? (
+                              <LoadingSpinner size="sm" />
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                          </button>
+                          {hoveredButton === `delete-${course.id}` && (
+                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded whitespace-nowrap z-10">
+                              {t('admin.courses.delete')}
+                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-gray-900 dark:border-t-gray-100"></div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
 
       {/* Pagination */}
       {pagination.pages > 1 && (
         <div className="flex justify-center items-center gap-2 mt-6">
-            <Button
-              variant="outline"
-              size="sm"
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => loadCourses(pagination.page - 1)}
             disabled={pagination.page === 1}
-            >
-              {t('admin.courses.pagination.previous')}
-            </Button>
-            
+          >
+            {t('admin.courses.pagination.previous')}
+          </Button>
+          
           <span className="text-sm text-gray-600 dark:text-gray-400">
-              {t('admin.courses.pagination.page')} {pagination.page} {t('admin.courses.pagination.of')} {pagination.pages}
-            </span>
-            
-            <Button
-              variant="outline"
-              size="sm"
+            {t('admin.courses.pagination.page')} {pagination.page} {t('admin.courses.pagination.of')} {pagination.pages}
+          </span>
+          
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => loadCourses(pagination.page + 1)}
-              disabled={pagination.page >= pagination.pages}
-            >
-              {t('admin.courses.pagination.next')}
-            </Button>
+            disabled={pagination.page >= pagination.pages}
+          >
+            {t('admin.courses.pagination.next')}
+          </Button>
         </div>
       )}
 
@@ -744,52 +802,39 @@ const AdminCourses: React.FC = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full">
             <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                  {t('admin.courses.approveModal.title')}
-                </h3>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowApprovalModal(false)}
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-            </div>
-            
-              <p className="text-gray-600 dark:text-gray-400 mb-4">
-                {t('admin.courses.approveModal.message')} "{selectedCourse.title}"?
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                {t('admin.courses.approveCourse')}
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                {t('admin.courses.approveCourseDesc')} "{selectedCourse.title}"?
               </p>
-              
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {t('admin.courses.approveModal.feedback')}
-                </label>
-                <textarea
-                  value={approvalFeedback}
-                  onChange={(e) => setApprovalFeedback(e.target.value)}
-                  rows={3}
-                  placeholder={t('admin.courses.approveModal.feedbackPlaceholder')}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                />
-              </div>
-              
+              <textarea
+                value={approvalFeedback}
+                onChange={(e) => setApprovalFeedback(e.target.value)}
+                placeholder={t('admin.courses.approvalFeedbackPlaceholder')}
+                className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white mb-4"
+                rows={3}
+              />
               <div className="flex justify-end gap-3">
                 <Button
                   variant="outline"
-                  onClick={() => setShowApprovalModal(false)}
+                  onClick={() => {
+                    setShowApprovalModal(false);
+                    setSelectedCourse(null);
+                    setApprovalFeedback('');
+                  }}
                 >
-                  {t('admin.courses.approveModal.cancel')}
+                  {t('admin.courses.cancel')}
                 </Button>
                 <Button
                   onClick={() => handleCourseAction(selectedCourse.id, 'approve')}
-                  disabled={actionLoading.includes(selectedCourse.id)}
+                  disabled={actionLoading === `approve-${selectedCourse.id}`}
                   className="bg-green-600 hover:bg-green-700 text-white"
                 >
-                  {actionLoading.includes(selectedCourse.id) ? (
+                  {actionLoading === `approve-${selectedCourse.id}` ? (
                     <LoadingSpinner size="sm" />
                   ) : (
-                    t('admin.courses.approveModal.approve')
+                    t('admin.courses.approve')
                   )}
                 </Button>
               </div>
@@ -803,53 +848,40 @@ const AdminCourses: React.FC = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full">
             <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                  {t('admin.courses.rejectModal.title')}
-                </h3>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowRejectModal(false)}
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-            </div>
-            
-              <p className="text-gray-600 dark:text-gray-400 mb-4">
-                {t('admin.courses.rejectModal.message')} "{selectedCourse.title}"?
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                {t('admin.courses.rejectCourse')}
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                {t('admin.courses.rejectCourseDesc')} "{selectedCourse.title}"?
               </p>
-              
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {t('admin.courses.rejectModal.reason')} *
-                </label>
-                <textarea
-                  value={rejectionReason}
-                  onChange={(e) => setRejectionReason(e.target.value)}
-                  rows={3}
-                  placeholder={t('admin.courses.rejectModal.reasonPlaceholder')}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                  required
-                />
-              </div>
-              
+              <textarea
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                placeholder={t('admin.courses.rejectionReasonPlaceholder')}
+                className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white mb-4"
+                rows={3}
+                required
+              />
               <div className="flex justify-end gap-3">
                 <Button
                   variant="outline"
-                  onClick={() => setShowRejectModal(false)}
+                  onClick={() => {
+                    setShowRejectModal(false);
+                    setSelectedCourse(null);
+                    setRejectionReason('');
+                  }}
                 >
-                  {t('admin.courses.approveModal.cancel')}
+                  {t('admin.courses.cancel')}
                 </Button>
                 <Button
                   onClick={() => handleCourseAction(selectedCourse.id, 'reject')}
-                  disabled={actionLoading.includes(selectedCourse.id) || !rejectionReason.trim()}
+                  disabled={actionLoading === `reject-${selectedCourse.id}` || !rejectionReason.trim()}
                   className="bg-red-600 hover:bg-red-700 text-white"
                 >
-                  {actionLoading.includes(selectedCourse.id) ? (
+                  {actionLoading === `reject-${selectedCourse.id}` ? (
                     <LoadingSpinner size="sm" />
                   ) : (
-                    t('admin.courses.rejectModal.reject')
+                    t('admin.courses.reject')
                   )}
                 </Button>
               </div>

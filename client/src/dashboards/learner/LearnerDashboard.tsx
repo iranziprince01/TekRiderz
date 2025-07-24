@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useStableThemeLanguage } from '../../hooks/useStableThemeLanguage';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -29,6 +30,8 @@ import OfflineStatus from '../../components/common/OfflineStatus';
 
 const LearnerDashboard: React.FC = () => {
   const { t } = useLanguage();
+  // Initialize stable theme and language
+  useStableThemeLanguage();
   const { user: authUser, isOfflineMode } = useAuth(); // Get user from AuthContext
   const [courses, setCourses] = useState<any[]>([]);
   const [enrolledCourses, setEnrolledCourses] = useState<any[]>([]);
@@ -118,12 +121,25 @@ const LearnerDashboard: React.FC = () => {
         if (authUser?.role === 'learner') {
           try {
             console.log('💾 Caching enrolled courses for offline access...');
-            await Promise.all(enrolledCourses.map((course: any) => cacheCourse(course)));
+            // Mark courses as enrolled before caching
+            const enrolledCoursesForCache = enrolledCourses.map((course: any) => ({
+              ...course,
+              isEnrolled: true,
+              enrollment: course.enrollment || {
+                id: `enrollment_${course._id || course.id}`,
+                enrolledAt: new Date().toISOString(),
+                progress: course.progress?.overallProgress || 0,
+                status: 'active'
+              },
+              offlineAccessible: true
+            }));
+            
+            await Promise.all(enrolledCoursesForCache.map((course: any) => cacheCourse(course)));
             console.log(`✅ Cached ${enrolledCourses.length} enrolled courses successfully`);
             
             // Cache complete learner data for offline access
             if (authUser) {
-              await cacheLearnerData(authUser, enrolledCourses);
+              await cacheLearnerData(authUser, enrolledCoursesForCache);
               console.log('💾 Learner data cached for offline access');
             }
           } catch (cacheError) {

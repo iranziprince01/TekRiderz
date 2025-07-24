@@ -1134,9 +1134,9 @@ router.put('/courses/:courseId/status', async (req: Request, res: Response): Pro
         if (instructor) {
           const emailService = require('../services/emailService');
           if (status === 'approved') {
-            await emailService.sendCourseApprovalEmail(instructor.email, course.title, notes);
+            await emailService.sendCourseApprovalEmail(instructor.email, course.title, course._id!, true, notes);
           } else if (status === 'rejected') {
-            await emailService.sendCourseRejectionEmail(instructor.email, course.title, reason || 'No reason provided');
+            await emailService.sendCourseApprovalEmail(instructor.email, course.title, course._id!, false, reason || 'No reason provided');
           }
         }
       } catch (emailError) {
@@ -1329,9 +1329,9 @@ router.put('/courses/:courseId/status', async (req: Request, res: Response): Pro
       const instructor = await userModel.findById(course.instructorId);
       if (instructor) {
         if (finalStatus === 'approved') {
-          await emailService.sendCourseApprovalEmail(instructor.email, course.title, true);
+          await emailService.sendCourseApprovalEmail(instructor.email, course.title, course._id!, true);
         } else if (status === 'rejected') {
-          await emailService.sendCourseApprovalEmail(instructor.email, course.title, false, reason);
+          await emailService.sendCourseApprovalEmail(instructor.email, course.title, course._id!, false, reason);
         }
       }
     } catch (emailError) {

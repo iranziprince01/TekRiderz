@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from './Header';
 import Sidebar from './Sidebar';
+import { useStableThemeLanguage } from '../../hooks/useStableThemeLanguage';
 
 
 interface DashboardLayoutProps {
@@ -9,6 +10,7 @@ interface DashboardLayoutProps {
 
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { isInitialized } = useStableThemeLanguage();
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
@@ -17,6 +19,14 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const closeMobileMenu = () => {
     setIsMobileMenuOpen(false);
   };
+
+  // Ensure theme and language are properly initialized before rendering
+  useEffect(() => {
+    if (!isInitialized) {
+      // Wait for initialization
+      return;
+    }
+  }, [isInitialized]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
