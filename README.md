@@ -103,17 +103,25 @@ TekRiderz/
 
 ## Screenshots
 
+- `Landing page`
+
+- <img width="1920" height="1080" alt="Untitled design (4)" src="https://github.com/user-attachments/assets/453238ea-8412-45ee-83e3-c1169e9598d0" />
+
+
 - `Login and Role-Based Dashboards`
 - 
-  <img width="512" height="288" alt="image" src="https://github.com/user-attachments/assets/a6b3bf92-5ed3-45eb-b479-fada89182daf" />
+  <img width="1920" height="1080" alt="Untitled design (3)" src="https://github.com/user-attachments/assets/eecc8db4-2fc5-4eee-8a5a-ed0ea61d2877" />
+
   
 - `Tutor Course Creation Form`
 - 
-  <img width="512" height="320" alt="image" src="https://github.com/user-attachments/assets/7fa14072-9d36-461d-9faa-b11c895746c4" />
+  <img width="1440" height="813" alt="image" src="https://github.com/user-attachments/assets/f3e56669-767b-4633-837b-a26d934f2463" />
+
 
 - `Admin Course Approval Panel`
 - 
-  <img width="512" height="320" alt="image" src="https://github.com/user-attachments/assets/a4597e5c-9df3-4829-a489-28e248ebdd04" />
+  <img width="1440" height="812" alt="image" src="https://github.com/user-attachments/assets/bb6e5e4d-d6d9-45b4-9a8e-798709672510" />
+
 
 - `Learner Course Enrollment and Offline Module Access`
 - 
