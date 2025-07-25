@@ -103,7 +103,12 @@ const LearnerDashboard: React.FC = () => {
         if (authUser?.role === 'learner') {
           try {
             console.log('💾 Caching courses for offline access...');
-            await Promise.all(courses.map((course: any) => cacheCourse(course)));
+            const coursesForCache = courses.map((course: any) => ({
+              ...course,
+              offlineAccessible: true,
+              lastCached: new Date().toISOString()
+            }));
+            await Promise.all(coursesForCache.map((course: any) => cacheCourse(course)));
             console.log(`✅ Cached ${courses.length} courses successfully`);
           } catch (cacheError) {
             console.warn('Failed to cache some courses:', cacheError);
@@ -131,7 +136,8 @@ const LearnerDashboard: React.FC = () => {
                 progress: course.progress?.overallProgress || 0,
                 status: 'active'
               },
-              offlineAccessible: true
+              offlineAccessible: true,
+              lastCached: new Date().toISOString()
             }));
             
             await Promise.all(enrolledCoursesForCache.map((course: any) => cacheCourse(course)));
@@ -314,8 +320,8 @@ const LearnerDashboard: React.FC = () => {
     return (
       <div className="flex items-center justify-center min-h-[500px]">
         <div className="text-center">
-          <LoadingSpinner size="lg" className="text-blue-600" />
-          <p className="text-gray-600 mt-4 text-lg">
+          <LoadingSpinner size="lg" className="text-blue-600 dark:text-blue-400" />
+          <p className="text-gray-600 dark:text-gray-400 mt-4 text-lg">
             {t('Loading your dashboard...')}
           </p>
         </div>
@@ -326,17 +332,17 @@ const LearnerDashboard: React.FC = () => {
   if (error) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Card className="p-8 text-center max-w-md border-gray-200">
-          <BookOpen className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">
+        <Card className="p-8 text-center max-w-md border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+          <BookOpen className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
             {t('Unable to load dashboard')}
           </h3>
-          <p className="text-gray-600 mb-6">
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
             {error}
           </p>
           <Button 
             onClick={loadDashboardData}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
+            className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white"
           >
             {t('Try Again')}
           </Button>
@@ -348,77 +354,77 @@ const LearnerDashboard: React.FC = () => {
   return (
     <div className="space-y-8">
       {/* Welcome Section */}
-      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-8">
+      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900 border border-blue-200 dark:border-gray-700 rounded-2xl p-8">
         <div className="max-w-4xl">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                            {t('Welcome back')}, {authUser?.name || t('Learner')}!
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            {t('Welcome back')}, {authUser?.name || t('Learner')}!
           </h1>
-                      <div className="flex items-center justify-between">
-              <p className="text-gray-700 text-lg">
-                {t('Continue your learning journey with our latest courses')}
-              </p>
-              <div className="flex items-center gap-4">
-                <OfflineStatus />
-                {navigator.onLine && (
-                  <Button
-                    onClick={handleManualSync}
-                    disabled={isSyncing}
-                    size="sm"
-                    variant="outline"
-                    className="flex items-center gap-2"
-                  >
-                    {isSyncing ? (
-                      <>
-                        <LoadingSpinner size="sm" />
-                        {t('Syncing...')}
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
-                        {t('Sync')}
-                      </>
-                    )}
-                  </Button>
-                )}
-              </div>
+          <div className="flex items-center justify-between">
+            <p className="text-gray-700 dark:text-gray-300 text-lg">
+              {t('Continue your learning journey with our latest courses')}
+            </p>
+            <div className="flex items-center gap-4">
+              <OfflineStatus />
+              {navigator.onLine && (
+                <Button
+                  onClick={handleManualSync}
+                  disabled={isSyncing}
+                  size="sm"
+                  variant="outline"
+                  className="flex items-center gap-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                  {isSyncing ? (
+                    <>
+                      <LoadingSpinner size="sm" />
+                      {t('Syncing...')}
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      {t('Sync')}
+                    </>
+                  )}
+                </Button>
+              )}
             </div>
+          </div>
           
           {/* Quick Stats */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-blue-100">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-blue-100 dark:border-blue-900">
               <div className="flex items-center gap-3">
-                <div className="bg-blue-100 p-2 rounded-lg">
-                  <BookOpen className="w-5 h-5 text-blue-600" />
+                <div className="bg-blue-100 dark:bg-blue-900 p-2 rounded-lg">
+                  <BookOpen className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-gray-900">{dashboardStats.totalAvailable}</div>
-                  <div className="text-sm text-gray-600">{t('Available Courses')}</div>
+                  <div className="text-2xl font-bold text-gray-900 dark:text-white">{dashboardStats.totalAvailable}</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">{t('Available Courses')}</div>
                 </div>
               </div>
             </div>
             
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-green-100">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-green-100 dark:border-green-900">
               <div className="flex items-center gap-3">
-                <div className="bg-green-100 p-2 rounded-lg">
-                  <Users className="w-5 h-5 text-green-600" />
+                <div className="bg-green-100 dark:bg-green-900 p-2 rounded-lg">
+                  <Users className="w-5 h-5 text-green-600 dark:text-green-400" />
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-gray-900">{dashboardStats.totalEnrolled}</div>
-                  <div className="text-sm text-gray-600">{t('Enrolled Courses')}</div>
+                  <div className="text-2xl font-bold text-gray-900 dark:text-white">{dashboardStats.totalEnrolled}</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">{t('Enrolled Courses')}</div>
                 </div>
               </div>
             </div>
             
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-purple-100">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-purple-100 dark:border-purple-900">
               <div className="flex items-center gap-3">
-                <div className="bg-purple-100 p-2 rounded-lg">
-                  <CheckCircle className="w-5 h-5 text-purple-600" />
+                <div className="bg-purple-100 dark:bg-purple-900 p-2 rounded-lg">
+                  <CheckCircle className="w-5 h-5 text-purple-600 dark:text-purple-400" />
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-gray-900">{dashboardStats.completed}</div>
-                  <div className="text-sm text-gray-600">{t('Completed')}</div>
+                  <div className="text-2xl font-bold text-gray-900 dark:text-white">{dashboardStats.completed}</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">{t('Completed')}</div>
                 </div>
               </div>
             </div>
@@ -427,18 +433,18 @@ const LearnerDashboard: React.FC = () => {
       </div>
 
       {/* Search and Filters */}
-      <Card className="p-6 border-gray-200 shadow-sm">
+      <Card className="p-6 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
         <div className="flex flex-col md:flex-row gap-4">
           {/* Search */}
           <div className="flex-1">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5" />
               <Input
                 type="text"
                 placeholder={t('Search courses...')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-11 h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg"
+                className="pl-11 h-12 border-gray-300 dark:border-gray-600 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
               />
             </div>
           </div>
@@ -449,7 +455,7 @@ const LearnerDashboard: React.FC = () => {
               <select
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
-                className="w-full h-12 px-4 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 appearance-none [&::-ms-expand]:hidden"
+                className="w-full h-12 px-4 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500 dark:focus:border-blue-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white appearance-none [&::-ms-expand]:hidden"
               >
                 <option value="all">{t('All Categories')}</option>
                 {categories.map((category: string) => (
@@ -459,7 +465,7 @@ const LearnerDashboard: React.FC = () => {
                 ))}
               </select>
               <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none">
-                <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-4 w-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </div>
@@ -472,7 +478,7 @@ const LearnerDashboard: React.FC = () => {
               <select
                 value={levelFilter}
                 onChange={(e) => setLevelFilter(e.target.value)}
-                className="w-full h-12 px-4 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 appearance-none [&::-ms-expand]:hidden"
+                className="w-full h-12 px-4 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500 dark:focus:border-blue-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white appearance-none [&::-ms-expand]:hidden"
               >
                 <option value="all">{t('All Levels')}</option>
                 {levels.map((level: string) => (
@@ -482,7 +488,7 @@ const LearnerDashboard: React.FC = () => {
                 ))}
               </select>
               <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none">
-                <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-4 w-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </div>
@@ -494,8 +500,8 @@ const LearnerDashboard: React.FC = () => {
       {/* Courses Section */}
       <div>
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">{t('Available Courses')}</h2>
-          <Badge variant="default" className="bg-gray-100 text-gray-700 px-3 py-1 text-sm">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{t('Available Courses')}</h2>
+          <Badge variant="default" className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-3 py-1 text-sm">
             {availableCourses.length} {t('courses')}
           </Badge>
         </div>
@@ -512,14 +518,14 @@ const LearnerDashboard: React.FC = () => {
             ))}
           </div>
         ) : (
-          <Card className="p-12 text-center border-gray-200 shadow-sm">
-            <div className="bg-gray-50 p-6 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center">
-              <Search className="w-12 h-12 text-gray-400" />
+          <Card className="p-12 text-center border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
+            <div className="bg-gray-50 dark:bg-gray-700 p-6 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center">
+              <Search className="w-12 h-12 text-gray-400 dark:text-gray-500" />
             </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-3">
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
               {t('No courses match your search')}
             </h3>
-            <p className="text-gray-600 mb-6 max-w-md mx-auto">
+            <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
               {t('Try adjusting your search terms or filters')}
             </p>
             <Button
@@ -529,7 +535,7 @@ const LearnerDashboard: React.FC = () => {
                 setCategoryFilter('all');
                 setLevelFilter('all');
               }}
-              className="border-blue-200 text-blue-600 hover:bg-blue-50"
+              className="border-blue-200 dark:border-blue-700 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
             >
               {t('Clear Search')}
             </Button>

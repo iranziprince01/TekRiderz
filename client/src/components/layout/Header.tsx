@@ -6,6 +6,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useStableThemeLanguage } from '../../hooks/useStableThemeLanguage';
 import { Button } from '../ui/Button';
 import Avatar from '../ui/Avatar';
+import NotificationBell from '../ui/NotificationBell';
 
 import { 
   Moon, 

@@ -609,8 +609,8 @@ If the print dialog doesn't appear, press Ctrl+P (or Cmd+P on Mac) in the certif
     return (
       <DashboardLayout>
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-600 mb-4">Error</h1>
-          <p className="text-gray-600 mb-4">{error}</p>
+          <h1 className="text-2xl font-bold text-red-600 dark:text-red-400 mb-4">Error</h1>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">{error}</p>
           <Button onClick={() => window.location.reload()} className="mr-2">
             Retry
           </Button>
@@ -629,10 +629,10 @@ If the print dialog doesn't appear, press Ctrl+P (or Cmd+P on Mac) in the certif
         <div className="mb-8">
           <div className="flex justify-between items-start">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
                 {language === 'rw' ? 'Impamyabumenyi Zanjye' : 'My Certificates'}
               </h1>
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-400">
                 {language === 'rw' 
                   ? 'Reba kandi kuraho impamyabumenyi zawe zo kurangira amasomo'
                   : 'View and download your course completion certificates'
@@ -647,23 +647,23 @@ If the print dialog doesn't appear, press Ctrl+P (or Cmd+P on Mac) in the certif
         {/* Certificates Section */}
         {certificates.length > 0 && (
           <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-gray-900 flex items-center">
-              <Award className="w-5 h-5 mr-2 text-green-600" />
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center">
+              <Award className="w-5 h-5 mr-2 text-green-600 dark:text-green-400" />
               {language === 'rw' ? 'Impamyabumenyi Zatangira' : 'Generated Certificates'}
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {certificates.map((certificate) => (
-                <Card key={certificate.certificateId} className="p-6 hover:shadow-lg transition-shadow">
+                <Card key={certificate.certificateId} className="p-6 hover:shadow-lg transition-shadow bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
                   <div className="mb-4">
                     <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-lg font-semibold text-gray-900">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                         {certificate.courseTitle}
                       </h3>
-                                          <div className="flex items-center gap-2">
-                      <CheckCircle className="w-5 h-5 text-green-600" />
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+                      </div>
                     </div>
-                    </div>
-                    <div className="space-y-1 text-sm text-gray-600">
+                    <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
                       <p>ID: {certificate.certificateId}</p>
                       <p className="flex items-center">
                         <Calendar className="w-4 h-4 mr-1" />
@@ -676,7 +676,7 @@ If the print dialog doesn't appear, press Ctrl+P (or Cmd+P on Mac) in the certif
                   <div className="flex space-x-2">
                     <Button 
                       onClick={() => handleDownload(certificate.certificateId)}
-                      className="flex-1 bg-blue-500 hover:bg-blue-600 text-white transition-colors duration-200"
+                      className="flex-1 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white transition-colors duration-200"
                     >
                       <Download className="w-4 h-4 mr-2" />
                       {language === 'rw' ? 'Kuraho PDF' : 'Get PDF'}
@@ -692,25 +692,25 @@ If the print dialog doesn't appear, press Ctrl+P (or Cmd+P on Mac) in the certif
         {/* Completed Courses Section */}
         {completedCourses.length > 0 && (
           <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-gray-900 flex items-center">
-              <BookOpen className="w-5 h-5 mr-2 text-blue-600" />
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center">
+              <BookOpen className="w-5 h-5 mr-2 text-blue-600 dark:text-blue-400" />
               {language === 'rw' ? 'Amasomo Arangiriye' : 'Completed Courses'}
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {completedCourses.map((course) => (
-                <Card key={course.courseId} className="p-6 hover:shadow-lg transition-shadow">
+                <Card key={course.courseId} className="p-6 hover:shadow-lg transition-shadow bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
                   <div className="mb-4">
                     <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-lg font-semibold text-gray-900">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                         {course.title}
                       </h3>
                       {course.hasCertificate ? (
-                        <CheckCircle className="w-5 h-5 text-green-600" />
+                        <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
                       ) : (
-                        <Award className="w-5 h-5 text-yellow-500" />
+                        <Award className="w-5 h-5 text-yellow-500 dark:text-yellow-400" />
                       )}
                     </div>
-                    <div className="space-y-1 text-sm text-gray-600">
+                    <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
                       <p className="flex items-center">
                         <Calendar className="w-4 h-4 mr-1" />
                         {new Date(course.completedAt).toLocaleDateString()}
@@ -723,7 +723,7 @@ If the print dialog doesn't appear, press Ctrl+P (or Cmd+P on Mac) in the certif
                     <Button 
                       onClick={() => handleGenerateCertificate(course.courseId)}
                       disabled={generatingCertificate === course.courseId}
-                      className="w-full bg-blue-500 hover:bg-blue-600 text-white transition-colors duration-200"
+                      className="w-full bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white transition-colors duration-200"
                     >
                       {generatingCertificate === course.courseId ? (
                         <>
@@ -748,20 +748,20 @@ If the print dialog doesn't appear, press Ctrl+P (or Cmd+P on Mac) in the certif
 
         {/* Empty State */}
         {certificates.length === 0 && completedCourses.length === 0 && (
-          <Card className="p-8 text-center">
+          <Card className="p-8 text-center bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
             <div className="mb-4">
-              <Award className="mx-auto h-12 w-12 text-gray-400" />
+              <Award className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500" />
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
               {language === 'rw' ? 'Nta mpamyabumenyi ubu' : 'No certificates yet'}
             </h3>
-            <p className="text-gray-600 mb-4">
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
               {language === 'rw' 
                 ? 'Rangira amasomo kugira ngo ubone impamyabumenyi. Impamyabumenyi zawe zizagaragara hano nyuma yo kurangira isomo.'
                 : 'Complete courses to earn certificates. Your certificates will appear here once you finish a course.'
               }
             </p>
-            <Button onClick={() => window.location.href = '/dashboard/courses'} className="bg-blue-500 hover:bg-blue-600 text-white transition-colors duration-200">
+            <Button onClick={() => window.location.href = '/dashboard/courses'} className="bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white transition-colors duration-200">
               <BookOpen className="w-4 h-4 mr-2" />
               {language === 'rw' ? 'Reba Amasomo' : 'Browse Courses'}
             </Button>

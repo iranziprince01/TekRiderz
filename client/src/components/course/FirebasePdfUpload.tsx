@@ -197,12 +197,12 @@ export const FirebasePdfUpload: React.FC<FirebasePdfUploadProps> = ({
 
       {/* Error Display */}
       {error && (
-        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-          <AlertCircle className="w-5 h-5 text-red-600" />
-          <span className="text-red-700 text-sm">{error}</span>
+        <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg">
+          <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+          <span className="text-red-700 dark:text-red-300 text-sm">{error}</span>
           <button
             onClick={() => setError('')}
-            className="ml-auto text-red-600 hover:text-red-800"
+            className="ml-auto text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
           >
             <X className="w-4 h-4" />
           </button>
@@ -211,13 +211,13 @@ export const FirebasePdfUpload: React.FC<FirebasePdfUploadProps> = ({
 
       {/* Current PDF Display */}
       {pdfUrl && (
-        <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+        <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <FileText className="w-6 h-6 text-green-600" />
+              <FileText className="w-6 h-6 text-green-600 dark:text-green-400" />
               <div>
-                <p className="text-green-800 font-medium">PDF Notes Uploaded</p>
-                <p className="text-green-600 text-sm">Lecture notes are ready for students</p>
+                <p className="text-green-800 dark:text-green-200 font-medium">PDF Notes Uploaded</p>
+                <p className="text-green-600 dark:text-green-400 text-sm">Lecture notes are ready for students</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -243,7 +243,7 @@ export const FirebasePdfUpload: React.FC<FirebasePdfUploadProps> = ({
                 onClick={removePdf}
                 variant="outline"
                 size="sm"
-                className="text-red-600 hover:text-red-800"
+                className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
               >
                 <X className="w-4 h-4" />
               </Button>
@@ -257,8 +257,8 @@ export const FirebasePdfUpload: React.FC<FirebasePdfUploadProps> = ({
         <div
           className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
             dragOver
-              ? 'border-blue-400 bg-blue-50'
-              : 'border-gray-300 hover:border-gray-400'
+              ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20'
+              : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
           }`}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
@@ -266,16 +266,16 @@ export const FirebasePdfUpload: React.FC<FirebasePdfUploadProps> = ({
         >
           <div className="space-y-4">
             <div className="flex justify-center">
-              <div className="p-3 bg-gray-100 rounded-full">
-                <FileText className="w-8 h-8 text-gray-600" />
+              <div className="p-3 bg-gray-100 dark:bg-gray-700 rounded-full">
+                <FileText className="w-8 h-8 text-gray-600 dark:text-gray-400" />
               </div>
             </div>
             
             <div>
-              <h3 className="text-lg font-medium text-gray-900">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">
                 Upload Module Notes (PDF)
               </h3>
-              <p className="text-gray-600 mt-1">
+              <p className="text-gray-600 dark:text-gray-400 mt-1">
                 Upload lecture notes or materials for this module
               </p>
             </div>
@@ -300,7 +300,7 @@ export const FirebasePdfUpload: React.FC<FirebasePdfUploadProps> = ({
               </Button>
             </div>
 
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-gray-500 dark:text-gray-400">
               <p>Supported: PDF files up to 25MB</p>
             </div>
           </div>

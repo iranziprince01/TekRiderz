@@ -30,16 +30,16 @@ export class ProgressModel extends BaseModel<Progress> {
   // Find progress by user and course
   async findByUserAndCourse(userId: string, courseId: string): Promise<Progress | null> {
     try {
-      const result = await databases.progress.view('progress', 'by_user', {
-        key: userId,
+      const result = await databases.progress.view('progress', 'by_user_and_course', {
+        key: [userId, courseId],
         include_docs: true,
       });
 
-      const progress = result.rows.find(row => 
-        row.doc && (row.doc as any).courseId === courseId
-      );
+      if (result.rows && result.rows.length > 0 && result.rows[0] && result.rows[0].doc) {
+        return result.rows[0].doc as Progress;
+      }
 
-      return progress ? progress.doc as Progress : null;
+      return null;
     } catch (error) {
       logger.error('Failed to find progress by user and course:', { userId, courseId, error });
       throw error;

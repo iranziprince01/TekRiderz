@@ -1114,6 +1114,15 @@ class ApiClient {
     const params = period ? `?period=${period}` : '';
     return this.makeRequest(`/analytics/tutor${params}`);
   }
+
+  // Gamification methods
+  async getGamificationData(courseId: string): Promise<ApiResponse> {
+    return this.makeRequest(`/gamification/course/${courseId}`);
+  }
+
+  async getOverallGamificationStats(): Promise<ApiResponse> {
+    return this.makeRequest('/gamification/overall');
+  }
 }
 
 export const apiClient = new ApiClient();
@@ -1157,6 +1166,41 @@ export const updateLessonProgressEnhanced = (courseId: string, lessonId: string,
   bookmarks?: any[];
   isCompleted?: boolean;
 }) => apiClient.updateLessonProgressEnhanced(courseId, lessonId, progressData);
+
+// Notification API methods
+export const getNotifications = async (params?: {
+  page?: number;
+  limit?: number;
+  unreadOnly?: boolean;
+  type?: string;
+  priority?: string;
+}) => {
+  const queryParams = new URLSearchParams();
+  if (params?.page) queryParams.append('page', params.page.toString());
+  if (params?.limit) queryParams.append('limit', params.limit.toString());
+  if (params?.unreadOnly) queryParams.append('unreadOnly', 'true');
+  if (params?.type) queryParams.append('type', params.type);
+  if (params?.priority) queryParams.append('priority', params.priority);
+  
+  return apiClient.makeRequest(`/notifications?${queryParams.toString()}`);
+};
+
+export const getNotificationStats = () => apiClient.makeRequest('/notifications/stats');
+
+export const markNotificationAsRead = (notificationId: string) => 
+  apiClient.makeRequest(`/notifications/${notificationId}/read`, { method: 'PUT' });
+
+export const markAllNotificationsAsRead = () => 
+  apiClient.makeRequest('/notifications/mark-all-read', { method: 'PUT' });
+
+export const deleteNotification = (notificationId: string) => 
+  apiClient.makeRequest(`/notifications/${notificationId}`, { method: 'DELETE' });
+
+export const analyzeSmartNotifications = (userId?: string) => 
+  apiClient.makeRequest('/notifications/analyze', { 
+    method: 'POST', 
+    body: userId ? { userId } : {} 
+  });
 
 export const getCourseContent = (courseId: string) => apiClient.getCourseContent(courseId);
 export const getCourseQuizzes = (courseId: string) => apiClient.getCourseQuizzes(courseId);
@@ -1223,6 +1267,15 @@ export const downloadCertificate = (certificateId: string) => apiClient.download
 export const getAnalytics = () => apiClient.getAnalytics();
 export const getAdminAnalytics = (period?: string) => apiClient.getAdminAnalytics(period);
 export const getTutorAnalytics = (period?: string) => apiClient.getTutorAnalytics(period);
+
+// Gamification API
+export const getGamificationData = async (courseId: string): Promise<ApiResponse> => {
+  return await apiClient.getGamificationData(courseId);
+};
+
+export const getOverallGamificationStats = async (): Promise<ApiResponse> => {
+  return await apiClient.getOverallGamificationStats();
+};
 
 // File URL Service with comprehensive handling
 class FileUrlService {

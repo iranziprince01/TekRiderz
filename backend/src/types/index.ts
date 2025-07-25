@@ -875,19 +875,28 @@ export type NotificationType =
 
 export type NotificationCategory = 'course' | 'achievement' | 'system' | 'marketing' | 'reminder';
 
+export type NotificationPriority = 'low' | 'medium' | 'high' | 'urgent';
+
 export interface Notification extends BaseDocument {
   type: 'notification';
   id: string;
   userId: string;
   title: string;
   message: string;
-  category: NotificationCategory;
   notificationType: NotificationType;
-  read: boolean;
+  priority: NotificationPriority;
+  isRead: boolean;
   readAt?: string;
   actionUrl?: string;
   actionText?: string;
   expiresAt?: string;
+  metadata?: {
+    courseId?: string;
+    lessonId?: string;
+    quizId?: string;
+    achievementId?: string;
+    [key: string]: any;
+  };
 }
 
 // Payment types

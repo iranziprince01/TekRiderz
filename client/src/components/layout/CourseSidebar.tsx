@@ -12,6 +12,7 @@ import {
 import { useLanguage } from '../../contexts/LanguageContext';
 import { CoursePermissions } from '../../utils/coursePermissions';
 import { Button } from '../ui/Button';
+import { GamificationDisplay } from '../course/GamificationDisplay';
 
 interface CourseSidebarProps {
   isOpen?: boolean;
@@ -165,6 +166,13 @@ const CourseSidebar: React.FC<CourseSidebarProps> = ({
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   {language === 'rw' ? 'Nta bigeze biboneka' : 'No sections available'}
                 </p>
+              </div>
+            )}
+
+            {/* Gamification Display - Only show for enrolled users */}
+            {permissions?.canWatchVideos && id && (
+              <div className="px-3 mt-4">
+                <GamificationDisplay courseId={id} />
               </div>
             )}
           </div>

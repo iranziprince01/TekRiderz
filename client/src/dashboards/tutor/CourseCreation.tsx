@@ -41,6 +41,12 @@ interface ModuleQuiz {
     maxAttempts: number;
     passingScore: number;
     showCorrectAnswers: boolean;
+    showScoreImmediately?: boolean;
+    timeLimit?: number;
+    randomizeQuestions?: boolean;
+    randomizeOptions?: boolean;
+    allowReview?: boolean;
+    requireSequential?: boolean;
   };
 }
 
@@ -68,7 +74,12 @@ interface FinalAssessment {
     maxAttempts: number;
     passingScore: number;
     showCorrectAnswers: boolean;
-    timeLimit: number; // 0 for untimed
+    showScoreImmediately?: boolean;
+    timeLimit?: number; // 0 for untimed
+    randomizeQuestions?: boolean;
+    randomizeOptions?: boolean;
+    allowReview?: boolean;
+    requireSequential?: boolean;
   };
 }
 
@@ -254,7 +265,7 @@ export const CourseCreation: React.FC = () => {
                 questions: [],
                 settings: {
                   maxAttempts: 3,
-                  passingScore: 70,
+                  passingScore: 50,
                   showCorrectAnswers: true
                 }
               },
@@ -346,7 +357,7 @@ export const CourseCreation: React.FC = () => {
         questions: [],
         settings: {
           maxAttempts: 3,
-          passingScore: 70,
+          passingScore: 50,
           showCorrectAnswers: true
         }
       },
@@ -647,10 +658,10 @@ export const CourseCreation: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center">
         <div className="text-center">
           <LoadingSpinner />
-          <p className="mt-4 text-gray-600">
+          <p className="mt-4 text-gray-600 dark:text-gray-400">
             {isEditing 
               ? t('courseCreation.loadingEdit')
               : t('courseCreation.loading')
@@ -664,14 +675,14 @@ export const CourseCreation: React.FC = () => {
   // Show error if course data failed to load for editing
   if (error && isEditing) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center">
         <div className="text-center max-w-md">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-6">
             <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-red-800 mb-2">
+            <h3 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">
               {t('courseCreation.errorLoadingCourse')}
             </h3>
-            <p className="text-red-600 mb-4">{error}</p>
+            <p className="text-red-600 dark:text-red-300 mb-4">{error}</p>
             <div className="space-x-3">
               <Button 
                 onClick={() => navigate('/dashboard/courses')}
@@ -698,18 +709,18 @@ export const CourseCreation: React.FC = () => {
   const renderStep1 = () => (
     <div className="space-y-8">
       {/* Basic Information Card */}
-      <Card className="relative overflow-hidden border-0 shadow-lg bg-white">
-        <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-slate-50/50"></div>
+      <Card className="relative overflow-hidden border-0 shadow-lg bg-white dark:bg-gray-800">
+        <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 to-slate-50/50 dark:from-gray-700/50 dark:to-gray-800/50"></div>
         <div className="relative p-8">
           <div className="flex items-center mb-6">
-            <div className="p-3 bg-gray-100 rounded-xl">
-              <FileText className="h-6 w-6 text-gray-600" />
+            <div className="p-3 bg-gray-100 dark:bg-gray-700 rounded-xl">
+              <FileText className="h-6 w-6 text-gray-600 dark:text-gray-400" />
             </div>
             <div className="ml-4">
-              <h2 className="text-2xl font-bold text-gray-900">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
                 {t('courseCreation.basicInfo')}
               </h2>
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-400">
                 {t('courseCreation.basicInfoDesc')}
               </p>
             </div>
@@ -718,7 +729,7 @@ export const CourseCreation: React.FC = () => {
           <div className="space-y-6">
             {/* Course Title */}
             <div>
-              <label className="block text-sm font-semibold text-gray-800 mb-3">
+              <label className="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">
                 {t('courseCreation.courseTitle')} *
               </label>
               <input
@@ -726,14 +737,14 @@ export const CourseCreation: React.FC = () => {
                 value={courseData.title}
                 onChange={(e) => setCourseData(prev => ({ ...prev, title: e.target.value }))}
                 placeholder={t('courseCreation.courseTitlePlaceholder')}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-gray-50 focus:bg-white"
+                className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/20 dark:focus:ring-blue-400/20 focus:border-blue-500 dark:focus:border-blue-400 transition-all duration-200 bg-gray-50 dark:bg-gray-700 focus:bg-white dark:focus:bg-gray-600 text-gray-900 dark:text-white"
                 required
               />
             </div>
 
             {/* Course Description */}
             <div>
-              <label className="block text-sm font-semibold text-gray-800 mb-3">
+              <label className="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">
                 {t('courseCreation.courseDescription')} *
               </label>
               <textarea
@@ -741,7 +752,7 @@ export const CourseCreation: React.FC = () => {
                 onChange={(e) => setCourseData(prev => ({ ...prev, description: e.target.value }))}
                 placeholder={t('courseCreation.courseDescPlaceholder')}
                 rows={6}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-gray-50 focus:bg-white resize-none"
+                className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/20 dark:focus:ring-blue-400/20 focus:border-blue-500 dark:focus:border-blue-400 transition-all duration-200 bg-gray-50 dark:bg-gray-700 focus:bg-white dark:focus:bg-gray-600 resize-none text-gray-900 dark:text-white"
                 required
               />
             </div>
@@ -749,14 +760,14 @@ export const CourseCreation: React.FC = () => {
             {/* Category and Level */}
             <div className="grid md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-semibold text-gray-800 mb-3">
+                <label className="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">
                   {language === 'rw' ? 'Icyiciro' : 'Category'}
                 </label>
                 <div className="relative">
                   <select
                     value={courseData.category}
                     onChange={(e) => setCourseData(prev => ({ ...prev, category: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-gray-50 focus:bg-white appearance-none"
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/20 dark:focus:ring-blue-400/20 focus:border-blue-500 dark:focus:border-blue-400 transition-all duration-200 bg-gray-50 dark:bg-gray-700 focus:bg-white dark:focus:bg-gray-600 appearance-none text-gray-900 dark:text-white"
                   >
                     {CATEGORIES.map(cat => (
                       <option key={cat.value} value={cat.value}>
@@ -765,20 +776,20 @@ export const CourseCreation: React.FC = () => {
                     ))}
                   </select>
                   <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none">
-                    <GraduationCap className="h-5 w-5 text-gray-400" />
+                    <GraduationCap className="h-5 w-5 text-gray-400 dark:text-gray-500" />
                   </div>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-800 mb-3">
+                <label className="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">
                   {language === 'rw' ? 'Urwego' : 'Level'}
                 </label>
                 <div className="relative">
                   <select
                     value={courseData.level}
                     onChange={(e) => setCourseData(prev => ({ ...prev, level: e.target.value as 'beginner' | 'intermediate' | 'advanced' }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-gray-50 focus:bg-white appearance-none"
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/20 dark:focus:ring-blue-400/20 focus:border-blue-500 dark:focus:border-blue-400 transition-all duration-200 bg-gray-50 dark:bg-gray-700 focus:bg-white dark:focus:bg-gray-600 appearance-none text-gray-900 dark:text-white"
                   >
                     <option value="beginner">
                       {language === 'rw' ? 'Umutagira ubumenyi' : 'Beginner'}
@@ -791,7 +802,7 @@ export const CourseCreation: React.FC = () => {
                     </option>
                   </select>
                   <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none">
-                    <Target className="h-5 w-5 text-gray-400" />
+                    <Target className="h-5 w-5 text-gray-400 dark:text-gray-500" />
                   </div>
                 </div>
               </div>
@@ -801,17 +812,17 @@ export const CourseCreation: React.FC = () => {
       </Card>
 
       {/* Course Thumbnail Card */}
-      <Card className="border-0 shadow-lg bg-white">
+      <Card className="border-0 shadow-lg bg-white dark:bg-gray-800">
         <div className="p-8">
           <div className="flex items-center mb-6">
-            <div className="p-3 bg-gray-100 rounded-xl">
-              <Eye className="h-6 w-6 text-gray-600" />
+            <div className="p-3 bg-gray-100 dark:bg-gray-700 rounded-xl">
+              <Eye className="h-6 w-6 text-gray-600 dark:text-gray-400" />
             </div>
             <div className="ml-4">
-              <h3 className="text-xl font-bold text-gray-900">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">
                 {language === 'rw' ? 'Ishusho y\'Isomo' : 'Course Thumbnail'} *
               </h3>
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-400">
                 {language === 'rw' 
                   ? 'Shyiramo ishusho nziza izakorwa kugaragaza isomo ryawe'
                   : 'Upload an attractive image that represents your course'
@@ -820,9 +831,8 @@ export const CourseCreation: React.FC = () => {
             </div>
           </div>
 
-
           
-          <div className="bg-gray-50 rounded-xl p-6">
+          <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-6">
             <CloudinaryImageUpload
               onImageUploaded={(url) => setCourseData(prev => ({ ...prev, thumbnail: url }))}
               currentImageUrl={courseData.thumbnail}
@@ -843,18 +853,18 @@ export const CourseCreation: React.FC = () => {
   const renderStep2 = () => (
     <div className="space-y-8">
       {/* Header */}
-      <Card className="border-0 shadow-lg bg-white">
+      <Card className="border-0 shadow-lg bg-white dark:bg-gray-800">
         <div className="p-8">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center">
-              <div className="p-3 bg-gray-100 rounded-xl">
-                <Video className="h-6 w-6 text-gray-600" />
+              <div className="p-3 bg-gray-100 dark:bg-gray-700 rounded-xl">
+                <Video className="h-6 w-6 text-gray-600 dark:text-gray-400" />
               </div>
               <div className="ml-4">
-                <h2 className="text-2xl font-bold text-gray-900">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
                   {language === 'rw' ? 'Ibice by\'Isomo' : 'Course Modules'}
                 </h2>
-                <p className="text-gray-600">
+                <p className="text-gray-600 dark:text-gray-400">
                   {language === 'rw' 
                     ? 'Kora ibice by\'isomo ryawe birangwa n\'amashusho n\'ibizamini'
                     : 'Create course modules with videos and quizzes'
@@ -862,7 +872,7 @@ export const CourseCreation: React.FC = () => {
                 </p>
               </div>
             </div>
-            <Button onClick={addModule} className="bg-gray-600 hover:bg-gray-700">
+            <Button onClick={addModule} className="bg-gray-600 hover:bg-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600">
               <Plus className="h-4 w-4 mr-2" />
               {language === 'rw' ? 'Ongeraho Igice' : 'Add Module'}
             </Button>
@@ -870,17 +880,17 @@ export const CourseCreation: React.FC = () => {
 
           {courseData.modules.length === 0 && (
             <div className="text-center py-12">
-              <Video className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
+              <Video className="h-16 w-16 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
                 {language === 'rw' ? 'Ntamugace usobanuye' : 'No modules yet'}
               </h3>
-              <p className="text-gray-500 mb-6">
+              <p className="text-gray-500 dark:text-gray-400 mb-6">
                 {language === 'rw' 
                   ? 'Tangira wongere igice cya mbere cy\'isomo ryawe'
                   : 'Start by adding your first course module'
                 }
               </p>
-              <Button onClick={addModule} className="bg-gray-600 hover:bg-gray-700">
+              <Button onClick={addModule} className="bg-gray-600 hover:bg-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600">
                 <Plus className="h-4 w-4 mr-2" />
                 {language === 'rw' ? 'Ongeraho Igice' : 'Add Module'}
               </Button>
@@ -892,21 +902,21 @@ export const CourseCreation: React.FC = () => {
       {/* Modules List */}
       <div className="space-y-6">
         {courseData.modules.map((module, index) => (
-          <Card key={module.id} className="border-0 shadow-lg bg-white">
+          <Card key={module.id} className="border-0 shadow-lg bg-white dark:bg-gray-800">
             <div className="p-8">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center">
-                  <div className="flex items-center justify-center w-10 h-10 bg-gray-100 text-gray-600 rounded-full font-bold">
+                  <div className="flex items-center justify-center w-10 h-10 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded-full font-bold">
                     {index + 1}
                   </div>
-                  <h3 className="ml-4 text-xl font-bold text-gray-900">
+                  <h3 className="ml-4 text-xl font-bold text-gray-900 dark:text-white">
                     {language === 'rw' ? `Igice cya ${index + 1}` : `Module ${index + 1}`}
                   </h3>
                 </div>
                 <Button
                   onClick={() => removeModule(module.id)}
                   variant="outline"
-                  className="text-red-600 border-red-200 hover:bg-red-50"
+                  className="text-red-600 border-red-200 hover:bg-red-50 dark:hover:bg-red-900/20"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -917,7 +927,7 @@ export const CourseCreation: React.FC = () => {
                 {/* Module Details */}
                 <div className="space-y-6">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-800 mb-3">
+                    <label className="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">
                       {language === 'rw' ? 'Izina ry\'Igice' : 'Module Title'} *
                     </label>
                     <input
@@ -925,13 +935,13 @@ export const CourseCreation: React.FC = () => {
                       value={module.title}
                       onChange={(e) => updateModule(module.id, { title: e.target.value })}
                       placeholder={language === 'rw' ? 'Andika izina ry\'igice' : 'Enter module title'}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all duration-200 bg-gray-50 focus:bg-white"
+                      className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-500/20 dark:focus:ring-indigo-400/20 focus:border-indigo-500 dark:focus:border-indigo-400 transition-all duration-200 bg-gray-50 dark:bg-gray-700 focus:bg-white dark:focus:bg-gray-600 text-gray-900 dark:text-white"
                       required
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-800 mb-3">
+                    <label className="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">
                       {language === 'rw' ? 'Ibisobanuro' : 'Description'} *
                     </label>
                     <textarea
@@ -939,13 +949,13 @@ export const CourseCreation: React.FC = () => {
                       onChange={(e) => updateModule(module.id, { description: e.target.value })}
                       placeholder={language === 'rw' ? 'Sobanura igice' : 'Describe this module'}
                       rows={4}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all duration-200 bg-gray-50 focus:bg-white resize-none"
+                      className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-500/20 dark:focus:ring-indigo-400/20 focus:border-indigo-500 dark:focus:border-indigo-400 transition-all duration-200 bg-gray-50 dark:bg-gray-700 focus:bg-white dark:focus:bg-gray-600 resize-none text-gray-900 dark:text-white"
                       required
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-800 mb-3">
+                    <label className="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">
                       <Clock className="inline h-4 w-4 mr-2" />
                       {language === 'rw' ? 'Igihe Giteganijwe (mu minota)' : 'Estimated Duration (minutes)'}
                     </label>
@@ -955,7 +965,7 @@ export const CourseCreation: React.FC = () => {
                       onChange={(e) => updateModule(module.id, { estimatedDuration: Number(e.target.value) })}
                       min="5"
                       max="120"
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all duration-200 bg-gray-50 focus:bg-white"
+                      className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-4 focus:ring-indigo-500/20 dark:focus:ring-indigo-400/20 focus:border-indigo-500 dark:focus:border-indigo-400 transition-all duration-200 bg-gray-50 dark:bg-gray-700 focus:bg-white dark:focus:bg-gray-600 text-gray-900 dark:text-white"
                     />
                   </div>
                 </div>
@@ -963,11 +973,11 @@ export const CourseCreation: React.FC = () => {
                 {/* Video Section */}
                 <div className="space-y-6">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-800 mb-3">
+                    <label className="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">
                       <Video className="inline h-4 w-4 mr-2" />
                       {language === 'rw' ? 'Amashusho ya YouTube' : 'YouTube Video'} *
                     </label>
-                    <div className="bg-gray-50 rounded-xl p-4">
+                    <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4">
                       <YouTubeVideoInput
                         onVideoAdded={(videoData) => updateModule(module.id, {
                           content: {
@@ -984,11 +994,11 @@ export const CourseCreation: React.FC = () => {
 
                   {/* PDF Lecture Notes Section */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-800 mb-3">
+                    <label className="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">
                       <FileText className="inline h-4 w-4 mr-2" />
                       {language === 'rw' ? 'Inyandiko z\'Isomo (PDF)' : 'Module Notes (PDF)'}
                     </label>
-                    <div className="bg-gray-50 rounded-xl p-4">
+                    <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4">
                       <FirebasePdfUpload
                         onPdfUploaded={(pdfUrl, filePath) => updateModule(module.id, {
                           content: {
@@ -1006,17 +1016,17 @@ export const CourseCreation: React.FC = () => {
               </div>
 
               {/* Quiz Section - Full Width */}
-              <div className="mt-8 pt-8 border-t border-gray-200">
-                <div className="bg-gradient-to-r from-gray-50 to-slate-50 rounded-2xl p-8">
+              <div className="mt-8 pt-8 border-t border-gray-200 dark:border-gray-700">
+                <div className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-700/50 dark:to-gray-800/50 rounded-2xl p-8">
                   <div className="flex items-center mb-6">
-                    <div className="p-3 bg-gray-100 rounded-xl">
-                      <ClipboardList className="h-6 w-6 text-gray-600" />
+                    <div className="p-3 bg-gray-100 dark:bg-gray-700 rounded-xl">
+                      <ClipboardList className="h-6 w-6 text-gray-600 dark:text-gray-400" />
                     </div>
                     <div className="ml-4">
-                      <h4 className="text-xl font-bold text-gray-900">
+                      <h4 className="text-xl font-bold text-gray-900 dark:text-white">
                       {language === 'rw' ? 'Ikizamini cy\'Igice' : 'Module Quiz'}
                       </h4>
-                      <p className="text-gray-600">
+                      <p className="text-gray-600 dark:text-gray-400">
                         {language === 'rw' 
                           ? 'Kora ikizamini gisuzuma ibyigishijwe muri iki gice'
                           : 'Create a quiz to assess learning from this module'
@@ -1025,7 +1035,7 @@ export const CourseCreation: React.FC = () => {
                     </div>
                   </div>
                   
-                  <div className="bg-white rounded-xl p-6 shadow-sm">
+                  <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
                        <JsonQuizCreator
                          courseId={courseId || 'new'}
                          sectionId={module.id}
@@ -1036,9 +1046,15 @@ export const CourseCreation: React.FC = () => {
                              description: quizData.description || '',
                              questions: quizData.questions,
                              settings: {
-                               maxAttempts: 3,
-                               passingScore: 70,
-                               showCorrectAnswers: true
+                               maxAttempts: quizData.settings.maxAttempts,
+                               passingScore: quizData.settings.passingScore,
+                               showCorrectAnswers: quizData.settings.showCorrectAnswers,
+                               showScoreImmediately: quizData.settings.showScoreImmediately,
+                               timeLimit: quizData.settings.timeLimit,
+                               randomizeQuestions: quizData.settings.randomizeQuestions,
+                               randomizeOptions: quizData.settings.randomizeOptions,
+                               allowReview: quizData.settings.allowReview,
+                               requireSequential: quizData.settings.requireSequential
                              }
                            }
                          })}
@@ -1051,14 +1067,15 @@ export const CourseCreation: React.FC = () => {
                            instructions: 'Answer all questions to the best of your ability.',
                            questions: module.quiz.questions,
                            settings: {
-                             maxAttempts: 3,
-                             passingScore: 70,
-                             showCorrectAnswers: true,
-                             showScoreImmediately: true,
-                             randomizeQuestions: false,
-                             randomizeOptions: false,
-                             allowReview: true,
-                             requireSequential: false
+                             maxAttempts: module.quiz.settings.maxAttempts,
+                             passingScore: module.quiz.settings.passingScore,
+                             showCorrectAnswers: module.quiz.settings.showCorrectAnswers,
+                             showScoreImmediately: module.quiz.settings.showScoreImmediately ?? true,
+                             randomizeQuestions: module.quiz.settings.randomizeQuestions ?? false,
+                             randomizeOptions: module.quiz.settings.randomizeOptions ?? false,
+                             allowReview: module.quiz.settings.allowReview ?? true,
+                             requireSequential: module.quiz.settings.requireSequential ?? false,
+                             timeLimit: module.quiz.settings.timeLimit ?? 0
                            },
                            createdAt: new Date().toISOString(),
                            updatedAt: new Date().toISOString(),
@@ -1082,17 +1099,17 @@ export const CourseCreation: React.FC = () => {
   // Step 3: Assessment
   const renderStep3 = () => (
     <div className="space-y-8">
-      <Card className="border-0 shadow-xl bg-white">
+      <Card className="border-0 shadow-xl bg-white dark:bg-gray-800">
         <div className="p-8">
           <div className="flex items-center mb-6">
-            <div className="p-3 bg-gray-100 rounded-xl">
-              <ClipboardList className="h-6 w-6 text-gray-600" />
+            <div className="p-3 bg-gray-100 dark:bg-gray-700 rounded-xl">
+              <ClipboardList className="h-6 w-6 text-gray-600 dark:text-gray-400" />
             </div>
             <div className="ml-4">
-              <h2 className="text-2xl font-bold text-gray-900">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
                 {language === 'rw' ? 'Ikizamini cya Nyuma' : 'Final Assessment'}
               </h2>
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-400">
                 {language === 'rw' 
                   ? 'Kora ikizamini cya nyuma gisuzuma byose byigishijwe mu isomo'
                   : 'Create a comprehensive final assessment covering all course material'
@@ -1103,19 +1120,19 @@ export const CourseCreation: React.FC = () => {
           
           {!courseData.finalAssessment ? (
             <div className="text-center py-12">
-              <div className="p-4 bg-gray-100 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
-                <Award className="h-10 w-10 text-gray-600" />
+              <div className="p-4 bg-gray-100 dark:bg-gray-700 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+                <Award className="h-10 w-10 text-gray-600 dark:text-gray-400" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
                 {language === 'rw' ? 'Nta kizamini cya nyuma' : 'No Final Assessment'}
               </h3>
-              <p className="text-gray-500 mb-8 max-w-md mx-auto">
+              <p className="text-gray-500 dark:text-gray-400 mb-8 max-w-md mx-auto">
                 {language === 'rw' 
                   ? 'Kora ikizamini cya nyuma gisuzuma ubumenyi bwose bw\'abanyeshuri bageze ku kigero'
                   : 'Create a final assessment to test students\' comprehensive understanding'
                 }
               </p>
-              <Button onClick={createFinalAssessment} className="bg-gray-600 hover:bg-gray-700">
+              <Button onClick={createFinalAssessment} className="bg-gray-600 hover:bg-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600">
                 <Plus className="h-4 w-4 mr-2" />
                 {language === 'rw' ? 'Kora Ikizamini cya Nyuma' : 'Create Final Assessment'}
               </Button>
@@ -1124,7 +1141,7 @@ export const CourseCreation: React.FC = () => {
             <div className="space-y-6">
               {/* Assessment Title */}
               <div>
-                <label className="block text-sm font-semibold text-gray-800 mb-3">
+                <label className="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">
                   {language === 'rw' ? 'Izina ry\'Ikizamini' : 'Assessment Title'} *
                 </label>
                 <input
@@ -1138,14 +1155,14 @@ export const CourseCreation: React.FC = () => {
                     } : undefined
                   }))}
                   placeholder={language === 'rw' ? 'Ikizamini cya nyuma' : 'Final Assessment'}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-orange-500/20 focus:border-orange-500 transition-all duration-200 bg-gray-50 focus:bg-white"
+                  className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-4 focus:ring-orange-500/20 dark:focus:ring-orange-400/20 focus:border-orange-500 dark:focus:border-orange-400 transition-all duration-200 bg-gray-50 dark:bg-gray-700 focus:bg-white dark:focus:bg-gray-600 text-gray-900 dark:text-white"
                   required
                 />
               </div>
 
               {/* Assessment Description */}
               <div>
-                <label className="block text-sm font-semibold text-gray-800 mb-3">
+                <label className="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">
                   {language === 'rw' ? 'Ibisobanuro' : 'Description'} *
                 </label>
                 <textarea
@@ -1162,23 +1179,23 @@ export const CourseCreation: React.FC = () => {
                     : 'Describe the final assessment'
                   }
                   rows={4}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-orange-500/20 focus:border-orange-500 transition-all duration-200 bg-gray-50 focus:bg-white resize-none"
+                  className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-4 focus:ring-orange-500/20 dark:focus:ring-orange-400/20 focus:border-orange-500 dark:focus:border-orange-400 transition-all duration-200 bg-gray-50 dark:bg-gray-700 focus:bg-white dark:focus:bg-gray-600 resize-none text-gray-900 dark:text-white"
                   required
                 />
               </div>
 
               {/* Quiz Creator */}
               {/* Final Assessment Quiz Section - Full Width */}
-              <div className="bg-gradient-to-r from-gray-50 to-slate-50 rounded-2xl p-8">
+              <div className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-700/50 dark:to-gray-800/50 rounded-2xl p-8">
                 <div className="flex items-center mb-6">
-                  <div className="p-3 bg-gray-100 rounded-xl">
-                    <ClipboardList className="h-6 w-6 text-gray-600" />
+                  <div className="p-3 bg-gray-100 dark:bg-gray-700 rounded-xl">
+                    <ClipboardList className="h-6 w-6 text-gray-600 dark:text-gray-400" />
                   </div>
                   <div className="ml-4">
-                    <h4 className="text-xl font-bold text-gray-900">
+                    <h4 className="text-xl font-bold text-gray-900 dark:text-white">
                   {language === 'rw' ? 'Ibibazo by\'Ikizamini' : 'Assessment Questions'} *
                     </h4>
-                    <p className="text-gray-600">
+                    <p className="text-gray-600 dark:text-gray-400">
                       {language === 'rw' 
                         ? 'Kora ikizamini cya nyuma gisuzuma byose byigishijwe mu isomo'
                         : 'Create comprehensive questions to assess overall course learning'
@@ -1187,7 +1204,7 @@ export const CourseCreation: React.FC = () => {
                   </div>
                 </div>
                 
-                <div className="bg-white rounded-xl p-6 shadow-sm">
+                <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
                    <JsonQuizCreator
                      courseId={courseId || 'new'}
                      sectionId="final_assessment"
@@ -1199,10 +1216,15 @@ export const CourseCreation: React.FC = () => {
                          description: quizData.description || '',
                          questions: quizData.questions,
                          settings: {
-                           maxAttempts: 3,
-                           passingScore: 70,
-                           showCorrectAnswers: false,
-                           timeLimit: 0
+                           maxAttempts: quizData.settings.maxAttempts,
+                           passingScore: quizData.settings.passingScore,
+                           showCorrectAnswers: quizData.settings.showCorrectAnswers,
+                           showScoreImmediately: quizData.settings.showScoreImmediately,
+                           timeLimit: quizData.settings.timeLimit,
+                           randomizeQuestions: quizData.settings.randomizeQuestions,
+                           randomizeOptions: quizData.settings.randomizeOptions,
+                           allowReview: quizData.settings.allowReview,
+                           requireSequential: quizData.settings.requireSequential
                          }
                        }
                      }))}
@@ -1215,14 +1237,15 @@ export const CourseCreation: React.FC = () => {
                        instructions: 'Complete this comprehensive assessment to finish the course.',
                        questions: courseData.finalAssessment.questions,
                        settings: {
-                         maxAttempts: 3,
-                         passingScore: 70,
-                         showCorrectAnswers: false,
-                         showScoreImmediately: true,
-                         randomizeQuestions: false,
-                         randomizeOptions: false,
-                         allowReview: true,
-                         requireSequential: false
+                         maxAttempts: courseData.finalAssessment.settings.maxAttempts,
+                         passingScore: courseData.finalAssessment.settings.passingScore,
+                         showCorrectAnswers: courseData.finalAssessment.settings.showCorrectAnswers,
+                         showScoreImmediately: courseData.finalAssessment.settings.showScoreImmediately ?? true,
+                         randomizeQuestions: courseData.finalAssessment.settings.randomizeQuestions ?? false,
+                         randomizeOptions: courseData.finalAssessment.settings.randomizeOptions ?? false,
+                         allowReview: courseData.finalAssessment.settings.allowReview ?? true,
+                         requireSequential: courseData.finalAssessment.settings.requireSequential ?? false,
+                         timeLimit: courseData.finalAssessment.settings.timeLimit ?? 0
                        },
                        createdAt: new Date().toISOString(),
                        updatedAt: new Date().toISOString(),
@@ -1245,17 +1268,17 @@ export const CourseCreation: React.FC = () => {
   // Step 4: Review & Submit
   const renderStep4 = () => (
     <div className="space-y-8">
-      <Card className="border-0 shadow-lg bg-white">
+      <Card className="border-0 shadow-lg bg-white dark:bg-gray-800">
         <div className="p-8">
           <div className="flex items-center mb-8">
-            <div className="p-3 bg-gray-100 rounded-xl">
-              <Check className="h-6 w-6 text-gray-600" />
+            <div className="p-3 bg-gray-100 dark:bg-gray-700 rounded-xl">
+              <Check className="h-6 w-6 text-gray-600 dark:text-gray-400" />
             </div>
             <div className="ml-4">
-              <h2 className="text-2xl font-bold text-gray-900">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
                 {language === 'rw' ? 'Gusuzuma no Kohereza' : 'Review & Submit'}
               </h2>
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-400">
                 {language === 'rw' 
                   ? 'Suzuma isomo ryawe hanyuma ushyikirize'
                   : 'Review your course and submit for approval'
@@ -1268,62 +1291,62 @@ export const CourseCreation: React.FC = () => {
           <div className="grid lg:grid-cols-3 gap-8">
             {/* Course Details */}
             <div className="lg:col-span-2 space-y-6">
-              <div className="bg-gradient-to-r from-gray-50 to-slate-50 rounded-xl p-6">
-                <h3 className="text-lg font-bold text-gray-700 mb-4">
+              <div className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-700/50 dark:to-gray-800/50 rounded-xl p-6">
+                <h3 className="text-lg font-bold text-gray-700 dark:text-gray-300 mb-4">
                   {language === 'rw' ? 'Amakuru y\'Isomo' : 'Course Information'}
                 </h3>
                 <div className="space-y-3">
                   <div>
-                    <span className="text-sm font-semibold text-gray-600">
+                    <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">
                       {language === 'rw' ? 'Izina:' : 'Title:'}
                     </span>
-                    <p className="text-gray-700">{courseData.title}</p>
+                    <p className="text-gray-700 dark:text-gray-200">{courseData.title}</p>
                   </div>
                   <div>
-                    <span className="text-sm font-semibold text-gray-600">
+                    <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">
                       {language === 'rw' ? 'Ibisobanuro:' : 'Description:'}
                     </span>
-                    <p className="text-gray-700">{courseData.description}</p>
+                    <p className="text-gray-700 dark:text-gray-200">{courseData.description}</p>
                   </div>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
-                      <span className="text-sm font-semibold text-gray-600">
+                      <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">
                         {language === 'rw' ? 'Icyiciro:' : 'Category:'}
                       </span>
-                      <p className="text-gray-700">
+                      <p className="text-gray-700 dark:text-gray-200">
                         {CATEGORIES.find(c => c.value === courseData.category)?.[language === 'rw' ? 'labelRw' : 'label']}
                       </p>
                     </div>
                     <div>
-                      <span className="text-sm font-semibold text-gray-600">
+                      <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">
                         {language === 'rw' ? 'Urwego:' : 'Level:'}
                       </span>
-                      <p className="text-gray-700 capitalize">{courseData.level}</p>
+                      <p className="text-gray-700 dark:text-gray-200 capitalize">{courseData.level}</p>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* Modules Summary */}
-              <div className="bg-gradient-to-r from-gray-50 to-slate-50 rounded-xl p-6">
-                <h3 className="text-lg font-bold text-gray-700 mb-4">
+              <div className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-700/50 dark:to-gray-800/50 rounded-xl p-6">
+                <h3 className="text-lg font-bold text-gray-700 dark:text-gray-300 mb-4">
                   {language === 'rw' ? 'Ibice by\'Isomo' : 'Course Modules'} ({courseData.modules.length})
                 </h3>
                 <div className="space-y-3">
                   {courseData.modules.map((module, index) => (
-                    <div key={module.id} className="flex items-center p-3 bg-white/60 rounded-lg">
-                      <div className="flex items-center justify-center w-8 h-8 bg-gray-200 text-gray-700 rounded-full text-sm font-bold mr-3">
+                    <div key={module.id} className="flex items-center p-3 bg-white/60 dark:bg-gray-700/60 rounded-lg">
+                      <div className="flex items-center justify-center w-8 h-8 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full text-sm font-bold mr-3">
                         {index + 1}
                       </div>
                       <div className="flex-1">
-                        <p className="font-medium text-gray-700">{module.title}</p>
-                        <p className="text-sm text-gray-600 flex items-center">
+                        <p className="font-medium text-gray-700 dark:text-gray-200">{module.title}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center">
                           <Clock className="h-3 w-3 mr-1" />
                           {module.estimatedDuration} {language === 'rw' ? 'minota' : 'mins'}
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
                           {module.quiz.questions.length} {language === 'rw' ? 'ibibazo' : 'questions'}
                         </p>
                       </div>
@@ -1334,22 +1357,22 @@ export const CourseCreation: React.FC = () => {
 
               {/* Assessment Summary */}
               {courseData.finalAssessment && (
-                <div className="bg-gradient-to-r from-gray-50 to-slate-50 rounded-xl p-6">
-                  <h3 className="text-lg font-bold text-gray-700 mb-4">
+                <div className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-700/50 dark:to-gray-800/50 rounded-xl p-6">
+                  <h3 className="text-lg font-bold text-gray-700 dark:text-gray-300 mb-4">
                     {language === 'rw' ? 'Ikizamini cya Nyuma' : 'Final Assessment'}
                   </h3>
                   <div className="space-y-3">
                     <div>
-                      <span className="text-sm font-semibold text-gray-600">
+                      <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">
                         {language === 'rw' ? 'Izina:' : 'Title:'}
                       </span>
-                      <p className="text-gray-700">{courseData.finalAssessment.title}</p>
+                      <p className="text-gray-700 dark:text-gray-200">{courseData.finalAssessment.title}</p>
                     </div>
                     <div>
-                      <span className="text-sm font-semibold text-gray-600">
+                      <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">
                         {language === 'rw' ? 'Umubare w\'ibibazo:' : 'Number of Questions:'}
                       </span>
-                      <p className="text-gray-700">{courseData.finalAssessment.questions.length}</p>
+                      <p className="text-gray-700 dark:text-gray-200">{courseData.finalAssessment.questions.length}</p>
                     </div>
                   </div>
                 </div>
@@ -1360,11 +1383,11 @@ export const CourseCreation: React.FC = () => {
             <div className="space-y-6">
               {/* Course Thumbnail Preview */}
               {courseData.thumbnail && (
-                <div className="bg-gray-50 rounded-xl p-4">
-                  <h4 className="font-semibold text-gray-900 mb-3">
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4">
+                  <h4 className="font-semibold text-gray-900 dark:text-white mb-3">
                     {language === 'rw' ? 'Ishusho y\'Isomo' : 'Course Thumbnail'}
                   </h4>
-                  <div className="relative w-full h-32 bg-gray-200 rounded-lg overflow-hidden">
+                  <div className="relative w-full h-32 bg-gray-200 dark:bg-gray-700 rounded-lg overflow-hidden">
                     <img
                       src={courseData.thumbnail}
                       alt="Course thumbnail preview"
@@ -1382,7 +1405,7 @@ export const CourseCreation: React.FC = () => {
                       }}
                     />
                     {/* Fallback placeholder */}
-                    <div className="absolute inset-0 bg-gray-100 flex items-center justify-center text-gray-500 text-sm">
+                    <div className="absolute inset-0 bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-500 dark:text-gray-400 text-sm">
                       {language === 'rw' ? 'Ishusho y\'isomo' : 'Course thumbnail'}
                     </div>
                   </div>
@@ -1390,30 +1413,30 @@ export const CourseCreation: React.FC = () => {
               )}
 
               {/* Course Stats */}
-              <div className="bg-gradient-to-br from-gray-50 to-slate-100 rounded-xl p-6">
-                <h4 className="font-semibold text-gray-700 mb-4">
+              <div className="bg-gradient-to-br from-gray-50 to-slate-100 dark:from-gray-700/50 dark:to-gray-800/50 rounded-xl p-6">
+                <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-4">
                   {language === 'rw' ? 'Incamake' : 'Course Summary'}
                 </h4>
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
                       {language === 'rw' ? 'Ibice:' : 'Modules:'}
                     </span>
-                    <span className="font-bold text-gray-700">{courseData.modules.length}</span>
+                    <span className="font-bold text-gray-700 dark:text-gray-200">{courseData.modules.length}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
                       {language === 'rw' ? 'Igihe rusange:' : 'Total Duration:'}
                     </span>
-                    <span className="font-bold text-gray-700">
+                    <span className="font-bold text-gray-700 dark:text-gray-200">
                       {courseData.modules.reduce((total, module) => total + module.estimatedDuration, 0)} {language === 'rw' ? 'min' : 'mins'}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
                       {language === 'rw' ? 'Ibizamini:' : 'Quizzes:'}
                     </span>
-                    <span className="font-bold text-gray-700">
+                    <span className="font-bold text-gray-700 dark:text-gray-200">
                       {courseData.modules.length + (courseData.finalAssessment ? 1 : 0)}
                     </span>
                   </div>
@@ -1426,7 +1449,7 @@ export const CourseCreation: React.FC = () => {
                   onClick={saveDraft}
                   disabled={saving}
                   variant="outline"
-                  className="w-full border-2 border-gray-300 hover:border-gray-400"
+                  className="w-full border-2 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Save className="h-4 w-4 mr-2" />
                   {saving ? (language === 'rw' ? 'Urabika...' : 'Saving...') : 
@@ -1439,7 +1462,7 @@ export const CourseCreation: React.FC = () => {
                   <Button
                     onClick={publishCourse}
                     disabled={saving || !validateStep1() || !validateStep2() || !validateStep3()}
-                    className="w-full bg-blue-600 hover:bg-blue-700"
+                    className="w-full bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600"
                   >
                     <CheckCircle className="h-4 w-4 mr-2" />
                     {saving ? (language === 'rw' ? 'Urabika...' : 'Publishing...') : 
@@ -1450,7 +1473,7 @@ export const CourseCreation: React.FC = () => {
                   <Button
                     onClick={submitForApproval}
                     disabled={saving || !validateStep1() || !validateStep2() || !validateStep3()}
-                    className="w-full bg-green-600 hover:bg-green-700"
+                    className="w-full bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600"
                   >
                     <Send className="h-4 w-4 mr-2" />
                     {saving ? (language === 'rw' ? 'Urohereza...' : 'Submitting...') : 
@@ -1461,8 +1484,8 @@ export const CourseCreation: React.FC = () => {
 
               {/* Status-specific notes */}
               {courseStatus === 'published' ? (
-                <div className="bg-green-50 rounded-lg p-4">
-                  <p className="text-sm text-green-800">
+                <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
+                  <p className="text-sm text-green-800 dark:text-green-200">
                     <strong>{language === 'rw' ? 'Icyitonderwa:' : 'Note:'}</strong>
                     {language === 'rw' 
                       ? ' Isomo ryawe ryemejwe! Ushobora kuryo hindura kandi ubike ibintu bishya.'
@@ -1471,8 +1494,8 @@ export const CourseCreation: React.FC = () => {
                   </p>
                 </div>
               ) : (
-                <div className="bg-blue-50 rounded-lg p-4">
-                  <p className="text-sm text-blue-800">
+                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
                     <strong>{language === 'rw' ? 'Icyitonderwa:' : 'Note:'}</strong>
                     {language === 'rw' 
                       ? ' Nyuma yo kohereza, isomo ryawe rizagaragara mu masomo yawe rikaba \'Bitegereje\' kugeza umuyobozi aryemeje kandi aryo tangaze.'
@@ -1489,19 +1512,19 @@ export const CourseCreation: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50/30 to-slate-100/50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50/30 to-slate-100/50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-12">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-700 to-gray-800 bg-clip-text text-transparent">
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-700 to-gray-800 bg-clip-text text-transparent dark:from-gray-200 dark:to-gray-300">
                 {isEditing 
                   ? (language === 'rw' ? 'Hindura Isomo' : 'Edit Course')
                   : (language === 'rw' ? 'Kora Isomo Rishya' : 'Create New Course')
                 }
               </h1>
-              <p className="text-lg text-gray-600 mt-2">
+              <p className="text-lg text-gray-600 dark:text-gray-400 mt-2">
                 {language === 'rw' 
                   ? 'Kora isomo ryiza rirebana n\'ibyizerezo by\'abanyeshuri'
                   : 'Create an engaging course that meets learners\' expectations'
@@ -1514,17 +1537,17 @@ export const CourseCreation: React.FC = () => {
 
         {/* Error Display */}
         {error && (
-          <div className="mb-8 p-4 bg-red-50 border-2 border-red-200 rounded-xl">
+          <div className="mb-8 p-4 bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-700 rounded-xl">
             <div className="flex items-center">
-              <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
-              <span className="text-red-700 font-medium">{error}</span>
+              <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 mr-2" />
+              <span className="text-red-700 dark:text-red-300 font-medium">{error}</span>
             </div>
           </div>
         )}
 
         {/* Enhanced Step Progress */}
         <div className="mb-12">
-          <div className="bg-white rounded-2xl shadow-xl p-8">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
             <div className="flex items-center justify-between">
               {STEPS.map((step, index) => {
                 const Icon = step.icon;
@@ -1549,8 +1572,8 @@ export const CourseCreation: React.FC = () => {
                             : isActive 
                               ? 'bg-gray-600 border-gray-600 text-white shadow-lg scale-105'
                               : isClickable
-                                ? 'border-gray-300 text-gray-500 hover:border-blue-500 hover:text-blue-500 hover:scale-105'
-                                : 'border-gray-200 text-gray-400'
+                                ? 'border-gray-300 text-gray-500 dark:text-gray-400 hover:border-blue-500 hover:text-blue-500 hover:scale-105'
+                                : 'border-gray-200 text-gray-400 dark:text-gray-500'
                           }
                         `}>
                           {isCompleted ? (
@@ -1561,11 +1584,11 @@ export const CourseCreation: React.FC = () => {
                         </div>
                         <div className="mt-4 text-center min-w-0">
                           <p className={`text-sm font-bold transition-colors ${
-                            isActive ? 'text-blue-600' : isCompleted ? 'text-green-600' : 'text-gray-600'
+                            isActive ? 'text-blue-600 dark:text-blue-400' : isCompleted ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'
                           }`}>
                             {language === 'rw' ? step.titleRw : step.title}
                           </p>
-                          <p className="text-xs text-gray-500 mt-1 hidden sm:block">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 hidden sm:block">
                             {language === 'rw' ? step.descriptionRw : step.description}
                           </p>
                         </div>
@@ -1573,7 +1596,7 @@ export const CourseCreation: React.FC = () => {
                     </div>
                     {index < STEPS.length - 1 && (
                       <div className={`hidden lg:block flex-1 h-1 mx-8 rounded-full transition-colors ${
-                        currentStep > step.id ? 'bg-green-500' : 'bg-gray-200'
+                        currentStep > step.id ? 'bg-green-500 dark:bg-green-600' : 'bg-gray-200 dark:bg-gray-700'
                       }`} />
                     )}
                   </React.Fragment>
@@ -1592,13 +1615,13 @@ export const CourseCreation: React.FC = () => {
         </div>
 
         {/* Enhanced Navigation */}
-        <div className="bg-white rounded-2xl shadow-xl p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6">
           <div className="flex items-center justify-between">
             <Button
               variant="outline"
               onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
               disabled={currentStep === 1}
-              className="border-2 border-gray-300 hover:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="border-2 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               {language === 'rw' ? 'Ibanza' : 'Previous'}
@@ -1609,8 +1632,8 @@ export const CourseCreation: React.FC = () => {
                 <div
                   key={step.id}
                   className={`w-3 h-3 rounded-full transition-colors ${
-                    step.id === currentStep ? 'bg-gray-600' :
-                    step.id < currentStep ? 'bg-green-500' : 'bg-gray-300'
+                    step.id === currentStep ? 'bg-gray-600 dark:bg-gray-400' :
+                    step.id < currentStep ? 'bg-green-500 dark:bg-green-600' : 'bg-gray-300 dark:bg-gray-600'
                   }`}
                 />
               ))}
@@ -1620,7 +1643,7 @@ export const CourseCreation: React.FC = () => {
               <Button
                 onClick={() => setCurrentStep(Math.min(4, currentStep + 1))}
                 disabled={!canProceed()}
-                className="bg-gray-600 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-gray-600 hover:bg-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {language === 'rw' ? 'Ibikurikira' : 'Next'}
                 <ArrowRight className="h-4 w-4 ml-2" />

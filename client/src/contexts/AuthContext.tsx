@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../utils/api';
 import { cacheUser, removeCachedUser, updateCachedUser, getCachedUser, getAllCachedUsers } from '../offline/cacheService';
 import { clearOfflineData } from '../offline/syncManager';
+import { authenticateOffline, getEssentialOfflineStatus } from '../offline/offlineEssentials';
 
 // Types
 interface User {
@@ -51,6 +52,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isOfflineMode: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginOffline: (email: string, password: string) => Promise<void>;
   signup: (name: string, email: string, password: string, role: 'learner' | 'tutor') => Promise<{ message: string }>;
   verifyOtp: (email: string, otp: string) => Promise<void>;
   resendOtp: (email: string) => Promise<{ message: string }>;
@@ -785,6 +787,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const loginOffline = async (email: string, password: string) => {
+    setAuthState(prev => ({ ...prev, isLoading: true }));
+    
+    try {
+      console.log('🔐 Attempting offline login for:', email);
+      
+      const result = await authenticateOffline(email, password);
+      
+      if (result.success && result.user) {
+        // Set user in auth state (no token for offline mode)
+        setAuthState(prev => ({
+          ...prev,
+          user: result.user,
+          token: null, // No token in offline mode
+          isLoading: false,
+          otpSent: false,
+          tempEmail: null,
+          tempUserData: null,
+        }));
+
+        // Auto-redirect based on user role
+        const currentPath = window.location.pathname;
+        const redirectTo = RoleBasedNavigation.getPostLoginRoute(result.user.role, currentPath);
+        navigate(redirectTo, { replace: true });
+        
+        console.log('Offline login successful');
+        return;
+      } else {
+        throw new Error(result.message);
+      }
+    } catch (error: any) {
+      console.error('❌ Offline login failed:', error?.message);
+      setAuthState(prev => ({ ...prev, isLoading: false }));
+      throw error;
+    }
+  };
+
   const signup = async (name: string, email: string, password: string, role: 'learner' | 'tutor') => {
     setAuthState(prev => ({ ...prev, isLoading: true }));
     
@@ -980,6 +1019,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isAuthenticated: !!authState.user, // Allow authentication without token in offline mode
     isOfflineMode: !!authState.user && !authState.token, // User is authenticated but has no token (offline mode)
     login,
+    loginOffline,
     signup,
     verifyOtp,
     resendOtp,

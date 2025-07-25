@@ -69,7 +69,7 @@ export class QuizGradingService {
     } = {}
   ): Promise<QuizGradingResponse> {
     try {
-      const { passingScore = 70, showCorrectAnswers = true } = quizSettings;
+      const { passingScore = 50, showCorrectAnswers = true } = quizSettings;
 
       // Create question map for efficient lookup
       const questionMap = new Map<string, QuizQuestion>();

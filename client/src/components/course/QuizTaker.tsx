@@ -3,6 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { submitQuiz } from '../../utils/api';
+import { 
+  getQuizAttemptData, 
+  saveQuizAttempt, 
+  canTakeQuiz, 
+  markQuizCompleted,
+  getQuizAttemptStats
+} from '../../utils/quizAttemptManager';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -80,6 +87,68 @@ export const QuizTaker: React.FC<QuizTakerProps> = ({
   const navigate = useNavigate();
   const { language } = useLanguage();
   const { theme } = useTheme();
+  
+  // Quiz attempt management state
+  const [attemptData, setAttemptData] = useState<any>(null);
+  const [canTake, setCanTake] = useState(true);
+  const [attemptsLeft, setAttemptsLeft] = useState(3);
+  const [attemptStats, setAttemptStats] = useState<any>(null);
+  
+  // Show maximum attempts reached message
+  if (!canTake && attemptStats) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-6">
+        <Card className="p-8 text-center">
+          <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+            {language === 'rw' ? 'Ikizamini ntikigiye neza' : 'Maximum Attempts Reached'}
+          </h3>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            {language === 'rw' 
+              ? `Uragerageje ikizamini ibice ${attemptStats.totalAttempts}/3. Ntibushoboka kugerageza ibindi bice.`
+              : `You have attempted this quiz ${attemptStats.totalAttempts}/3 times. No more attempts allowed.`
+            }
+          </p>
+          
+          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 mb-6">
+            <h4 className="font-medium text-gray-900 dark:text-white mb-2">
+              {language === 'rw' ? 'Ibisubizo byawe' : 'Your Results'}
+            </h4>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-gray-600 dark:text-gray-400">
+                  {language === 'rw' ? 'Igihe cyiza:' : 'Best Score:'}
+                </span>
+                <div className="font-semibold text-green-600">{attemptStats.bestScore}%</div>
+              </div>
+              <div>
+                <span className="text-gray-600 dark:text-gray-400">
+                  {language === 'rw' ? 'Igihe cyose:' : 'Average Score:'}
+                </span>
+                <div className="font-semibold text-blue-600">{Math.round(attemptStats.averageScore)}%</div>
+              </div>
+              <div>
+                <span className="text-gray-600 dark:text-gray-400">
+                  {language === 'rw' ? 'Byarangiye neza:' : 'Passed Attempts:'}
+                </span>
+                <div className="font-semibold text-green-600">{attemptStats.passedAttempts}</div>
+              </div>
+              <div>
+                <span className="text-gray-600 dark:text-gray-400">
+                  {language === 'rw' ? 'Ntibyarangiye neza:' : 'Failed Attempts:'}
+                </span>
+                <div className="font-semibold text-red-600">{attemptStats.failedAttempts}</div>
+              </div>
+            </div>
+          </div>
+          
+          <Button onClick={onCancel} className="bg-blue-600 hover:bg-blue-700 text-white">
+            {language === 'rw' ? 'Subira Inyuma' : 'Go Back'}
+          </Button>
+        </Card>
+      </div>
+    );
+  }
   
   // Safety checks for required props
   if (!quiz || !courseId || !quiz.questions || !Array.isArray(quiz.questions)) {
@@ -195,6 +264,28 @@ export const QuizTaker: React.FC<QuizTakerProps> = ({
       window.removeEventListener('continuePreviousQuestion', handlePreviousQuestionEvent);
     };
   }, [showInstructions, showResults, isSubmitting]);
+
+  // Check if learner can take this quiz
+  useEffect(() => {
+    const checkQuizAccess = async () => {
+      try {
+        const accessCheck = await canTakeQuiz(courseId, quiz.id);
+        setCanTake(accessCheck.canTake);
+        setAttemptsLeft(accessCheck.attemptsLeft);
+        
+        if (!accessCheck.canTake) {
+          console.log('❌ Cannot take quiz:', accessCheck.reason);
+          // Get attempt stats to show to user
+          const stats = await getQuizAttemptStats(courseId, quiz.id);
+          setAttemptStats(stats);
+        }
+      } catch (error) {
+        console.error('Error checking quiz access:', error);
+      }
+    };
+
+    checkQuizAccess();
+  }, [courseId, quiz.id]);
 
   // Keyboard navigation for quiz interactions
   useEffect(() => {
@@ -312,6 +403,12 @@ export const QuizTaker: React.FC<QuizTakerProps> = ({
   const handleSubmitQuiz = async () => {
     if (!courseId || !quiz) return;
     
+    // Check if learner can take this quiz
+    if (!canTake) {
+      console.log('❌ Cannot take quiz - maximum attempts reached');
+      return;
+    }
+    
     setIsSubmitting(true);
     
     try {
@@ -320,7 +417,7 @@ export const QuizTaker: React.FC<QuizTakerProps> = ({
         questionId,
         answer,
         timeSpent: 5, // Simple time tracking
-        hintsUsed: 0,
+        hintsUsed: usedHints[questionId] || 0,
         confidence: 3
       }));
 
@@ -328,6 +425,24 @@ export const QuizTaker: React.FC<QuizTakerProps> = ({
 
       if (response.success && response.data) {
         const { score, passed, totalQuestions, correctAnswers, grading } = response.data;
+        const percentage = Math.round((correctAnswers / totalQuestions) * 100);
+        
+        // Save attempt to local storage
+        const attemptData = {
+          score: correctAnswers,
+          maxScore: totalQuestions,
+          percentage,
+          passed,
+          answers: answersArray,
+          timeSpent: 300, // Total time spent
+          gradeSaved: grading?.gradeSavedToAccount || false
+        };
+        
+        const savedAttempt = await saveQuizAttempt(courseId, quiz.id, attemptData);
+        console.log('✅ Quiz attempt saved:', savedAttempt);
+        
+        // Mark quiz as completed for course progress
+        await markQuizCompleted(courseId, quiz.id);
         
         // Check if grade was properly saved
         if (grading?.gradeSavedToAccount) {
@@ -345,26 +460,33 @@ export const QuizTaker: React.FC<QuizTakerProps> = ({
           passed,
           totalQuestions,
           correctAnswers,
-          percentage: Math.round((correctAnswers / totalQuestions) * 100),
+          percentage,
           feedback: grading?.feedback || 'Quiz completed',
           showCorrectAnswers: grading?.showCorrectAnswers || false,
           gradeSavedToAccount: grading?.gradeSavedToAccount || false,
           results: response.data.results || [],
-          grading: grading || {}
+          grading: grading || {},
+          attemptNumber: savedAttempt.attemptNumber,
+          attemptsLeft: attemptsLeft - 1
         };
         
         setQuizResult(quizResult);
         setShowResults(true);
+        
+        // Update attempts left
+        setAttemptsLeft(prev => prev - 1);
         
         // Call onQuizComplete with properly structured result
         try {
           await onQuizComplete({
             score: score,
             passed: passed,
-            percentage: Math.round((correctAnswers / totalQuestions) * 100),
+            percentage,
             totalQuestions: totalQuestions,
             correctAnswers: correctAnswers,
-            gradeSaved: grading?.gradeSavedToAccount || false
+            gradeSaved: grading?.gradeSavedToAccount || false,
+            attemptNumber: savedAttempt.attemptNumber,
+            attemptsLeft: attemptsLeft - 1
           });
         } catch (completeError) {
           console.warn('Error in onQuizComplete callback:', completeError);
@@ -378,7 +500,9 @@ export const QuizTaker: React.FC<QuizTakerProps> = ({
             quizId: quiz.id, 
             passed, 
             score,
-            gradeSaved: grading?.gradeSavedToAccount 
+            gradeSaved: grading?.gradeSavedToAccount,
+            attemptNumber: savedAttempt.attemptNumber,
+            attemptsLeft: attemptsLeft - 1
           }
         }));
         

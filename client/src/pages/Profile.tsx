@@ -250,8 +250,8 @@ const Profile: React.FC = () => {
     return (
       <div className="flex items-center justify-center min-h-[500px]">
         <div className="text-center">
-          <LoadingSpinner size="lg" className="text-blue-600" />
-          <p className="text-gray-600 mt-4 text-lg">
+          <LoadingSpinner size="lg" className="text-blue-600 dark:text-blue-400" />
+          <p className="text-gray-600 dark:text-gray-400 mt-4 text-lg">
             {t('Loading your profile...')}
           </p>
         </div>
@@ -262,17 +262,17 @@ const Profile: React.FC = () => {
   if (!profile) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Card className="p-8 text-center max-w-md border-gray-200">
-          <User className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">
+        <Card className="p-8 text-center max-w-md border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+          <User className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
             {t('Profile not found')}
           </h3>
-          <p className="text-gray-600 mb-6">
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
             {t('Unable to load your profile information')}
           </p>
           <Button 
             onClick={loadProfile}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
+            className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white"
           >
             {t('Try Again')}
           </Button>
@@ -284,7 +284,7 @@ const Profile: React.FC = () => {
   return (
     <div className="space-y-8 max-w-4xl mx-auto">
       {/* Header */}
-      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-8">
+      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900 border border-blue-200 dark:border-gray-700 rounded-2xl p-8">
         <div className="flex flex-col md:flex-row md:items-center gap-6">
           {/* Profile Picture Upload */}
           <div className="flex-shrink-0">
@@ -297,7 +297,7 @@ const Profile: React.FC = () => {
               />
             ) : (
               <div className="relative">
-                <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white shadow-lg bg-gradient-to-br from-blue-400 to-blue-600">
+                <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white dark:border-gray-700 shadow-lg bg-gradient-to-br from-blue-400 to-blue-600">
                   {profile.avatar && !profile.avatar.startsWith('data:') ? (
                     <img
                       src={profile.avatar}
@@ -335,20 +335,20 @@ const Profile: React.FC = () => {
           
           {/* Basic Info */}
           <div className="flex-1 min-w-0">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
               {profile.name}
             </h1>
             <div className="flex flex-wrap items-center gap-4 mb-4">
-              <Badge variant="default" className="bg-blue-100 text-blue-800 px-3 py-1">
+              <Badge variant="default" className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-3 py-1">
                 <User className="w-4 h-4 mr-2" />
                 {getRoleDisplayName(profile.role)}
               </Badge>
-              <Badge variant="success" className="bg-green-100 text-green-800 px-3 py-1">
+              <Badge variant="success" className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 px-3 py-1">
                 <CheckCircle className="w-4 h-4 mr-2" />
                 {t('Active')}
               </Badge>
             </div>
-            <div className="flex items-center gap-2 text-gray-600">
+            <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
               <Mail className="w-4 h-4" />
               <span>{profile.email}</span>
             </div>
@@ -359,7 +359,7 @@ const Profile: React.FC = () => {
             {!editing ? (
               <Button
                 onClick={handleEdit}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2"
+                className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white px-6 py-2"
               >
                 <Edit3 className="w-4 h-4 mr-2" />
                 {t('Edit Profile')}
@@ -369,7 +369,7 @@ const Profile: React.FC = () => {
                 <Button
                   onClick={handleSave}
                   disabled={saving}
-                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2"
+                  className="bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 text-white px-4 py-2"
                 >
                   {saving ? (
                     <LoadingSpinner size="sm" className="mr-2" />
@@ -381,7 +381,7 @@ const Profile: React.FC = () => {
                 <Button
                   onClick={handleCancel}
                   variant="outline"
-                  className="border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2"
+                  className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 px-4 py-2"
                 >
                   <X className="w-4 h-4 mr-2" />
                   {t('Cancel')}
@@ -395,8 +395,8 @@ const Profile: React.FC = () => {
         {message && (
           <div className={`mt-4 p-4 rounded-lg border ${
             message.type === 'success' 
-              ? 'bg-green-50 border-green-200 text-green-800' 
-              : 'bg-red-50 border-red-200 text-red-800'
+              ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700 text-green-800 dark:text-green-200' 
+              : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700 text-red-800 dark:text-red-200'
           }`}>
             <div className="flex items-center gap-2">
               {message.type === 'success' ? (
@@ -412,16 +412,16 @@ const Profile: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Personal Information */}
-        <Card className="p-6 border-gray-200 shadow-sm">
+        <Card className="p-6 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
           <div className="flex items-center gap-2 mb-6">
-            <User className="w-5 h-5 text-blue-600" />
-            <h2 className="text-xl font-semibold text-gray-900">{t('Personal Information')}</h2>
+            <User className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{t('Personal Information')}</h2>
           </div>
           
           <div className="space-y-6">
             {/* Name */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 {t('Full Name')}
               </label>
               {editing ? (
@@ -429,11 +429,11 @@ const Profile: React.FC = () => {
                   type="text"
                   value={formData.name}
                   onChange={(e) => handleChange('name', e.target.value)}
-                  className="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                  className="w-full border-gray-300 dark:border-gray-600 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400"
                   placeholder={t('Enter your full name')}
                 />
               ) : (
-                <p className="text-gray-900 py-2 px-3 bg-gray-50 rounded-lg">
+                <p className="text-gray-900 dark:text-white py-2 px-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                   {profile.name || t('Not provided')}
                 </p>
               )}
@@ -441,20 +441,20 @@ const Profile: React.FC = () => {
 
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 {t('Email Address')}
               </label>
-              <p className="text-gray-900 py-2 px-3 bg-gray-50 rounded-lg">
+              <p className="text-gray-900 dark:text-white py-2 px-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                 {profile.email}
               </p>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 {t('Email cannot be changed')}
               </p>
             </div>
 
             {/* Phone */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 {t('Phone Number')}
               </label>
               {editing ? (
@@ -462,11 +462,11 @@ const Profile: React.FC = () => {
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => handleChange('phone', e.target.value)}
-                  className="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                  className="w-full border-gray-300 dark:border-gray-600 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400"
                   placeholder={t('Enter your phone number')}
                 />
               ) : (
-                <p className="text-gray-900 py-2 px-3 bg-gray-50 rounded-lg">
+                <p className="text-gray-900 dark:text-white py-2 px-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                   {profile.phone || t('Not provided')}
                 </p>
               )}
@@ -474,7 +474,7 @@ const Profile: React.FC = () => {
 
             {/* Location */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 {t('Location')}
               </label>
               {editing ? (
@@ -482,11 +482,11 @@ const Profile: React.FC = () => {
                   type="text"
                   value={formData.location}
                   onChange={(e) => handleChange('location', e.target.value)}
-                  className="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                  className="w-full border-gray-300 dark:border-gray-600 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400"
                   placeholder={t('Enter your location')}
                 />
               ) : (
-                <p className="text-gray-900 py-2 px-3 bg-gray-50 rounded-lg">
+                <p className="text-gray-900 dark:text-white py-2 px-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                   {profile.location || t('Not provided')}
                 </p>
               )}
@@ -497,14 +497,14 @@ const Profile: React.FC = () => {
         {/* About & Account Info */}
         <div className="space-y-8">
           {/* Bio Section */}
-          <Card className="p-6 border-gray-200 shadow-sm">
+          <Card className="p-6 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
             <div className="flex items-center gap-2 mb-6">
-              <BookOpen className="w-5 h-5 text-blue-600" />
-              <h2 className="text-xl font-semibold text-gray-900">{t('About')}</h2>
+              <BookOpen className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{t('About')}</h2>
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 {t('Bio')}
               </label>
               {editing ? (
@@ -512,13 +512,13 @@ const Profile: React.FC = () => {
                   value={formData.bio}
                   onChange={(e) => handleChange('bio', e.target.value)}
                   rows={4}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-blue-500 resize-none"
+                  className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400 resize-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   placeholder={t('Tell us about yourself...')}
                 />
               ) : (
-                <div className="text-gray-900 py-3 px-3 bg-gray-50 rounded-lg min-h-[100px]">
+                <div className="text-gray-900 dark:text-white py-3 px-3 bg-gray-50 dark:bg-gray-700 rounded-lg min-h-[100px]">
                   {profile.bio || (
-                    <span className="text-gray-500 italic">
+                    <span className="text-gray-500 dark:text-gray-400 italic">
                       {t('No bio provided yet')}
                     </span>
                   )}
@@ -528,37 +528,37 @@ const Profile: React.FC = () => {
           </Card>
 
           {/* Account Information */}
-          <Card className="p-6 border-gray-200 shadow-sm">
+          <Card className="p-6 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
             <div className="flex items-center gap-2 mb-6">
-              <Settings className="w-5 h-5 text-blue-600" />
-              <h2 className="text-xl font-semibold text-gray-900">{t('Account Information')}</h2>
+              <Settings className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{t('Account Information')}</h2>
             </div>
             
             <div className="space-y-4">
-              <div className="flex items-center justify-between py-3 border-b border-gray-100">
+              <div className="flex items-center justify-between py-3 border-b border-gray-100 dark:border-gray-700">
                 <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-gray-500" />
-                  <span className="text-sm font-medium text-gray-700">{t('Member Since')}</span>
+                  <Calendar className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('Member Since')}</span>
                 </div>
-                <span className="text-sm text-gray-900">{formatDate(profile.createdAt)}</span>
+                <span className="text-sm text-gray-900 dark:text-white">{formatDate(profile.createdAt)}</span>
               </div>
               
-              <div className="flex items-center justify-between py-3 border-b border-gray-100">
+              <div className="flex items-center justify-between py-3 border-b border-gray-100 dark:border-gray-700">
                 <div className="flex items-center gap-2">
-                  <RefreshCw className="w-4 h-4 text-gray-500" />
-                  <span className="text-sm font-medium text-gray-700">{t('Last Login')}</span>
+                  <RefreshCw className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('Last Login')}</span>
                 </div>
-                <span className="text-sm text-gray-900">
+                <span className="text-sm text-gray-900 dark:text-white">
                   {profile.lastLogin ? formatDate(profile.lastLogin) : t('Unknown')}
                 </span>
               </div>
               
               <div className="flex items-center justify-between py-3">
                 <div className="flex items-center gap-2">
-                  <User className="w-4 h-4 text-gray-500" />
-                  <span className="text-sm font-medium text-gray-700">{t('Account Status')}</span>
+                  <User className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('Account Status')}</span>
                 </div>
-                <Badge variant="success" className="bg-green-100 text-green-800 text-xs">
+                <Badge variant="success" className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-xs">
                   {t('Active')}
                 </Badge>
               </div>

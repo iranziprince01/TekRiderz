@@ -3,14 +3,30 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { LanguageProvider } from './contexts/LanguageContext';
+import NotificationProvider from './contexts/NotificationContext';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { NotificationManager } from './components/ui/NotificationManager';
 import ProtectedRoute from './components/ProtectedRoute';
 import OfflineStatus from './components/common/OfflineStatus';
+import OfflineInitializer from './components/common/OfflineInitializer';
+
 import { performOneTimeSync, checkSyncNeeded, clearOfflineData } from './offline/syncManager';
 import { localDB } from './offline/db';
 import { initializeOfflineEssentials, cleanupOfflineEssentials, getEssentialOfflineStatus } from './offline/offlineEssentials';
+import './utils/offlineTestUtils';
 
+// Page imports
+import Landing from './pages/Landing';
+import Login from './pages/Login';
+import Signup from './pages/Signup';
+import OTPVerify from './pages/OTPVerify';
+import ForgotPassword from './pages/ForgotPassword';
+import Dashboard from './pages/Dashboard';
+import Course from './pages/Course';
+import Profile from './pages/Profile';
+import Analytics from './pages/Analytics';
+import Certificates from './pages/Certificates';
+import NotFound from './pages/NotFound';
 
 
 // Offline Status Hook
@@ -103,18 +119,6 @@ const SyncInitializer: React.FC = () => {
   return null; // This component doesn't render anything
 };
 
-// Pages
-import Landing from './pages/Landing';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
-import OTPVerify from './pages/OTPVerify';
-import ForgotPassword from './pages/ForgotPassword';
-import Dashboard from './pages/Dashboard';
-import Course from './pages/Course';
-import Profile from './pages/Profile';
-import Analytics from './pages/Analytics';
-import Certificates from './pages/Certificates';
-import NotFound from './pages/NotFound';
 
 function App() {
   const isOffline = useOfflineStatus();
@@ -211,11 +215,12 @@ Type any command in the console to use these tools.
       <LanguageProvider>
           <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <AuthProvider>
-              <SyncInitializer />
-              <div className={`App ${isOffline ? 'pt-10' : ''}`}>
-                <OfflineBanner />
-                <NotificationManager />
-                <OfflineStatus showDetails={false} />
+              <OfflineInitializer>
+                <SyncInitializer />
+                <div className={`App ${isOffline ? 'pt-10' : ''}`}>
+                  <OfflineBanner />
+                  <NotificationManager />
+                  <OfflineStatus showDetails={false} />
                 
                 <Routes>
                   {/* Public routes */}
@@ -260,6 +265,7 @@ Type any command in the console to use these tools.
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </div>
+                </OfflineInitializer>
             </AuthProvider>
           </Router>
         </LanguageProvider>

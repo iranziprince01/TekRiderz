@@ -8,14 +8,17 @@ import {
   getCourseQuizzes, 
   submitQuiz
 } from '../utils/api';
+import { getPassingScore } from '../utils/quizSettings';
 import { useProgressService } from '../services/progressService';
-import { testCourseProgressCalculation } from '../utils/progressTest';
 import { 
   cacheModule, 
   getCachedModulesByCourse, 
   getCourseOffline,
-  cacheLearnerData 
+  cacheLearnerData,
+  cacheCourse,
+  ensureCourseOfflineAccess
 } from '../offline/cacheService';
+import { getOfflineCourseData } from '../offline/offlineEssentials';
 import { getCoursePermissions } from '../utils/coursePermissions';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { Alert } from '../components/ui/Alert';
@@ -193,56 +196,60 @@ const Course: React.FC = () => {
       setIsOffline(true);
       
       try {
-        // Try to get the full course data first
-        const cachedCourse = await getCourseOffline(courseId!);
+        // First, ensure the course is available offline
+        const offlineCourse = await ensureCourseOfflineAccess(courseId!);
         
-        if (cachedCourse) {
-          console.log('📚 Found cached course:', cachedCourse.title);
+        if (offlineCourse) {
+          console.log('📚 Ensuring offline course access:', offlineCourse.title);
           
-          // Get cached modules for this course
-          const cachedModules = await getCachedModulesByCourse(courseId!);
-          console.log('📚 Loaded cached modules for course:', cachedModules.length);
+          // Use the enhanced offline course data function
+          const offlineData = await getOfflineCourseData(courseId!);
           
-          // Create course data with cached information
-          const courseData: CourseData = {
-            course: {
-              id: cachedCourse.id || cachedCourse._id || courseId!,
-              title: cachedCourse.title || 'Cached Course',
-              description: cachedCourse.description || 'Course content available offline',
-              thumbnail: cachedCourse.thumbnail,
-              category: cachedCourse.category || 'general',
-              level: cachedCourse.level || 'beginner',
-              status: cachedCourse.status || 'published',
-              instructorName: cachedCourse.instructorName || 'Instructor',
-              totalLessons: cachedModules.length,
-              totalDuration: cachedCourse.totalDuration || cachedModules.reduce((total, module) => total + module.estimatedDuration, 0),
-              learningObjectives: cachedCourse.learningObjectives
-            },
-            modules: cachedModules,
-            quizzes: [], // No quizzes in offline mode
-            grades: [], // No grades in offline mode
-            isEnrolled: true, // Assume enrolled for offline access
-            userProgress: {
-              completedLessons: cachedModules.filter(m => m.isCompleted).length,
-              totalLessons: cachedModules.length,
-              overallProgress: Math.round((cachedModules.filter(m => m.isCompleted).length / cachedModules.length) * 100),
-              completedModules: cachedModules.filter(m => m.isCompleted).length,
-              totalModules: cachedModules.length,
-              completedQuizzes: 0,
-              totalQuizzes: 0,
-              averageScore: 0
-            }
-          };
-          
-          setCourseData(courseData);
-          setError('');
-          setLoading(false);
-          return;
-        } else {
-          setError('Course not available offline. Please connect online to access this course.');
-          setLoading(false);
-          return;
+          if (offlineData) {
+            console.log('📚 Found cached course:', offlineData.course.title);
+            
+            // Create course data with cached information
+            const courseData: CourseData = {
+              course: {
+                id: offlineData.course.id || offlineData.course._id || courseId!,
+                title: offlineData.course.title || 'Cached Course',
+                description: offlineData.course.description || 'Course content available offline',
+                thumbnail: offlineData.course.thumbnail,
+                category: offlineData.course.category || 'general',
+                level: offlineData.course.level || 'beginner',
+                status: offlineData.course.status || 'published',
+                instructorName: offlineData.course.instructorName || 'Instructor',
+                totalLessons: offlineData.modules.length,
+                totalDuration: offlineData.course.totalDuration || offlineData.modules.reduce((total, module) => total + module.estimatedDuration, 0),
+                learningObjectives: offlineData.course.learningObjectives
+              },
+              modules: offlineData.modules,
+              quizzes: [], // No quizzes in offline mode
+              grades: [], // No grades in offline mode
+              isEnrolled: true, // Assume enrolled for offline access
+              userProgress: {
+                completedLessons: offlineData.modules.filter(m => m.isCompleted).length,
+                totalLessons: offlineData.modules.length,
+                overallProgress: Math.round((offlineData.modules.filter(m => m.isCompleted).length / offlineData.modules.length) * 100),
+                completedModules: offlineData.modules.filter(m => m.isCompleted).length,
+                totalModules: offlineData.modules.length,
+                completedQuizzes: 0,
+                totalQuizzes: 0,
+                averageScore: 0
+              }
+            };
+            
+            setCourseData(courseData);
+            setError('');
+            setLoading(false);
+            return;
+          }
         }
+        
+        // If we get here, something went wrong
+        setError('Course not available offline. Please connect online to access this course.');
+        setLoading(false);
+        return;
       } catch (cacheError) {
         console.error('Failed to load cached course data:', cacheError);
         setError('Failed to load cached course data');
@@ -461,7 +468,7 @@ const Course: React.FC = () => {
             type: quiz.type || 'module',
             questions: quiz.questions || [], // Ensure questions is an array
             estimatedDuration: quiz.estimatedDuration || 15,
-            passingScore: quiz.passingScore || 70,
+            passingScore: getPassingScore(quiz.passingScore),
             maxAttempts: quiz.maxAttempts || 3,
             isCompleted: quizScore?.passed || false,
             bestScore: quizScore?.bestPercentage,
@@ -469,7 +476,7 @@ const Course: React.FC = () => {
             isUnlocked: true, // Always unlocked regardless of module completion
             settings: {
               timeLimit: quiz.timeLimit,
-              passingScore: quiz.passingScore || 70,
+              passingScore: getPassingScore(quiz.passingScore),
               maxAttempts: quiz.maxAttempts || 3,
               showCorrectAnswers: quiz.showCorrectAnswers ?? true,
               showScoreImmediately: quiz.showScoreImmediately ?? true
@@ -496,7 +503,7 @@ const Course: React.FC = () => {
                   type: 'module',
                   questions: lesson.quiz.questions || [], // Ensure questions is an array
                   estimatedDuration: lesson.quiz.estimatedDuration || 15,
-                  passingScore: lesson.quiz.passingScore || 70,
+                  passingScore: getPassingScore(lesson.quiz.passingScore),
                   maxAttempts: lesson.quiz.maxAttempts || 3,
                   isCompleted: quizScore?.passed || false,
                   bestScore: quizScore?.bestPercentage,
@@ -520,7 +527,7 @@ const Course: React.FC = () => {
               type: 'module',
               questions: section.moduleQuiz.questions || [], // Ensure questions is an array
               estimatedDuration: section.moduleQuiz.estimatedDuration || 20,
-              passingScore: section.moduleQuiz.passingScore || 70,
+              passingScore: getPassingScore(section.moduleQuiz.passingScore),
               maxAttempts: section.moduleQuiz.maxAttempts || 3,
               isCompleted: quizScore?.passed || false,
               bestScore: quizScore?.bestPercentage,
@@ -541,7 +548,7 @@ const Course: React.FC = () => {
           type: 'final',
           questions: course.finalAssessment.questions || [], // Ensure questions is an array
           estimatedDuration: 30,
-          passingScore: 70,
+          passingScore: 50,
           maxAttempts: 3,
           isCompleted: finalScore?.passed || false,
           bestScore: finalScore?.bestPercentage,
@@ -565,7 +572,7 @@ const Course: React.FC = () => {
             type: 'module',
             questions: [], // Sample questions
             estimatedDuration: 10,
-            passingScore: 70,
+            passingScore: 50,
             maxAttempts: 3,
             isCompleted: false,
             bestScore: undefined,
@@ -584,7 +591,7 @@ const Course: React.FC = () => {
           type: 'final',
           questions: [], // Sample questions
           estimatedDuration: 30,
-          passingScore: 70,
+          passingScore: 50,
           maxAttempts: 3,
           isCompleted: false,
           bestScore: undefined,
@@ -746,15 +753,15 @@ const Course: React.FC = () => {
 
       // Test progress calculation for debugging
       if (process.env.NODE_ENV === 'development') {
-        const testResult = testCourseProgressCalculation({
-          course,
-          modules: adjustedModules,
-          userProgress
-        });
-        console.log('🧪 Progress calculation test result:', testResult);
+        // const testResult = testCourseProgressCalculation({
+        //   course,
+        //   modules: adjustedModules,
+        //   userProgress
+        // });
+        // console.log('🧪 Progress calculation test result:', testResult);
       }
 
-      setCourseData({
+      const finalCourseData = {
         course: {
           id: course.id || course._id,
           title: course.title,
@@ -776,7 +783,50 @@ const Course: React.FC = () => {
         isEnrolled,
         userProgress,
         overallStats
-      });
+      };
+
+      setCourseData(finalCourseData);
+
+      // Cache course data for offline access (learners only)
+      if (user?.role === 'learner' && isEnrolled) {
+        try {
+          console.log('💾 Caching course data for offline access...');
+          
+          // Cache the course
+          const courseForCache = {
+            ...course,
+            _id: course.id || course._id,
+            id: course.id || course._id,
+            isEnrolled: true,
+            enrollment: {
+              id: `enrollment_${course.id || course._id}`,
+              enrolledAt: new Date().toISOString(),
+              progress: userProgress.overallProgress,
+              status: 'active'
+            },
+            offlineAccessible: true,
+            lastCached: new Date().toISOString()
+          };
+          
+          await cacheCourse(courseForCache);
+          
+          // Cache modules
+          for (const module of adjustedModules) {
+            const moduleForCache = {
+              ...module,
+              _id: module.id,
+              courseId: course.id || course._id,
+              isCompleted: module.isCompleted,
+              isUnlocked: module.isUnlocked
+            };
+            await cacheModule(moduleForCache);
+          }
+          
+          console.log(`✅ Cached course and ${adjustedModules.length} modules for offline access`);
+        } catch (cacheError) {
+          console.warn('Failed to cache course data for offline access:', cacheError);
+        }
+      }
 
     } catch (err: any) {
       console.error('Error fetching course:', err);

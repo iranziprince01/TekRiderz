@@ -7,6 +7,8 @@ import { logger } from '../utils/logger';
 import { ApiResponse, Progress } from '../types';
 import { quizGradingService } from '../services/quizGradingService';
 import { certificateService } from '../services/certificateService';
+import { gamificationService } from '../services/gamificationService';
+import { notificationService } from '../services/notificationService';
 
 export class CourseController {
   // Get all published courses
@@ -899,7 +901,7 @@ export class CourseController {
                   questions: lesson.quiz.questions || [],
                   questionsCount: lesson.quiz.questions?.length || 0,
                   estimatedDuration: lesson.quiz.estimatedDuration || 15,
-                  passingScore: lesson.quiz.passingScore || lesson.quiz.settings?.passingScore || 70,
+                  passingScore: lesson.quiz.passingScore || lesson.quiz.settings?.passingScore || 50,
                   maxAttempts: lesson.quiz.maxAttempts || lesson.quiz.settings?.attempts || 3,
                   timeLimit: lesson.quiz.timeLimit || lesson.quiz.settings?.timeLimit || 0,
                   showCorrectAnswers: lesson.quiz.settings?.showCorrectAnswers ?? true,
@@ -937,7 +939,7 @@ export class CourseController {
               questions: section.moduleQuiz.questions || [],
               questionsCount: section.moduleQuiz.questions?.length || 0,
               estimatedDuration: section.moduleQuiz.estimatedDuration || 20,
-              passingScore: section.moduleQuiz.passingScore || section.moduleQuiz.settings?.passingScore || 70,
+                              passingScore: section.moduleQuiz.passingScore || section.moduleQuiz.settings?.passingScore || 50,
               maxAttempts: section.moduleQuiz.maxAttempts || section.moduleQuiz.settings?.attempts || 3,
               timeLimit: section.moduleQuiz.timeLimit || section.moduleQuiz.settings?.timeLimit || 0,
               showCorrectAnswers: section.moduleQuiz.settings?.showCorrectAnswers ?? true,
@@ -972,7 +974,7 @@ export class CourseController {
           questions: course.finalAssessment.questions || [],
           questionsCount: course.finalAssessment.questions?.length || 0,
           estimatedDuration: 30,
-          passingScore: course.finalAssessment.settings?.passingScore || 70,
+                          passingScore: course.finalAssessment.settings?.passingScore || 50,
           maxAttempts: course.finalAssessment.settings?.attempts || 3,
           timeLimit: course.finalAssessment.settings?.timeLimit || 0,
           showCorrectAnswers: course.finalAssessment.settings?.showCorrectAnswers ?? true,
@@ -1045,7 +1047,7 @@ export class CourseController {
             ],
             questionsCount: 3,
             estimatedDuration: 10,
-            passingScore: 70,
+            passingScore: 50,
             maxAttempts: 3,
             timeLimit: 0,
             showCorrectAnswers: true,
@@ -1126,7 +1128,7 @@ export class CourseController {
           ],
           questionsCount: 5,
           estimatedDuration: 45,
-          passingScore: 70,
+          passingScore: 50,
           maxAttempts: 3,
           timeLimit: 0,
           showCorrectAnswers: true,
@@ -1343,7 +1345,7 @@ export class CourseController {
           confidence: answer.confidence || 3
         })),
         {
-          passingScore: quiz.settings?.passingScore || quiz.passingScore || 70,
+          passingScore: quiz.settings?.passingScore || quiz.passingScore || 50,
           showCorrectAnswers: quiz.settings?.showCorrectAnswers ?? true
         }
       );
@@ -1401,6 +1403,13 @@ export class CourseController {
         // Verify the save was successful by checking the returned progress
         if (!progressUpdateResult || !progressUpdateResult.quizScores || !progressUpdateResult.quizScores[quizId]) {
           throw new Error('Quiz score was not properly saved to progress');
+        }
+
+        // Award gamification points for quiz completion
+        try {
+          await gamificationService.awardQuizCompletion(req.user.id, courseId, quizId, score, passed);
+        } catch (gamificationError) {
+          logger.warn('Failed to award gamification points for quiz completion:', gamificationError);
         }
 
         // If quiz passed, mark lesson as complete
@@ -1534,7 +1543,7 @@ export class CourseController {
           }
         ],
         settings: {
-          passingScore: 70,
+          passingScore: 50,
           maxAttempts: 3,
           showCorrectAnswers: true,
           showScoreImmediately: true
@@ -1574,7 +1583,7 @@ export class CourseController {
           }
         ],
         settings: {
-          passingScore: 70,
+          passingScore: 50,
           maxAttempts: 3,
           showCorrectAnswers: true,
           showScoreImmediately: true
@@ -1823,8 +1832,8 @@ export class CourseController {
                 score: percentage,
                 maxScore: 100,
                 percentage,
-                passingScore: 70, // Default passing score
-                passed: (quizScore.passed || false) || percentage >= 70,
+                passingScore: 50, // Default passing score
+                passed: (quizScore.passed || false) || percentage >= 50,
                 attempts: quizScore.totalAttempts || 0,
                 completedAt: bestAttempt.completedAt || bestAttempt.submittedAt || new Date().toISOString(),
                 timeSpent: timeSpentMinutes
@@ -1848,7 +1857,7 @@ export class CourseController {
         totalTimeSpent,
         modulesCompleted: moduleGrades.filter(g => g.passed).length,
         totalModules: moduleGrades.length,
-        coursePassed: overallGrade >= 70,
+        coursePassed: overallGrade >= 50,
         completionDate: finalGrade?.completedAt || null
       };
 
@@ -2290,7 +2299,7 @@ export class CourseController {
         return;
       }
 
-      logger.info('Updating lesson progress:', {
+      logger.info('🔄 Updating lesson progress with consistency checks:', {
         userId: req.user.id,
         courseId,
         lessonId,
@@ -2300,44 +2309,49 @@ export class CourseController {
         isCompleted
       });
 
-      // Get or create progress record
+      // Get or create progress record with validation
       const progress = await progressModel.getOrCreateProgress(req.user.id, courseId);
+      
+      // Validate existing progress data
+      const existingLessonProgress = progress.lessonProgress?.[lessonId];
+      if (existingLessonProgress?.completedAt && !isCompleted) {
+        logger.warn('⚠️ Attempting to mark completed lesson as incomplete, preserving completion status');
+        // Don't allow marking a completed lesson as incomplete
+        res.json({
+          success: true,
+          message: 'Lesson already completed, preserving completion status',
+          data: {
+            lessonId,
+            isCompleted: true,
+            preserved: true
+          }
+        });
+        return;
+      }
 
-      // Update lesson-specific progress
-      const existingLessonProgress = progress.lessonProgress?.[lessonId] || {
-        timeSpent: 0,
-        interactions: [],
-        notes: [],
-        bookmarks: [],
-        startedAt: new Date().toISOString()
-      };
-      
-      // Add video progress interaction if provided
-      const videoProgressInteraction = percentageWatched > 0 ? {
-        type: 'video_progress',
-        timestamp: new Date().toISOString(),
-        data: {
-          currentPosition,
-          percentageWatched,
-          duration: req.body.duration || 0
-        }
-      } : null;
-      
-      const updatedInteractions = [
-        ...(existingLessonProgress.interactions || []),
-        ...interactions,
-        ...(videoProgressInteraction ? [videoProgressInteraction] : [])
-      ];
-      
+      // Update lesson-specific progress with enhanced tracking
       const updatedLessonProgress = {
         ...existingLessonProgress,
-        timeSpent: Math.max(existingLessonProgress.timeSpent || 0, timeSpent),
+        timeSpent: Math.max(existingLessonProgress?.timeSpent || 0, timeSpent),
         lastPosition: currentPosition,
-        interactions: updatedInteractions,
-        notes: [...(existingLessonProgress.notes || []), ...notes],
-        bookmarks: [...(existingLessonProgress.bookmarks || []), ...bookmarks],
-        startedAt: existingLessonProgress.startedAt || new Date().toISOString(),
-        ...(isCompleted && { completedAt: new Date().toISOString() })
+        interactions: [
+          ...(existingLessonProgress?.interactions || []),
+          ...interactions,
+          {
+            type: 'progress_update',
+            timestamp: new Date().toISOString(),
+            data: {
+              percentageWatched,
+              timeSpent,
+              currentPosition,
+              isCompleted
+            }
+          }
+        ],
+        notes: [...(existingLessonProgress?.notes || []), ...notes],
+        bookmarks: [...(existingLessonProgress?.bookmarks || []), ...bookmarks],
+        startedAt: existingLessonProgress?.startedAt || new Date().toISOString(),
+        lastUpdated: new Date().toISOString()
       };
 
       // Mark lesson as completed if criteria met
@@ -2345,10 +2359,18 @@ export class CourseController {
         if (!progress.completedLessons.includes(lessonId)) {
           progress.completedLessons.push(lessonId);
           updatedLessonProgress.completedAt = new Date().toISOString();
+          
+          logger.info('✅ Lesson marked as completed:', {
+            userId: req.user.id,
+            courseId,
+            lessonId,
+            percentageWatched,
+            completedAt: updatedLessonProgress.completedAt
+          });
         }
       }
 
-      // Update the progress record
+      // Update the progress record with atomic operation
       const updatedProgress = await progressModel.update(progress._id!, {
         lessonProgress: {
           ...progress.lessonProgress,
@@ -2360,53 +2382,63 @@ export class CourseController {
         lastWatched: new Date().toISOString()
       } as Partial<Progress>);
 
-      // Calculate overall course progress
+      // Calculate and sync overall course progress
       const course = await courseModel.findById(courseId);
       const totalLessons = course?.totalLessons || 0;
-      const completedLessons = progress.completedLessons.length;
+      const completedLessons = updatedProgress.completedLessons.length;
       const progressPercentage = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
 
-      // Update enrollment progress
-      try {
-        const enrollment = await enrollmentModel.findByUserAndCourse(req.user.id, courseId);
-        if (enrollment) {
-          await enrollmentModel.updateProgress(enrollment._id!, progressPercentage);
+      // Update overall progress with validation
+      const finalProgress = await progressModel.update(updatedProgress._id!, {
+        overallProgress: Math.min(100, Math.max(0, progressPercentage)),
+        lastWatched: new Date().toISOString()
+      } as Partial<Progress>);
+
+      // Award gamification points for lesson completion
+      if (isCompleted || percentageWatched >= 90) {
+        try {
+          await gamificationService.awardModuleCompletion(req.user.id, courseId, lessonId);
+          logger.info('🎯 Gamification points awarded for lesson completion');
+        } catch (gamificationError) {
+          logger.warn('⚠️ Failed to award gamification points for lesson completion:', gamificationError);
         }
-      } catch (enrollmentError) {
-        logger.warn('Failed to update enrollment progress:', enrollmentError);
       }
 
-      logger.info('Lesson progress updated successfully:', {
+      // Verify the update was successful
+      const verificationProgress = await progressModel.findByUserAndCourse(req.user.id, courseId);
+      if (!verificationProgress || !verificationProgress.lessonProgress?.[lessonId]) {
+        throw new Error('Progress update verification failed - data not found after update');
+      }
+
+      logger.info('✅ Lesson progress successfully updated and verified:', {
         userId: req.user.id,
         courseId,
         lessonId,
-        overallProgress: progressPercentage,
-        lessonCompleted: progress.completedLessons.includes(lessonId)
+        finalProgress: verificationProgress.overallProgress,
+        completedLessons: verificationProgress.completedLessons.length,
+        totalLessons,
+        lessonCompleted: !!(verificationProgress.lessonProgress[lessonId].completedAt)
       });
 
-      const response: ApiResponse = {
+      res.json({
         success: true,
-        message: 'Lesson progress updated successfully',
+        message: 'Progress updated successfully',
         data: {
-          courseId,
           lessonId,
-          progress: progressPercentage,
-          completedLessons,
+          isCompleted: !!(verificationProgress.lessonProgress[lessonId].completedAt),
+          overallProgress: verificationProgress.overallProgress,
+          completedLessons: verificationProgress.completedLessons.length,
           totalLessons,
-          timeSpent,
-          currentPosition,
-          percentageWatched,
-          isCompleted: progress.completedLessons.includes(lessonId),
-          lessonProgress: updatedLessonProgress
+          timeSpent: verificationProgress.lessonProgress[lessonId].timeSpent
         }
-      };
+      });
 
-      res.json(response);
     } catch (error) {
-      logger.error('Failed to update lesson progress:', error);
+      logger.error('❌ Failed to update lesson progress:', error);
       res.status(500).json({
         success: false,
-        error: 'Failed to update lesson progress'
+        error: 'Failed to update lesson progress',
+        details: error instanceof Error ? error.message : 'Unknown error'
       });
     }
   }
@@ -2438,6 +2470,13 @@ export class CourseController {
       // Update current lesson
       await progressModel.updateCurrentLesson(req.user.id, courseId, lessonId);
 
+      // Award gamification points for module completion
+      try {
+        await gamificationService.awardModuleCompletion(req.user.id, courseId, lessonId);
+      } catch (gamificationError) {
+        logger.warn('Failed to award gamification points for module completion:', gamificationError);
+      }
+
       // Calculate overall progress
       const course = await courseModel.findById(courseId);
       const totalLessons = course?.totalLessons || 0;
@@ -2461,6 +2500,13 @@ export class CourseController {
         try {
           // Mark enrollment as completed
           await enrollmentModel.completeEnrollment(enrollment._id!);
+          
+          // Award gamification points for course completion
+          try {
+            await gamificationService.awardCourseCompletion(req.user.id, courseId);
+          } catch (gamificationError) {
+            logger.warn('Failed to award gamification points for course completion:', gamificationError);
+          }
           
           // Get course and user data for certificate
           const course = await courseModel.findById(courseId);

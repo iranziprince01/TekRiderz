@@ -7,7 +7,8 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Alert } from '../components/ui/Alert';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
-import { Mail, Lock, GraduationCap, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { Mail, Lock, GraduationCap, Eye, EyeOff, ArrowRight, Wifi, WifiOff } from 'lucide-react';
+import { getEssentialOfflineStatus } from '../offline/offlineEssentials';
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -15,11 +16,42 @@ const Login: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
+  const [offlineStatus, setOfflineStatus] = useState<any>(null);
 
-
-  const { login } = useAuth();
+  const { login, loginOffline } = useAuth();
   const { language } = useLanguage();
   const navigate = useNavigate();
+
+  // Check offline status on mount
+  useEffect(() => {
+    const checkOfflineStatus = () => {
+      const status = getEssentialOfflineStatus();
+      setIsOffline(status.isOffline);
+      setOfflineStatus(status);
+    };
+
+    checkOfflineStatus();
+    
+    // Listen for online/offline events
+    const handleOnline = () => {
+      setIsOffline(false);
+      setOfflineStatus(getEssentialOfflineStatus());
+    };
+    
+    const handleOffline = () => {
+      setIsOffline(true);
+      setOfflineStatus(getEssentialOfflineStatus());
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
 
 
@@ -35,7 +67,12 @@ const Login: React.FC = () => {
     setError('');
 
     try {
-      await login(email, password);
+      // Try offline login first if offline, otherwise try online login
+      if (isOffline) {
+        await loginOffline(email, password);
+      } else {
+        await login(email, password);
+      }
       navigate('/dashboard');
     } catch (err: any) {
       setError(err.message || (language === 'rw' ? 'Habaye ikosa' : 'Something went wrong'));
@@ -67,6 +104,33 @@ const Login: React.FC = () => {
             <p className="text-gray-600 dark:text-gray-400">
               {language === 'rw' ? 'Injira konte yawe' : 'Sign in to your account'}
             </p>
+            
+            {/* Offline Status */}
+            {isOffline && (
+              <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                <div className="flex items-center justify-center space-x-2 text-yellow-800 dark:text-yellow-200">
+                  <WifiOff className="h-4 w-4" />
+                  <span className="text-sm font-medium">
+                    {language === 'rw' ? 'Ntibashobora kwinjira - Offline Mode' : 'Offline Mode - Limited Access'}
+                  </span>
+                </div>
+                {offlineStatus?.hasLocalData && (
+                  <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
+                    {language === 'rw' ? 'Koresha amakuru y\'inyongera' : 'Using cached data'}
+                  </p>
+                )}
+                
+                {/* Offline Info */}
+                <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded">
+                  <p className="text-xs text-blue-800 dark:text-blue-200 font-medium mb-1">
+                    Offline Access:
+                  </p>
+                  <p className="text-xs text-blue-700 dark:text-blue-300">
+                    Login with your cached credentials to access courses offline
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Form Card */}

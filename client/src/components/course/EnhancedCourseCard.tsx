@@ -78,6 +78,9 @@ const EnhancedCourseCard: React.FC<EnhancedCourseCardProps> = ({
                             course.enrollment?.progress || 0;
   const isInProgress = progressPercentage > 0 && progressPercentage < 100;
   const isCompleted = progressPercentage >= 100;
+  
+  // Check if course is completed (100% progress)
+  const isFullyCompleted = isCompleted || progressPercentage >= 100;
 
   // Format duration helper
   const formatDuration = (minutes: number) => {
@@ -160,7 +163,7 @@ const EnhancedCourseCard: React.FC<EnhancedCourseCardProps> = ({
       return (
         <Link to={`/course/${course.id || course._id}`} onClick={handleCourseAccess}>
           <Button className="w-full bg-blue-500 hover:bg-blue-600 text-white transition-colors duration-200">
-            {isCompleted ? (
+            {isFullyCompleted ? (
               <>
                 <Award className="w-4 h-4 mr-2" />
                 {t('Review Course')}
@@ -218,20 +221,20 @@ const EnhancedCourseCard: React.FC<EnhancedCourseCardProps> = ({
   const getLevelBadgeClass = (level: string) => {
     switch (level?.toLowerCase()) {
       case 'beginner':
-        return 'bg-green-100 text-green-800 border border-green-200';
+        return 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 border border-green-200 dark:border-green-700';
       case 'intermediate':
-        return 'bg-blue-100 text-blue-800 border border-blue-200';
+        return 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 border border-blue-200 dark:border-blue-700';
       case 'advanced':
-        return 'bg-purple-100 text-purple-800 border border-purple-200';
+        return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 border border-purple-200 dark:border-purple-700';
       default:
-        return 'bg-gray-100 text-gray-800 border border-gray-200';
+        return 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-600';
     }
   };
 
   return (
-    <Card className="overflow-hidden border border-gray-200 shadow-sm hover:shadow-lg transition-all duration-300 bg-white">
+    <Card className="overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-lg transition-all duration-300 bg-white dark:bg-gray-800">
       {/* Course Thumbnail */}
-      <div className="relative h-48 bg-gradient-to-br from-blue-50 to-indigo-50">
+      <div className="relative h-48 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-700 dark:to-gray-800">
         {course.thumbnail ? (
           <img
             src={getFileUrl(course.thumbnail, 'thumbnail')}
@@ -240,7 +243,7 @@ const EnhancedCourseCard: React.FC<EnhancedCourseCardProps> = ({
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <BookOpen className="w-16 h-16 text-blue-400" />
+            <BookOpen className="w-16 h-16 text-blue-400 dark:text-blue-500" />
           </div>
         )}
         
@@ -254,7 +257,7 @@ const EnhancedCourseCard: React.FC<EnhancedCourseCardProps> = ({
         </div>
         
         {course.rating && (
-          <div className="absolute top-3 right-3 bg-white bg-opacity-90 rounded-full px-2 py-1 flex items-center gap-1">
+          <div className="absolute top-3 right-3 bg-white dark:bg-gray-800 bg-opacity-90 dark:bg-opacity-90 rounded-full px-2 py-1 flex items-center gap-1">
             <Star className="w-3 h-3 text-yellow-500 fill-current" />
             <span className="text-xs font-medium text-gray-900 dark:text-white">{course.rating}</span>
           </div>
@@ -263,14 +266,14 @@ const EnhancedCourseCard: React.FC<EnhancedCourseCardProps> = ({
         {/* Progress indicator for enrolled courses */}
         {showProgress && isEnrolled && (
           <div className="absolute bottom-3 left-3 right-3">
-            <div className="bg-white bg-opacity-90 rounded-lg p-2">
+            <div className="bg-white dark:bg-gray-800 bg-opacity-90 dark:bg-opacity-90 rounded-lg p-2">
               <div className="flex justify-between text-xs mb-1">
                 <span className="text-gray-600 dark:text-gray-400">{t('Progress')}</span>
-                <span className="font-medium dark:text-white">{Math.round(progressPercentage)}%</span>
+                <span className="font-medium text-gray-900 dark:text-white">{Math.round(progressPercentage)}%</span>
               </div>
               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
                 <div
-                  className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
+                  className="bg-blue-600 dark:bg-blue-500 h-1.5 rounded-full transition-all duration-300"
                   style={{ width: `${progressPercentage}%` }}
                 />
               </div>
@@ -326,8 +329,8 @@ const EnhancedCourseCard: React.FC<EnhancedCourseCardProps> = ({
         {enrollmentMessage && (
           <div className={`mb-3 p-2 rounded text-sm ${
             enrollmentStatus === 'enrolled' 
-              ? 'bg-green-100 text-green-700 border border-green-200' 
-              : 'bg-red-100 text-red-700 border border-red-200'
+              ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200 border border-green-200 dark:border-green-700' 
+              : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 border border-red-200 dark:border-red-700'
           }`}>
             {enrollmentMessage}
           </div>

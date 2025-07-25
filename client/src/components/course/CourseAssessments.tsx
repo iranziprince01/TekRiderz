@@ -3,6 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { getCourseQuizzes, getCourse, getCourseGrades } from '../../utils/api';
+import { 
+  getQuizAttemptData, 
+  getQuizAttemptStats,
+  canTakeQuiz 
+} from '../../utils/quizAttemptManager';
+import { getPassingScore, getPassingScoreText } from '../../utils/quizSettings';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -96,6 +102,7 @@ export const CourseAssessments: React.FC<CourseAssessmentsProps> = ({
   const [showQuizTaker, setShowQuizTaker] = useState(false);
   const [highlightedQuiz, setHighlightedQuiz] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [quizAttempts, setQuizAttempts] = useState<{ [quizId: string]: any }>({});
 
   // Handle accessibility events
   useEffect(() => {
@@ -176,6 +183,15 @@ export const CourseAssessments: React.FC<CourseAssessmentsProps> = ({
 
   // Enhanced quiz navigation with accessibility support
   const handleQuizAction = (quiz: Quiz, action: 'take' | 'review' | 'retake') => {
+    // Check attempt limits before allowing quiz access
+    const attemptInfo = quizAttempts[quiz.id];
+    const canTake = attemptInfo?.accessCheck?.canTake !== false;
+    
+    if (!canTake) {
+      console.log('❌ Cannot take quiz - maximum attempts reached');
+      return;
+    }
+    
     switch (action) {
       case 'take':
         if (quiz.isUnlocked && !quiz.isCompleted) {
@@ -188,7 +204,7 @@ export const CourseAssessments: React.FC<CourseAssessmentsProps> = ({
         }
         break;
       case 'retake':
-        if (quiz.isCompleted && quiz.attempts < quiz.maxAttempts) {
+        if (quiz.isCompleted && attemptInfo?.accessCheck?.attemptsLeft > 0) {
           handleTakeQuiz(quiz.id);
         }
         break;
@@ -247,7 +263,7 @@ export const CourseAssessments: React.FC<CourseAssessmentsProps> = ({
           moduleTitle: quiz.moduleTitle,
           type: quiz.type || 'module',
           questions: quiz.questions || [],
-          passingScore: quiz.passingScore || 70,
+          passingScore: getPassingScore(quiz.passingScore),
           maxAttempts: quiz.maxAttempts || 3,
           isCompleted: quiz.isCompleted || false,
           bestScore: quiz.bestScore,
@@ -255,13 +271,50 @@ export const CourseAssessments: React.FC<CourseAssessmentsProps> = ({
           isUnlocked: true, // All quizzes are always unlocked
           settings: {
             timeLimit: quiz.timeLimit,
-            passingScore: quiz.passingScore || 70,
+            passingScore: getPassingScore(quiz.passingScore),
             maxAttempts: quiz.maxAttempts || 3,
             showCorrectAnswers: quiz.showCorrectAnswers ?? true,
             showScoreImmediately: quiz.showScoreImmediately ?? true
           }
         }));
       }
+
+      // Load quiz attempt data for each quiz
+      const attemptDataPromises = allQuizzes.map(async (quiz) => {
+        try {
+          const attemptData = await getQuizAttemptData(courseId, quiz.id);
+          const attemptStats = await getQuizAttemptStats(courseId, quiz.id);
+          const accessCheck = await canTakeQuiz(courseId, quiz.id);
+          
+          return {
+            quizId: quiz.id,
+            attemptData,
+            attemptStats,
+            accessCheck
+          };
+        } catch (error) {
+          console.error(`Error loading attempt data for quiz ${quiz.id}:`, error);
+          return {
+            quizId: quiz.id,
+            attemptData: null,
+            attemptStats: null,
+            accessCheck: { canTake: true, attemptsLeft: 3 }
+          };
+        }
+      });
+
+      const attemptResults = await Promise.all(attemptDataPromises);
+      const attemptsMap: { [quizId: string]: any } = {};
+      
+      attemptResults.forEach(result => {
+        attemptsMap[result.quizId] = {
+          attemptData: result.attemptData,
+          attemptStats: result.attemptStats,
+          accessCheck: result.accessCheck
+        };
+      });
+
+      setQuizAttempts(attemptsMap);
 
       // Extract quizzes from course structure if not found in API
       if (courseResponse.success && courseResponse.data?.course) {
@@ -282,14 +335,14 @@ export const CourseAssessments: React.FC<CourseAssessmentsProps> = ({
                     moduleTitle,
                     type: 'module',
                     questions: lesson.quiz.questions || [],
-                    passingScore: lesson.quiz.passingScore || 70,
+                    passingScore: lesson.quiz.passingScore !== undefined && lesson.quiz.passingScore !== null ? lesson.quiz.passingScore : 70,
                     maxAttempts: lesson.quiz.maxAttempts || 3,
                     isCompleted: false,
                     bestScore: undefined,
                     attempts: 0,
                     isUnlocked: true,
                     settings: {
-                      passingScore: lesson.quiz.passingScore || 70,
+                      passingScore: lesson.quiz.passingScore !== undefined && lesson.quiz.passingScore !== null ? lesson.quiz.passingScore : 70,
                       maxAttempts: lesson.quiz.maxAttempts || 3,
                       showCorrectAnswers: lesson.quiz.settings?.showCorrectAnswers ?? true,
                       showScoreImmediately: lesson.quiz.settings?.showScoreImmediately ?? true
@@ -310,14 +363,14 @@ export const CourseAssessments: React.FC<CourseAssessmentsProps> = ({
                 moduleTitle,
                 type: 'module',
                 questions: section.moduleQuiz.questions || [],
-                passingScore: section.moduleQuiz.passingScore || 70,
+                passingScore: section.moduleQuiz.passingScore !== undefined && section.moduleQuiz.passingScore !== null ? section.moduleQuiz.passingScore : 70,
                 maxAttempts: section.moduleQuiz.maxAttempts || 3,
                 isCompleted: false,
                 bestScore: undefined,
                 attempts: 0,
                 isUnlocked: true,
                 settings: {
-                  passingScore: section.moduleQuiz.passingScore || 70,
+                  passingScore: section.moduleQuiz.passingScore !== undefined && section.moduleQuiz.passingScore !== null ? section.moduleQuiz.passingScore : 70,
                   maxAttempts: section.moduleQuiz.maxAttempts || 3,
                   showCorrectAnswers: section.moduleQuiz.settings?.showCorrectAnswers ?? true,
                   showScoreImmediately: section.moduleQuiz.settings?.showScoreImmediately ?? true
@@ -336,14 +389,14 @@ export const CourseAssessments: React.FC<CourseAssessmentsProps> = ({
             moduleTitle: 'Final Assessment',
             type: 'final',
             questions: course.finalAssessment.questions || [],
-            passingScore: course.finalAssessment.settings?.passingScore || 70,
+            passingScore: course.finalAssessment.settings?.passingScore !== undefined && course.finalAssessment.settings?.passingScore !== null ? course.finalAssessment.settings.passingScore : 70,
             maxAttempts: course.finalAssessment.settings?.attempts || 3,
             isCompleted: false,
             bestScore: undefined,
             attempts: 0,
             isUnlocked: true,
             settings: {
-              passingScore: course.finalAssessment.settings?.passingScore || 70,
+              passingScore: course.finalAssessment.settings?.passingScore !== undefined && course.finalAssessment.settings?.passingScore !== null ? course.finalAssessment.settings.passingScore : 70,
               maxAttempts: course.finalAssessment.settings?.attempts || 3,
               showCorrectAnswers: course.finalAssessment.settings?.showCorrectAnswers ?? true,
               showScoreImmediately: course.finalAssessment.settings?.showResultsImmediately ?? true
@@ -401,14 +454,14 @@ export const CourseAssessments: React.FC<CourseAssessmentsProps> = ({
                 correctAnswer: i === 1 ? 'a' : i === 2 ? 'b' : 'c'
               }
             ],
-            passingScore: 70,
+            passingScore: 50,
             maxAttempts: 3,
             isCompleted: false,
             bestScore: undefined,
             attempts: 0,
             isUnlocked: true,
             settings: {
-              passingScore: 70,
+              passingScore: 50,
               maxAttempts: 3,
               showCorrectAnswers: true,
               showScoreImmediately: true
@@ -451,14 +504,14 @@ export const CourseAssessments: React.FC<CourseAssessmentsProps> = ({
               correctAnswers: ['a', 'b', 'c']
             }
           ],
-          passingScore: 70,
+          passingScore: 50,
           maxAttempts: 3,
           isCompleted: false,
           bestScore: undefined,
           attempts: 0,
           isUnlocked: true,
           settings: {
-            passingScore: 70,
+            passingScore: 50,
             maxAttempts: 3,
             showCorrectAnswers: true,
             showScoreImmediately: true
@@ -736,8 +789,15 @@ export const CourseAssessments: React.FC<CourseAssessmentsProps> = ({
   const QuizCard = ({ quiz }: { quiz: Quiz }) => {
     const status = getQuizStatus(quiz);
     const grade = getQuizGrade(quiz.id);
+    const attemptInfo = quizAttempts[quiz.id];
     const canTake = quiz.isUnlocked && !quiz.isCompleted;
     const canRetake = quiz.isCompleted && quiz.attempts < quiz.maxAttempts;
+    
+    // Get attempt information
+    const attemptsLeft = attemptInfo?.accessCheck?.attemptsLeft || 3;
+    const maxAttemptsReached = attemptInfo?.accessCheck?.canTake === false;
+    const bestScore = attemptInfo?.attemptStats?.bestScore || 0;
+    const totalAttempts = attemptInfo?.attemptStats?.totalAttempts || 0;
     
     return (
       <div 
@@ -796,12 +856,18 @@ export const CourseAssessments: React.FC<CourseAssessmentsProps> = ({
                   </div>
                   <div className="flex items-center gap-1">
                     <Target className="w-4 h-4" />
-                    <span>{quiz.passingScore}% {language === 'rw' ? 'kugirango uhagaze' : 'to pass'}</span>
+                    <span>{getPassingScoreText(quiz.passingScore)}</span>
                   </div>
-                  {quiz.attempts > 0 && (
+                  {totalAttempts > 0 && (
                     <div className="flex items-center gap-1">
                       <RotateCcw className="w-4 h-4" />
-                      <span>{quiz.attempts}/{quiz.maxAttempts} {language === 'rw' ? 'igerageza' : 'attempts'}</span>
+                      <span>{totalAttempts}/3 {language === 'rw' ? 'igerageza' : 'attempts'}</span>
+                    </div>
+                  )}
+                  {bestScore > 0 && (
+                    <div className="flex items-center gap-1">
+                      <Star className="w-4 h-4" />
+                      <span>{bestScore}% {language === 'rw' ? 'igihe cyiza' : 'best score'}</span>
                     </div>
                   )}
                 </div>
@@ -820,7 +886,17 @@ export const CourseAssessments: React.FC<CourseAssessmentsProps> = ({
 
               {/* Action Buttons */}
               <div className="flex items-center gap-2">
-                {canTake ? (
+                {maxAttemptsReached ? (
+                  <Button
+                    disabled
+                    variant="outline"
+                    className="border-red-300 text-red-600 cursor-not-allowed"
+                    aria-label={language === 'rw' ? 'Igerageza ryose ryarangiye' : 'Maximum attempts reached'}
+                  >
+                    <XCircle className="w-4 h-4 mr-2" />
+                    {language === 'rw' ? 'Igerageza ryose' : 'Max Attempts'}
+                  </Button>
+                ) : canTake ? (
                   <Button
                     onClick={() => handleQuizAction(quiz, 'take')}
                     className={`${
@@ -832,10 +908,15 @@ export const CourseAssessments: React.FC<CourseAssessmentsProps> = ({
                   >
                     <Play className="w-4 h-4 mr-2" />
                     {language === 'rw' ? 'Tangira' : 'Start'}
+                    {attemptsLeft < 3 && (
+                      <span className="ml-2 text-xs opacity-75">
+                        ({attemptsLeft} {language === 'rw' ? 'ibindi' : 'left'})
+                      </span>
+                    )}
                   </Button>
                 ) : quiz.isCompleted ? (
                   <div className="flex items-center gap-2">
-                    {canRetake && (
+                    {canRetake && attemptsLeft > 0 && (
                       <Button
                         onClick={() => handleQuizAction(quiz, 'retake')}
                         variant="outline"
@@ -844,6 +925,9 @@ export const CourseAssessments: React.FC<CourseAssessmentsProps> = ({
                       >
                         <RotateCcw className="w-4 h-4 mr-2" />
                         {language === 'rw' ? 'Subiramo' : 'Retake'}
+                        <span className="ml-2 text-xs opacity-75">
+                          ({attemptsLeft} {language === 'rw' ? 'ibindi' : 'left'})
+                        </span>
                       </Button>
                     )}
                     <Button

@@ -581,6 +581,101 @@ const translations = {
     'learner.currentLesson': 'Current lesson',
     'learner.review': 'Review',
     'learner.continue': 'Continue',
+
+    'quiz.attempts.remaining': 'Attempts remaining',
+    'quiz.attempts.unlimited': 'Unlimited attempts',
+    'quiz.attempts.none': 'No attempts remaining',
+    'quiz.attempts.last': 'Last attempt',
+    'quiz.attempts.next': 'Next attempt',
+    'quiz.attempts.used': 'Attempts used',
+    'quiz.attempts.total': 'Total attempts',
+    'quiz.attempts.current': 'Current attempt',
+    'quiz.attempts.best': 'Best attempt',
+    'quiz.attempts.worst': 'Worst attempt',
+    'quiz.attempts.average': 'Average score',
+    'quiz.attempts.highest': 'Highest score',
+    'quiz.attempts.lowest': 'Lowest score',
+    'quiz.attempts.first': 'First attempt',
+    'quiz.attempts.second': 'Second attempt',
+    'quiz.attempts.third': 'Third attempt',
+    'quiz.attempts.fourth': 'Fourth attempt',
+    'quiz.attempts.fifth': 'Fifth attempt',
+
+    // Gamification
+    'gamification.achievements': 'Achievements',
+    'gamification.points': 'points',
+    'gamification.level': 'Level',
+    'gamification.modules': 'Modules',
+    'gamification.quizzes': 'Quizzes',
+    'gamification.perfect': 'Perfect',
+    'gamification.days': 'Days',
+    'gamification.badges': 'Badges',
+    'gamification.pts': 'pts',
+            'gamification.completeModules': 'Complete modules and quizzes to earn badges!',
+        'gamification.loading': 'Loading achievements...',
+        
+        // Notifications
+        'notifications.title': 'Notifications',
+        'notifications.noNotifications': 'No notifications yet',
+        'notifications.markAllRead': 'Mark all read',
+        'notifications.loadMore': 'Load more',
+        'notifications.total': 'Total',
+        'notifications.unread': 'Unread',
+        'notifications.markAsRead': 'Mark as read',
+        'notifications.delete': 'Delete',
+        'notifications.priority': {
+          'low': 'Low',
+          'medium': 'Medium',
+          'high': 'High',
+          'urgent': 'Urgent'
+        },
+        'notifications.types': {
+          'course_enrollment': 'Course Enrollment',
+          'course_completion': 'Course Completion',
+          'achievement_unlocked': 'Achievement Unlocked',
+          'assignment_reminder': 'Assignment Reminder',
+          'course_announcement': 'Course Announcement',
+          'grade_posted': 'Grade Posted',
+          'maintenance_notice': 'Maintenance Notice',
+          'welcome_email': 'Welcome'
+        },
+
+    // Analytics Dashboard
+    'analytics.dashboard': 'Analytics Dashboard',
+    'analytics.platformPerformance': 'Platform performance and insights',
+    'analytics.errorLoading': 'Error Loading Analytics',
+    'analytics.noData': 'No Analytics Data',
+    'analytics.dataNotAvailable': 'Analytics data is not available.',
+    'analytics.retry': 'Retry',
+    'analytics.sevenDays': '7 Days',
+    'analytics.thirtyDays': '30 Days',
+    'analytics.ninetyDays': '90 Days',
+    'analytics.totalUsers': 'Total Users',
+    'analytics.totalCourses': 'Total Courses',
+    'analytics.totalEnrollments': 'Total Enrollments',
+    'analytics.activeUsers': 'Active Users',
+    'analytics.published': 'published',
+    'analytics.completionRate': 'completion rate',
+    'analytics.lastSevenDays': 'Last 7 days',
+    'analytics.recentActivity': 'Recent Activity',
+    'analytics.userDistribution': 'User Distribution',
+    'analytics.learners': 'Learners',
+    'analytics.tutors': 'Tutors',
+    'analytics.admins': 'Admins',
+    'analytics.inactiveUsers': 'Inactive Users',
+    'analytics.topPerformingCourses': 'Top Performing Courses',
+    'analytics.by': 'by',
+    'analytics.enrollments': 'enrollments',
+    'analytics.completion': 'completion',
+    'analytics.enrollmentTrends': 'Enrollment Trends',
+    'analytics.newUsers': 'New Users',
+    'analytics.newCourses': 'New Courses',
+    'analytics.newEnrollments': 'New Enrollments',
+    'analytics.courseCompletions': 'Course Completions',
+    'analytics.lastThirtyDays': 'Last 30 days',
+    'analytics.users': 'Users',
+    'analytics.courses': 'Courses',
+    'analytics.completions': 'Completions'
   },
   rw: {
     // Navigation & Header
@@ -1142,6 +1237,101 @@ const translations = {
     'learner.currentLesson': 'Isomo rya ubu',
     'learner.review': 'Subiramo',
     'learner.continue': 'Komeza',
+
+    'quiz.attempts.remaining': 'Attempts remaining',
+    'quiz.attempts.unlimited': 'Unlimited attempts',
+    'quiz.attempts.none': 'No attempts remaining',
+    'quiz.attempts.last': 'Last attempt',
+    'quiz.attempts.next': 'Next attempt',
+    'quiz.attempts.used': 'Attempts used',
+    'quiz.attempts.total': 'Total attempts',
+    'quiz.attempts.current': 'Current attempt',
+    'quiz.attempts.best': 'Best attempt',
+    'quiz.attempts.worst': 'Worst attempt',
+    'quiz.attempts.average': 'Average score',
+    'quiz.attempts.highest': 'Highest score',
+    'quiz.attempts.lowest': 'Lowest score',
+    'quiz.attempts.first': 'First attempt',
+    'quiz.attempts.second': 'Second attempt',
+    'quiz.attempts.third': 'Third attempt',
+    'quiz.attempts.fourth': 'Fourth attempt',
+    'quiz.attempts.fifth': 'Fifth attempt',
+
+    // Gamification
+    'gamification.achievements': 'Ibihembo',
+    'gamification.points': 'amagambo',
+    'gamification.level': 'Urupapuro',
+    'gamification.modules': 'Amasomo',
+    'gamification.quizzes': 'Amazamini',
+    'gamification.perfect': 'Amagambo yuzuye',
+    'gamification.days': 'Umunsi',
+    'gamification.badges': 'Ibimenyetso',
+    'gamification.pts': 'amagambo',
+            'gamification.completeModules': 'Gerageza amasomo kugira ngo ubone ibimenyetso!',
+        'gamification.loading': 'Turimo gushaka...',
+        
+        // Notifications
+        'notifications.title': 'Ubutumwa',
+        'notifications.noNotifications': 'Nta butumwa buhari',
+        'notifications.markAllRead': 'Bika byose bisomwe',
+        'notifications.loadMore': 'Bika byinshi',
+        'notifications.total': 'Byose',
+        'notifications.unread': 'Bitasomwe',
+        'notifications.markAsRead': 'Bika bisomwe',
+        'notifications.delete': 'Siba',
+        'notifications.priority': {
+          'low': 'Hasi',
+          'medium': 'Hagati',
+          'high': 'Hejuru',
+          'urgent': 'Byihuse'
+        },
+        'notifications.types': {
+          'course_enrollment': 'Kwiyandikisha kuri isomo',
+          'course_completion': 'Kurangiza isomo',
+          'achievement_unlocked': 'Ibihembo byemewe',
+          'assignment_reminder': 'Ibyifuzo byibutse',
+          'course_announcement': 'Amatangazo y\'isomo',
+          'grade_posted': 'Amagambo yashyizwe',
+          'maintenance_notice': 'Ibutumwa rya serivisi',
+          'welcome_email': 'Murakaza neza'
+        },
+
+    // Analytics Dashboard
+    'analytics.dashboard': 'Ikibaho cy\'Ibipimo',
+    'analytics.platformPerformance': 'Imikorere y\'ububiko n\'ubumenyi',
+    'analytics.errorLoading': 'Ikosa mu Gufungura Ibipimo',
+    'analytics.noData': 'Nta Bipimo Bihari',
+    'analytics.dataNotAvailable': 'Ibipimo ntibiboneka.',
+    'analytics.retry': 'Ongera ugerageze',
+    'analytics.sevenDays': 'Iminsi 7',
+    'analytics.thirtyDays': 'Iminsi 30',
+    'analytics.ninetyDays': 'Iminsi 90',
+    'analytics.totalUsers': 'Abakoresha Bose',
+    'analytics.totalCourses': 'Amasomo Yose',
+    'analytics.totalEnrollments': 'Kwiyandikisha Kwose',
+    'analytics.activeUsers': 'Abakoresha Bakora',
+    'analytics.published': 'byatangazwa',
+    'analytics.completionRate': 'igipimo cyo kurangiza',
+    'analytics.lastSevenDays': 'Iminsi 7 ishize',
+    'analytics.recentActivity': 'Ibikorwa By\'Ubu',
+    'analytics.userDistribution': 'Gusambura Abakoresha',
+    'analytics.learners': 'Abanyeshuri',
+    'analytics.tutors': 'Abarimu',
+    'analytics.admins': 'Abayobozi',
+    'analytics.inactiveUsers': 'Abakoresha Badakora',
+    'analytics.topPerformingCourses': 'Amasomo Akora Neza',
+    'analytics.by': 'na',
+    'analytics.enrollments': 'kwiyandikisha',
+    'analytics.completion': 'kurangiza',
+    'analytics.enrollmentTrends': 'Imikorere y\'Kwiyandikisha',
+    'analytics.newUsers': 'Abakoresha Basha',
+    'analytics.newCourses': 'Amasomo Asha',
+    'analytics.newEnrollments': 'Kwiyandikisha Gusha',
+    'analytics.courseCompletions': 'Kurangiza Amasomo',
+    'analytics.lastThirtyDays': 'Iminsi 30 ishize',
+    'analytics.users': 'Abakoresha',
+    'analytics.courses': 'Amasomo',
+    'analytics.completions': 'Kurangiza'
   }
 };
 
@@ -1184,14 +1374,14 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
   const t = useCallback((key: string): string => {
     try {
       const translation = translations[language][key as keyof typeof translations['en']];
-      if (translation) {
+      if (translation && typeof translation === 'string') {
         return translation;
       }
       
       // Fallback to English if translation not found in current language
       if (language !== 'en') {
         const englishTranslation = translations['en'][key as keyof typeof translations['en']];
-        if (englishTranslation) {
+        if (englishTranslation && typeof englishTranslation === 'string') {
           console.warn(`Translation missing for key "${key}" in ${language}, falling back to English`);
           return englishTranslation;
         }

@@ -1,179 +1,123 @@
-import React, { useState, useEffect } from 'react';
-
-interface ServiceWorkerStatus {
-  registered: boolean;
-  active: boolean;
-  scope: string;
-  state: string;
-}
+import React, { useState } from 'react';
+import { Button } from '../ui/Button';
+import { Card } from '../ui/Card';
+import { getEssentialOfflineStatus } from '../../offline/offlineEssentials';
 
 const OfflineTest: React.FC = () => {
-  const [swStatus, setSwStatus] = useState<ServiceWorkerStatus | null>(null);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [status, setStatus] = useState(getEssentialOfflineStatus());
+  const [isVisible, setIsVisible] = useState(false);
 
-  useEffect(() => {
-    // Check Service Worker status
-    const checkServiceWorker = async () => {
-      if ('serviceWorker' in navigator) {
-        try {
-          const registration = await navigator.serviceWorker.getRegistration();
-          if (registration) {
-            setSwStatus({
-              registered: true,
-              active: !!registration.active,
-              scope: registration.scope,
-              state: registration.active?.state || 'unknown'
-            });
-          } else {
-            setSwStatus({
-              registered: false,
-              active: false,
-              scope: '',
-              state: 'not registered'
-            });
-          }
-        } catch (error) {
-          console.error('Error checking Service Worker:', error);
-          setSwStatus({
-            registered: false,
-            active: false,
-            scope: '',
-            state: 'error'
-          });
-        }
-      } else {
-        setSwStatus({
-          registered: false,
-          active: false,
-          scope: '',
-          state: 'not supported'
-        });
-      }
-    };
-
-    checkServiceWorker();
-
-    // Listen for online/offline events
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-  const registerServiceWorker = async () => {
-    if ('serviceWorker' in navigator) {
-      try {
-        const registration = await navigator.serviceWorker.register('/sw.js');
-        console.log('Service Worker registered:', registration);
-        // Refresh the page to show updated status
-        window.location.reload();
-      } catch (error) {
-        console.error('Service Worker registration failed:', error);
-      }
-    }
+  const refreshStatus = () => {
+    setStatus(getEssentialOfflineStatus());
   };
 
-  const unregisterServiceWorker = async () => {
-    if ('serviceWorker' in navigator) {
-      try {
-        const registration = await navigator.serviceWorker.getRegistration();
-        if (registration) {
-          await registration.unregister();
-          console.log('Service Worker unregistered');
-          window.location.reload();
-        }
-      } catch (error) {
-        console.error('Service Worker unregistration failed:', error);
-      }
-    }
+  const toggleVisibility = () => {
+    setIsVisible(!isVisible);
   };
 
-  if (!swStatus) {
-    return <div className="p-4">Loading Service Worker status...</div>;
+  if (!isVisible) {
+    return (
+      <div className="fixed bottom-4 left-4 z-40">
+        <Button
+          onClick={toggleVisibility}
+          size="sm"
+          variant="outline"
+          className="bg-white dark:bg-gray-800 shadow-lg"
+        >
+          Test Offline
+        </Button>
+      </div>
+    );
   }
 
   return (
-    <div className="p-6 bg-white rounded-lg shadow-md max-w-md mx-auto mt-8">
-      <h2 className="text-xl font-bold mb-4">Service Worker Status</h2>
-      
-      <div className="space-y-3">
-        <div className="flex justify-between">
-          <span className="font-medium">Network Status:</span>
-          <span className={`px-2 py-1 rounded text-sm ${isOnline ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-            {isOnline ? '🟢 Online' : '🔴 Offline'}
-          </span>
+    <div className="fixed bottom-4 left-4 z-40 w-80">
+      <Card className="p-4 shadow-lg border-2 border-blue-200 dark:border-blue-800">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold text-gray-900 dark:text-white">Offline Test Panel</h3>
+          <Button
+            onClick={toggleVisibility}
+            size="sm"
+            variant="ghost"
+            className="text-gray-500 hover:text-gray-700"
+          >
+            ×
+          </Button>
         </div>
 
-        <div className="flex justify-between">
-          <span className="font-medium">Service Worker:</span>
-          <span className={`px-2 py-1 rounded text-sm ${swStatus.registered ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-            {swStatus.registered ? '✅ Registered' : '❌ Not Registered'}
-          </span>
+        <div className="space-y-3 text-sm">
+          <div className="flex justify-between">
+            <span className="text-gray-600 dark:text-gray-400">Network Status:</span>
+            <span className={`font-medium ${status.isOffline ? 'text-red-600' : 'text-green-600'}`}>
+              {status.isOffline ? 'Offline' : 'Online'}
+            </span>
+          </div>
+
+          <div className="flex justify-between">
+            <span className="text-gray-600 dark:text-gray-400">Local Data:</span>
+            <span className={`font-medium ${status.hasLocalData ? 'text-green-600' : 'text-red-600'}`}>
+              {status.hasLocalData ? 'Available' : 'Not Available'}
+            </span>
+          </div>
+
+          <div className="flex justify-between">
+            <span className="text-gray-600 dark:text-gray-400">Course Access:</span>
+            <span className={`font-medium ${status.canAccessCourses ? 'text-green-600' : 'text-yellow-600'}`}>
+              {status.canAccessCourses ? 'Ready' : 'Limited'}
+            </span>
+          </div>
+
+          {status.cachedUser && (
+            <div className="flex justify-between">
+              <span className="text-gray-600 dark:text-gray-400">Cached User:</span>
+              <span className="font-medium text-blue-600">
+                {status.cachedUser.name}
+              </span>
+            </div>
+          )}
+
+          {status.lastSync && (
+            <div className="flex justify-between">
+              <span className="text-gray-600 dark:text-gray-400">Last Sync:</span>
+              <span className="font-medium text-gray-800 dark:text-gray-200">
+                {status.lastSync}
+              </span>
+            </div>
+          )}
+
+          <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+            <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+              Offline Access:
+            </div>
+            <div className="text-xs bg-gray-50 dark:bg-gray-700 p-2 rounded">
+              <div>Login with cached credentials</div>
+              <div>Access enrolled courses offline</div>
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <Button
+              onClick={refreshStatus}
+              size="sm"
+              variant="outline"
+              className="flex-1"
+            >
+              Refresh
+            </Button>
+            <Button
+              onClick={() => {
+                localStorage.clear();
+                refreshStatus();
+              }}
+              size="sm"
+              variant="outline"
+              className="flex-1 text-red-600 hover:text-red-700"
+            >
+              Clear Data
+            </Button>
+          </div>
         </div>
-
-        {swStatus.registered && (
-          <>
-            <div className="flex justify-between">
-              <span className="font-medium">Active:</span>
-              <span className={`px-2 py-1 rounded text-sm ${swStatus.active ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                {swStatus.active ? '✅ Active' : '⏳ Inactive'}
-              </span>
-            </div>
-
-            <div className="flex justify-between">
-              <span className="font-medium">State:</span>
-              <span className="px-2 py-1 rounded text-sm bg-gray-100 text-gray-800">
-                {swStatus.state}
-              </span>
-            </div>
-
-            <div className="text-sm text-gray-600">
-              <strong>Scope:</strong> {swStatus.scope}
-            </div>
-          </>
-        )}
-      </div>
-
-      <div className="mt-6 space-y-2">
-        {!swStatus.registered ? (
-          <button
-            onClick={registerServiceWorker}
-            className="w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition-colors"
-          >
-            Register Service Worker
-          </button>
-        ) : (
-          <button
-            onClick={unregisterServiceWorker}
-            className="w-full bg-red-500 text-white py-2 px-4 rounded hover:bg-red-600 transition-colors"
-          >
-            Unregister Service Worker
-          </button>
-        )}
-
-        <button
-          onClick={() => window.location.reload()}
-          className="w-full bg-gray-500 text-white py-2 px-4 rounded hover:bg-gray-600 transition-colors"
-        >
-          Refresh Page
-        </button>
-      </div>
-
-      <div className="mt-4 p-3 bg-blue-50 rounded text-sm text-blue-800">
-        <strong>Testing Instructions:</strong>
-        <ol className="mt-2 list-decimal list-inside space-y-1">
-          <li>Go to DevTools → Application → Service Workers</li>
-          <li>Check "Offline" checkbox</li>
-          <li>Refresh the page</li>
-          <li>Should see cached app instead of "No internet" page</li>
-        </ol>
-      </div>
+      </Card>
     </div>
   );
 };

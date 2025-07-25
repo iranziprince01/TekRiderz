@@ -7,6 +7,7 @@ import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
+import { GamificationDisplay } from './GamificationDisplay';
 import { getFileUrl, apiClient, cleanInstructorName } from '../../utils/api';
 import { 
   Users, 
@@ -324,6 +325,11 @@ export const CourseHome: React.FC<CourseHomeProps> = ({
             </div>
           </div>
         </Card>
+
+        {/* Gamification Display - Only show for enrolled users */}
+        {isEnrolled && (
+          <GamificationDisplay courseId={course.id} />
+        )}
       </div>
     </div>
   );

@@ -108,7 +108,8 @@ const LearnerCourses: React.FC = () => {
                 progress: course.progress?.overallProgress || 0,
                 status: 'active'
               },
-              offlineAccessible: true
+              offlineAccessible: true,
+              lastCached: new Date().toISOString()
             }));
             
             await Promise.all(enrolledCoursesForCache.map((course: any) => cacheCourse(course)));

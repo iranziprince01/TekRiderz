@@ -24,6 +24,8 @@ import { cleanupService } from './services/cleanupService';
 import speechRoutes from './routes/speech';
 import { certificateRoutes } from './routes/certificates';
 import analyticsRoutes from './routes/analytics';
+import gamificationRoutes from './routes/gamification';
+import notificationRoutes from './routes/notifications';
 import { apiRateLimiter, progressRateLimiter, courseRateLimiter, dynamicRateLimiter } from './middleware/rateLimiter';
 import { dbUrlsRoutes } from './routes/db-urls';
 
@@ -85,6 +87,8 @@ app.use('/api/v1/firebase-pdf', firebasePdfRoutes);
 app.use('/api/v1/speech', speechRoutes);
 app.use('/api/v1/certificates', certificateRoutes);
 app.use('/api/v1/analytics', analyticsRoutes);
+app.use('/api/v1/gamification', gamificationRoutes);
+app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/cleanup', cleanupRoutes);
 app.use('/api/v1/db-urls', dbUrlsRoutes);
 

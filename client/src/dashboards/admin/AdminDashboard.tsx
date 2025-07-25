@@ -18,8 +18,7 @@ import {
   Clock, 
   Circle, 
   Activity,
-  CheckCircle2,
-  BarChart3
+  CheckCircle2
 } from 'lucide-react';
 
 interface DashboardStats {

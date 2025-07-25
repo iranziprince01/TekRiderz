@@ -364,12 +364,12 @@ export const CloudinaryImageUpload: React.FC<CloudinaryImageUploadProps> = ({
     <div className={`space-y-4 ${className}`}>
       {/* Configuration Status Indicator */}
       {isCloudinaryConfigured ? (
-        <div className="flex items-center space-x-2 text-sm text-green-600 bg-green-50 p-2 rounded-md">
+        <div className="flex items-center space-x-2 text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 p-2 rounded-md">
           <Cloud className="h-4 w-4" />
           <span>Image upload ready</span>
         </div>
       ) : (
-        <div className="flex items-center space-x-2 text-sm text-blue-600 bg-blue-50 p-2 rounded-md">
+        <div className="flex items-center space-x-2 text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded-md">
           <Upload className="h-4 w-4" />
           <span>Upload available</span>
         </div>
@@ -381,7 +381,7 @@ export const CloudinaryImageUpload: React.FC<CloudinaryImageUploadProps> = ({
           <img
             src={imageUrl}
             alt="Course thumbnail"
-            className="w-full h-48 object-cover rounded-lg border-2 border-gray-200"
+            className="w-full h-48 object-cover rounded-lg border-2 border-gray-200 dark:border-gray-600"
             onError={() => {
               console.error('Image failed to display:', imageUrl);
               setError('Image failed to load');
@@ -405,8 +405,8 @@ export const CloudinaryImageUpload: React.FC<CloudinaryImageUploadProps> = ({
         <div
           className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
             dragOver
-              ? 'border-blue-500 bg-blue-50'
-              : 'border-gray-300 hover:border-gray-400'
+              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+              : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
           }`}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
@@ -414,16 +414,16 @@ export const CloudinaryImageUpload: React.FC<CloudinaryImageUploadProps> = ({
         >
           <div className="space-y-4">
             <div className="flex justify-center">
-              <div className="p-3 bg-gray-100 rounded-full">
-                <Image className="h-8 w-8 text-gray-600" />
+              <div className="p-3 bg-gray-100 dark:bg-gray-700 rounded-full">
+                <Image className="h-8 w-8 text-gray-600 dark:text-gray-400" />
               </div>
             </div>
 
             <div>
-              <p className="text-gray-600 mb-2">
+              <p className="text-gray-600 dark:text-gray-400 mb-2">
                 Drag and drop an image here, or use the buttons below
               </p>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
                 PNG, JPG, WEBP up to 10MB
               </p>
             </div>
@@ -431,7 +431,7 @@ export const CloudinaryImageUpload: React.FC<CloudinaryImageUploadProps> = ({
             <Button
               onClick={openFileDialog}
               disabled={uploading}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600"
             >
               {isCloudinaryConfigured ? (
                 <Cloud className="h-4 w-4 mr-2" />
@@ -456,13 +456,13 @@ export const CloudinaryImageUpload: React.FC<CloudinaryImageUploadProps> = ({
 
       {/* URL Input Alternative */}
       <div className="text-center">
-        <p className="text-sm text-gray-500 mb-3">or</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">or</p>
         <form onSubmit={handleUrlSubmit} className="flex gap-2">
           <input
             type="url"
             name="imageUrl"
             placeholder="https://example.com/image.jpg"
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500 dark:focus:border-blue-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             disabled={uploading}
           />
           <Button
@@ -477,7 +477,7 @@ export const CloudinaryImageUpload: React.FC<CloudinaryImageUploadProps> = ({
 
       {/* Error Display */}
       {error && (
-        <div className="flex items-center space-x-2 text-red-600 bg-red-50 p-3 rounded-md">
+        <div className="flex items-center space-x-2 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-3 rounded-md">
           <AlertCircle className="h-4 w-4" />
           <span className="text-sm">{error}</span>
         </div>
@@ -485,8 +485,8 @@ export const CloudinaryImageUpload: React.FC<CloudinaryImageUploadProps> = ({
 
       {/* Upload Progress */}
       {uploading && (
-        <div className="flex items-center space-x-2 text-blue-600 bg-blue-50 p-3 rounded-md">
-          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+        <div className="flex items-center space-x-2 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md">
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 dark:border-blue-400"></div>
           <span className="text-sm">
             {isCloudinaryConfigured ? 'Uploading to Cloudinary...' : 'Processing image...'}
           </span>

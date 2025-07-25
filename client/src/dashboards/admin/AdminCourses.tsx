@@ -576,9 +576,6 @@ const AdminCourses: React.FC = () => {
                     {t('admin.courses.course')}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    {t('admin.courses.instructor')}
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     {t('admin.courses.status')}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -621,25 +618,10 @@ const AdminCourses: React.FC = () => {
                             {course.title}
                           </div>
                           <div className="text-sm text-gray-500 dark:text-gray-400 max-w-xs truncate">
-                            {course.description}
-                          </div>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-xs text-gray-500 dark:text-gray-400">{course.category}</span>
-                            <span className="text-xs text-gray-500 dark:text-gray-400">•</span>
-                            <span className="text-xs text-gray-500 dark:text-gray-400">{course.level}</span>
+                            {cleanInstructorName(course.instructorName)}
                           </div>
                         </div>
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900 dark:text-white">
-                        {cleanInstructorName(course.instructorName)}
-                      </div>
-                      {course.instructorEmail && (
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {course.instructorEmail}
-                        </div>
-                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {getStatusBadge(course.status)}

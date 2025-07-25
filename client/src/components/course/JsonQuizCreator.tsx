@@ -14,7 +14,7 @@ interface JsonQuizCreatorProps {
 
 const DEFAULT_QUIZ_SETTINGS: QuizSettings = {
   maxAttempts: 3,
-  passingScore: 70,
+  passingScore: 50,
   showCorrectAnswers: true,
   showScoreImmediately: true,
   randomizeQuestions: false,

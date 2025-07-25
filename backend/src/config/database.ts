@@ -20,10 +20,11 @@ export const databases = {
   courses: couch.db.use('courses'),       // Course content and metadata
   enrollments: couch.db.use('enrollments'), // Course enrollments
   progress: couch.db.use('progress'),     // Student learning progress
-  // certificates removed for academic project simplification
+  certificates: couch.db.use('certificates'), // Certificate metadata and URLs
   analytics: couch.db.use('analytics'),   // Basic platform analytics
   assessments: couch.db.use('assessments'), // Quizzes and assessments
   grades: couch.db.use('grades'),         // Student grades and scores
+  notifications: couch.db.use('notifications'), // In-app notifications and alerts
   
   // Essential support databases
   otp: couch.db.use('otp'),              // Authentication codes
@@ -46,8 +47,8 @@ export const connectToDatabases = async (): Promise<void> => {
     
     // Required databases for basic e-learning platform
     const requiredDatabases = [
-      'users', 'courses', 'enrollments', 
-      'analytics', 'assessments', 'grades', 'otp', 'files'
+      'users', 'courses', 'enrollments', 'certificates',
+      'analytics', 'assessments', 'grades', 'notifications', 'otp', 'files'
     ];
 
     // Check if all required databases exist
@@ -118,6 +119,8 @@ const createDesignDocuments = async (): Promise<void> => {
     await createAnalyticsDesignDocuments();
     await createAssessmentDesignDocuments();
     await createGradeDesignDocuments();
+    await createCertificateDesignDocuments();
+    await createNotificationDesignDocuments();
     
     logger.info('Essential design documents created successfully');
   } catch (error) {
@@ -311,6 +314,20 @@ const createProgressDesignDocuments = async (): Promise<void> => {
               emit(doc.lastWatched, null);
             }
           }`
+        },
+        gamification_by_user_course: {
+          map: `function(doc) {
+            if (doc.type === 'gamification' && doc.userId && doc.courseId) {
+              emit([doc.userId, doc.courseId], null);
+            }
+          }`
+        },
+        gamification_by_user: {
+          map: `function(doc) {
+            if (doc.type === 'gamification' && doc.userId) {
+              emit(doc.userId, null);
+            }
+          }`
         }
       }
     };
@@ -459,6 +476,123 @@ const createGradeDesignDocuments = async (): Promise<void> => {
   } catch (error: any) {
     if (error.statusCode !== 409) {
       logger.error('Failed to create grade design document:', error);
+    }
+  }
+};
+
+// Create certificate design documents
+const createCertificateDesignDocuments = async (): Promise<void> => {
+  const certificatesDb = databases.certificates;
+  
+  try {
+    const designDoc: any = {
+      _id: '_design/certificates',
+      views: {
+        by_user: {
+          map: `function(doc) {
+            if (doc.type === 'certificate' && doc.userId) {
+              emit(doc.userId, null);
+            }
+          }`
+        },
+        by_course: {
+          map: `function(doc) {
+            if (doc.type === 'certificate' && doc.courseId) {
+              emit(doc.courseId, null);
+            }
+          }`
+        },
+        by_certificate_id: {
+          map: `function(doc) {
+            if (doc.type === 'certificate' && doc.certificateId) {
+              emit(doc.certificateId, null);
+            }
+          }`
+        },
+        valid_certificates: {
+          map: `function(doc) {
+            if (doc.type === 'certificate' && doc.status === 'valid') {
+              emit([doc.userId, doc.courseId], null);
+            }
+          }`
+        }
+      }
+    };
+
+    try {
+      const existing = await certificatesDb.get('_design/certificates');
+      designDoc._rev = existing._rev;
+    } catch (error) {
+      // Design doc doesn't exist, will create new one
+    }
+
+    await certificatesDb.insert(designDoc);
+    logger.info('Certificate design document created/updated successfully');
+  } catch (error: any) {
+    if (error.statusCode !== 409) {
+      logger.error('Failed to create certificate design document:', error);
+    }
+  }
+};
+
+// Create notification design documents
+const createNotificationDesignDocuments = async (): Promise<void> => {
+  const notificationsDb = databases.notifications;
+  
+  try {
+    const designDoc: any = {
+      _id: '_design/notifications',
+      views: {
+        by_user: {
+          map: `function(doc) {
+            if (doc.type === 'notification' && doc.userId) {
+              emit(doc.userId, null);
+            }
+          }`
+        },
+        by_type: {
+          map: `function(doc) {
+            if (doc.type === 'notification' && doc.notificationType) {
+              emit(doc.notificationType, null);
+            }
+          }`
+        },
+        by_priority: {
+          map: `function(doc) {
+            if (doc.type === 'notification' && doc.priority) {
+              emit(doc.priority, null);
+            }
+          }`
+        },
+        unread_by_user: {
+          map: `function(doc) {
+            if (doc.type === 'notification' && doc.userId && !doc.isRead) {
+              emit(doc.userId, null);
+            }
+          }`
+        },
+        by_created_at: {
+          map: `function(doc) {
+            if (doc.type === 'notification' && doc.createdAt) {
+              emit(doc.createdAt, null);
+            }
+          }`
+        }
+      }
+    };
+
+    try {
+      const existing = await notificationsDb.get('_design/notifications');
+      designDoc._rev = existing._rev;
+    } catch (error) {
+      // Design doc doesn't exist, will create new one
+    }
+
+    await notificationsDb.insert(designDoc);
+    logger.info('Notification design document created/updated successfully');
+  } catch (error: any) {
+    if (error.statusCode !== 409) {
+      logger.error('Failed to create notification design document:', error);
     }
   }
 };
