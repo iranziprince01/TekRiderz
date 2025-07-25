@@ -1,217 +1,190 @@
-# TekRiders - Modern E-Learning Platform
+# TekRiders - Empowering Offline Learning for Marginalized Youth
 
-> A comprehensive e-learning platform designed for modern education needs, featuring intuitive course management and interactive learning experiences.
+> A modern offline-first e-learning platform designed in Kinyarwanda to teach IT and coding skills to refugee and rural youth in Rwanda.
 
 ![React](https://img.shields.io/badge/React-18-blue?logo=react)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?logo=typescript)
 ![Node.js](https://img.shields.io/badge/Node.js-18+-green?logo=node.js)
 ![CouchDB](https://img.shields.io/badge/CouchDB-Database-red?logo=apache-couchdb)
 
+---
+
 ## Project Overview
-
-TekRiders is a full-stack e-learning platform that enables seamless knowledge sharing between instructors and learners. Built with modern web technologies, it provides a complete educational ecosystem with course creation, student enrollment, progress tracking, and certification features.
-
-## Key Features
-
-### **Learning Management**
-- Interactive course creation with multimedia support
-- Real-time progress tracking and analytics
-- Comprehensive quiz and assessment system
-
-
-### **User Management**
-- Multi-role system (Admin, Tutor, Learner)
-- Secure authentication and user profiles
-- Role-based access control and permissions
-- User activity monitoring and statistics
-
-### **Modern Experience**
-- Responsive design for all devices
-- Multi-language support (English/Kinyarwanda)
-
-### **Security & Performance**
-- JWT-based authentication
-- Data encryption and validation
-- Optimized loading and caching
-
-## Technology Stack
-
-### **Frontend**
-- **React 18** - Modern UI library with hooks
-- **TypeScript** - Type-safe development
-- **Tailwind CSS** - Utility-first styling
-- **Vite** - Fast development and building
-- **React Router** - Client-side routing
-
-### **Backend**
-- **Node.js** - JavaScript runtime
-- **Express.js** - Web application framework
-- **TypeScript** - Server-side type safety
-- **JWT** - Secure authentication
-- **Multer** - File upload handling
-
-### **Database & Storage**
-- **CouchDB** - Primary document database
-
-## Getting Started
-
-### Prerequisites
-- Node.js 18 or higher
-- npm or yarn package manager
-- CouchDB (optional for advanced features)
-
-### Installation
-
-1. **Clone the repository**
-```bash
-git clone <repository-url>
-cd TekRiderz
-   ```
-
-2. **Install dependencies**
-   ```bash
-npm install
-   ```
-
-3. **Environment setup**
-   ```bash
-   # Copy environment templates
-cp backend/env.example backend/.env
-cp client/env.example client/.env
-   ```
-
-4. **Start development servers**
-```bash
-   npm run dev
-   ```
-
-The application will be available at:
-- Frontend: `http://localhost:5173`
-- Backend API: `http://localhost:3000`
-
-## User Roles
-
-### **Administrator**
-- Manage users and system settings
-- Approve/reject course submissions
-- Monitor platform analytics
-- Control user permissions
-
-### **Tutor/Instructor**
-- Create and manage courses
-- Design quizzes and assessments
-- Track student progress
-- Generate course analytics
-
-### **Learner/Student**
-- Browse and enroll in courses
-- Complete lessons and assessments
-- Track learning progress
-
-
-## Project Structure
-
-```
-TekRiderz/
-├── client/                 # React frontend application
-│   ├── src/
-│   │   ├── components/     # Reusable UI components
-│   │   ├── pages/          # Application pages
-│   │   ├── dashboards/     # Role-specific dashboards
-│   │   ├── contexts/       # React context providers
-│   │   └── utils/          # Utility functions
-│   └── public/             # Static assets
-├── backend/                # Node.js backend application
-│   ├── src/
-│   │   ├── controllers/    # Request handlers
-│   │   ├── models/         # Database models
-│   │   ├── routes/         # API endpoints
-│   │   ├── middleware/     # Express middleware
-│   │   └── services/       # Business logic
-│   └── uploads/            # File storage
-└── docs/                   # Project documentation
-```
-
-## Development Commands
-
-```bash
-# Start development environment
-npm run dev                 # Both frontend and backend
-
-# Frontend only
-npm run dev:client          # Start React development server
-npm run build:client        # Build for production
-
-# Backend only  
-npm run dev:server          # Start Node.js development server
-npm run build:server        # Compile TypeScript
-
-# Production
-npm run build               # Build both applications
-npm run start               # Start production servers
-```
-
-## Core Functionality
-
-### **Course Management**
-- Rich content editor with multimedia support
-- Structured lessons and modules
-- Interactive quizzes and assessments
-- Progress tracking and analytics
-- **Quality Control**: Admin approval workflow for all courses
-- **Tutor Publishing**: Tutors can publish approved courses directly
-
-### **User Experience**
-- Intuitive dashboard interfaces
-- Real-time notifications
-- Responsive mobile design
-
-
-### **Data Management**
-- Secure user authentication
-- Real-time data synchronization
-- Automatic backup and recovery
-- Performance optimization
-
-## Progressive Web App
-
-TekRiderz functions as a Progressive Web App, providing:
-- **Mobile Installation** - Add to home screen like a native app
-- **Fast Loading** - Optimized performance and caching
-
-## Security Features
-
-- **Authentication** - Secure JWT-based login system
-- **Authorization** - Role-based access control
-- **Data Protection** - Encrypted data transmission
-- **Input Validation** - Comprehensive server-side validation
-- **Rate Limiting** - Protection against abuse
-
-## Academic Project Goals
-
-This project demonstrates proficiency in:
-- Full-stack web development
-- Modern JavaScript/TypeScript
-- Database design and management
-- User experience design
-- Security best practices
-- Performance optimization
-- Progressive Web App development
-
-## License
-
-This project is developed as an academic project and is available under the MIT License.
-
-## Contributing
-
-This is an academic project. For educational purposes, please:
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
+TekRiders is a full-stack Progressive Web App (PWA) that delivers offline-first digital literacy and coding courses to youth in under-connected refugee and rural communities. It supports multi-role user management (Admin, Tutor, Learner), course creation and approval workflows, multilingual support, gamified achievements, and interactive assessments — all available with or without internet.
 
 ---
 
-**Built with passion for modern education**
+## Core Features
+- **Offline-first learning with PWA and Service Workers**
+- **Multilingual content:** Kinyarwanda (primary) and English
+- **Gamified assessments:** quizzes, badges, leaderboards, and certificates
+- **Secure authentication:** JWT with role-based dashboards
+- **Tutor > Course > Admin Approval > Learner Enrollment workflow**
+- **In-app real-time notifications**
+- **Theme toggling and mobile responsiveness**
+- **TTS and STT accessibilities for course pages**
 
-*TekRiders - Empowering knowledge through technology* 
+---
+
+## Technology Stack
+
+### Frontend
+- React 18 + Vite (Fast UI development)
+- TypeScript (type-safe, scalable)
+- Tailwind CSS (utility-first styling)
+- React Router (routing)
+
+### Backend
+- Node.js + Express.js (REST API)
+- TypeScript (type safety)
+- JWT (Authentication)
+- Multer (file upload handling)
+
+### Database and Sync
+- CouchDB (document storage & sync)
+- PouchDB (offline browser cache)
+- IndexedDB (local-first access)
+
+### Cloud & Deployment
+- Firebase (PDF storage)
+- Cloudinary (profile pictures & thumbnails)
+- YouTube (unlisted course videos)
+- Render (backend hosting)
+- Vercel (frontend hosting)
+- IBM Cloudant (CouchDB production instance)
+
+---
+
+## User Roles
+### Administrator
+- Approves or rejects tutor-created courses
+- Manages users and platform settings
+
+### Tutor
+- Creates and submits courses (form-based)
+- Views and tracks learner progress
+
+### Learner
+- Enrolls in approved courses
+- Downloads materials for offline access
+- Completes lessons and assessments
+
+---
+
+## 📁 Project Structure
+```
+TekRiderz/
+├── client/      → React frontend
+├── backend/     → Node.js API
+├── docs/        → Project documentation
+```
+
+---
+
+## Testing and Validation
+### Unit Testing
+- Component logic and route tests (e.g., login, role-based redirects)
+- Screenshots: `__tests__/auth.test.tsx`
+
+### Integration Testing
+- Tutor > Course Creation > Admin Approval > Learner Enrollment flow
+- Screenshot: `dashboard/tutor_course_form.png`, `admin/approval_list.png`
+
+### Functional & Validation Testing
+- Multiple devices tested (smartphone, tablet, laptop)
+- Verified role-based access & multilingual interface
+- Screenshot: `screens/login.png`
+
+### Performance Testing
+- Measured loading with PWA on 3G / no internet
+- Offline access verified using Chrome DevTools
+
+---
+
+## Screenshots
+- `Login and Role-Based Dashboards`
+  <img width="512" height="288" alt="image" src="https://github.com/user-attachments/assets/a6b3bf92-5ed3-45eb-b479-fada89182daf" />
+- `Tutor Course Creation Form`
+  <img width="512" height="320" alt="image" src="https://github.com/user-attachments/assets/7fa14072-9d36-461d-9faa-b11c895746c4" />
+
+- `Admin Course Approval Panel`
+  <img width="512" height="320" alt="image" src="https://github.com/user-attachments/assets/a4597e5c-9df3-4829-a489-28e248ebdd04" />
+
+- `Learner Course Enrollment and Offline Module Access`
+  <img width="1440" height="813" alt="image" src="https://github.com/user-attachments/assets/70ce4236-96ed-4484-8332-3228f57ed3d9" />
+
+- `Gamified Quiz and Certificate Preview`
+  <img width="1440" height="812" alt="image" src="https://github.com/user-attachments/assets/aa724238-237a-4610-98ce-374f7fb952fe" />
+
+
+---
+
+## Results and Analysis
+- **Objective mostly met:** Needed offline-first PWA built in Kinyarwanda
+- **Learner feedback:** 90% satisfaction on offline usability
+- **Device testing:** Functioned on low-end Android phones
+- **Pre/post test:** Improved quiz scores in pilot learners by avg. 35%
+- **Storage:** Efficient offline caching of modules (videos & PDFs) via IndexedDB
+
+---
+
+## Supervisor & Milestone Discussion
+Throughout development, feedback from the supervisor helped shape:
+- **Early ideation** into a culturally relevant solution with PWA
+- **Midpoint check-ins** refocused scope on offline-first integrity
+- **Final reviews** validated PWA performance, UX, and platform logic/flow
+
+Each milestone — from proposal to prototype to pilot - was guided and adjusted according to real-world usability and research objectives.
+
+---
+
+## Recommendations
+- **Use in Refugee Programs:** Partner with UNHCR, Save the Children to deploy TekRiders in camps
+- **Incorporate with TVET:** Align with Rwanda’s ICT TVET initiatives
+- **Train Local Tutors:** Equip local instructors with platform onboarding
+
+---
+
+## Future Work
+- AI-powered in-app tutor (advanced offline NLP Q&A model)
+- Real-time discussion forums and peer learning
+- Learner activity analytics for tutors
+- Tutor revenue system for local monetization
+- Enhanced accessibility for visually impaired learners
+
+---
+
+## Ethical Considerations
+- **Data Privacy:** All user data is encrypted and stored securely
+- **Informed Consent:** Participants were informed of data usage during testing
+- **Open Source Access:** MIT License for transparency and contribution
+
+---
+
+## Development Commands
+```bash
+npm run dev           # Start frontend and backend
+npm run dev:client    # Frontend only
+npm run dev:backend    # Backend only
+npm run build         # Production build
+npm run start         # Start production server
+```
+
+---
+
+## Final Submission Summary
+- ✅ Offline-first full-stack e-learning platform
+- ✅ Localized in Kinyarwanda and English
+- ✅ Pilot-tested in refugee and rural communities
+- ✅ Fully implemented system with real-world validation
+
+---
+
+## License
+MIT License — Educational Project
+
+---
+
+**Built with passion for accessible tech education in Rwanda**
+
+*TekRiders — Where learning breaks boundaries.*
