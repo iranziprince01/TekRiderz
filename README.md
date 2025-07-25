@@ -104,6 +104,7 @@ TekRiderz/
 ## Screenshots
 - `Login and Role-Based Dashboards`
   <img width="512" height="288" alt="image" src="https://github.com/user-attachments/assets/a6b3bf92-5ed3-45eb-b479-fada89182daf" />
+  
 - `Tutor Course Creation Form`
   <img width="512" height="320" alt="image" src="https://github.com/user-attachments/assets/7fa14072-9d36-461d-9faa-b11c895746c4" />
 
@@ -115,7 +116,6 @@ TekRiderz/
 
 - `Gamified Quiz and Certificate Preview`
   <img width="1440" height="812" alt="image" src="https://github.com/user-attachments/assets/aa724238-237a-4610-98ce-374f7fb952fe" />
-
 
 ---
 
