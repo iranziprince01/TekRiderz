@@ -120,6 +120,7 @@ TekRiderz/
   <img width="1440" height="813" alt="image" src="https://github.com/user-attachments/assets/70ce4236-96ed-4484-8332-3228f57ed3d9" />
 
 - `Gamified Quiz and Certificate Preview`
+- 
   <img width="1440" height="812" alt="image" src="https://github.com/user-attachments/assets/aa724238-237a-4610-98ce-374f7fb952fe" />
 
 ---
