@@ -102,16 +102,21 @@ TekRiderz/
 ---
 
 ## Screenshots
+
 - `Login and Role-Based Dashboards`
+- 
   <img width="512" height="288" alt="image" src="https://github.com/user-attachments/assets/a6b3bf92-5ed3-45eb-b479-fada89182daf" />
   
 - `Tutor Course Creation Form`
+- 
   <img width="512" height="320" alt="image" src="https://github.com/user-attachments/assets/7fa14072-9d36-461d-9faa-b11c895746c4" />
 
 - `Admin Course Approval Panel`
+- 
   <img width="512" height="320" alt="image" src="https://github.com/user-attachments/assets/a4597e5c-9df3-4829-a489-28e248ebdd04" />
 
 - `Learner Course Enrollment and Offline Module Access`
+- 
   <img width="1440" height="813" alt="image" src="https://github.com/user-attachments/assets/70ce4236-96ed-4484-8332-3228f57ed3d9" />
 
 - `Gamified Quiz and Certificate Preview`
