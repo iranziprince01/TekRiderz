@@ -11,7 +11,9 @@ import {
   Shield,
   Award,
   BarChart3,
-  FileText
+  FileText,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -23,36 +25,54 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
-  const { user, logout } = useAuth();
+  const { user, logout, isOfflineMode } = useAuth();
   const { t, language } = useLanguage();
   const location = useLocation();
+  const [isOffline, setIsOffline] = React.useState(false);
+
+  // Detect offline mode
+  React.useEffect(() => {
+    const checkOfflineMode = () => {
+      const offline = isOfflineMode || !navigator.onLine;
+      setIsOffline(offline);
+    };
+
+    checkOfflineMode();
+    window.addEventListener('online', checkOfflineMode);
+    window.addEventListener('offline', checkOfflineMode);
+
+    return () => {
+      window.removeEventListener('online', checkOfflineMode);
+      window.removeEventListener('offline', checkOfflineMode);
+    };
+  }, [isOfflineMode]);
 
   // Navigation based on user role
   const getNavigation = () => {
     if (user?.role === 'admin') {
       return [
         { 
-          name: language === 'rw' ? 'Ikibaho' : 'Dashboard', 
+          name: t('nav.dashboard'), 
           href: '/dashboard', 
           icon: Home
         },
         { 
-          name: language === 'rw' ? 'Abakoresha' : 'Users', 
+          name: t('admin.users.title'), 
           href: '/dashboard/users', 
           icon: Users
         },
         { 
-          name: language === 'rw' ? 'Amasomo' : 'Courses', 
+          name: t('nav.coursesModeration'), 
           href: '/dashboard/courses', 
           icon: BookOpen
         },
         { 
-          name: language === 'rw' ? 'Ibipimo' : 'Analytics', 
+          name: t('nav.analytics'), 
           href: '/dashboard/analytics', 
           icon: BarChart3
         },
         { 
-          name: language === 'rw' ? 'Umwirondoro' : 'Profile', 
+          name: t('nav.profile'), 
           href: '/dashboard/profile', 
           icon: User
         }
@@ -62,22 +82,22 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
     if (user?.role === 'tutor') {
       return [
         { 
-          name: language === 'rw' ? 'Ikibaho' : 'Dashboard', 
+          name: t('nav.dashboard'), 
           href: '/dashboard', 
           icon: Home
         },
         { 
-          name: language === 'rw' ? 'Kora Isomo' : 'Create Course', 
+          name: t('nav.createCourse'), 
           href: '/dashboard/courses/new', 
           icon: Upload
         },
         { 
-          name: language === 'rw' ? 'Ibipimo' : 'Analytics', 
+          name: t('nav.analytics'), 
           href: '/dashboard/analytics', 
           icon: BarChart3
         },
         { 
-          name: language === 'rw' ? 'Umwirondoro' : 'Profile', 
+          name: t('nav.profile'), 
           href: '/dashboard/profile', 
           icon: User
         }
@@ -87,22 +107,22 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
     // Learner navigation
     return [
       { 
-        name: language === 'rw' ? 'Ikibaho' : 'Dashboard', 
+        name: t('nav.dashboard'), 
         href: '/dashboard', 
         icon: Home
       },
       { 
-        name: language === 'rw' ? 'Amasomo Yanjye' : 'My Courses', 
+        name: t('nav.myCourses'), 
         href: '/dashboard/courses', 
         icon: BookOpen
       },
       { 
-        name: language === 'rw' ? 'Icyemezo' : 'Certificates', 
+        name: t('nav.certificates'), 
         href: '/certificates', 
         icon: Award
       },
       { 
-        name: language === 'rw' ? 'Umwirondoro' : 'Profile', 
+        name: t('nav.profile'), 
         href: '/dashboard/profile', 
         icon: User
       }
@@ -124,21 +144,21 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
       case 'admin':
         return {
           icon: Shield,
-          label: language === 'rw' ? 'Umuyobozi' : 'Administrator',
+          label: t('admin.users.admin'),
           bgColor: 'bg-red-50 dark:bg-red-900/10',
           textColor: 'text-red-700 dark:text-red-300'
         };
       case 'tutor':
         return {
           icon: BookOpen,
-          label: language === 'rw' ? 'Umwarimu' : 'Tutor',
+          label: t('admin.users.tutor'),
           bgColor: 'bg-blue-50 dark:bg-blue-900/10',
           textColor: 'text-blue-700 dark:text-blue-300'
         };
       default:
         return {
           icon: User,
-          label: language === 'rw' ? 'Umunyeshuri' : 'Learner',
+          label: t('auth.learner'),
           bgColor: 'bg-green-50 dark:bg-green-900/10',
           textColor: 'text-green-700 dark:text-green-300'
         };
@@ -174,7 +194,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
               size="sm"
               onClick={onClose}
             >
-              <X className="h-5 w-5" />
+              <X className="w-5 h-5" />
             </Button>
           </div>
 
@@ -189,6 +209,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
               </div>
               <span>{roleConfig.label}</span>
             </div>
+            
+            {/* Offline Status Indicator */}
+            {isOffline && (
+              <div className="mt-2 flex items-center space-x-2 text-xs text-yellow-600 dark:text-yellow-400">
+                <WifiOff className="w-3 h-3" />
+                <span>Offline Mode</span>
+              </div>
+            )}
           </div>
 
           {/* Navigation */}
@@ -206,37 +234,29 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
                       ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
                       : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700'
                     }
+                    ${isOffline && item.href !== '/dashboard/profile' ? 'opacity-60' : ''}
                   `}
+                  title={isOffline && item.href !== '/dashboard/profile' ? 'Limited functionality in offline mode' : ''}
                 >
-                  <div className={`
-                    flex items-center justify-center w-6 h-6 mr-3
-                    ${isActive(item.href) 
-                      ? 'text-blue-600 dark:text-blue-400' 
-                      : 'text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-300'
-                    }
-                  `}>
-                    <item.icon className="h-4 w-4" />
-                  </div>
+                  <item.icon className="w-5 h-5 mr-3" />
                   <span className="flex-1">{item.name}</span>
+                  {isOffline && item.href !== '/dashboard/profile' && (
+                    <WifiOff className="w-3 h-3 text-yellow-500" />
+                  )}
                 </Link>
               ))}
             </nav>
           </div>
 
-          {/* Logout button */}
-          <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 p-4">
+          {/* Footer */}
+          <div className="p-4 border-t border-gray-200 dark:border-gray-700">
             <Button
+              onClick={logout}
               variant="ghost"
-              onClick={() => {
-                logout();
-                handleLinkClick();
-              }}
-              className="w-full justify-start text-gray-700 dark:text-gray-300 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/10"
+              className="w-full justify-start text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700"
             >
-              <div className="flex items-center justify-center w-6 h-6 mr-3">
-                <LogOut className="h-4 w-4" />
-              </div>
-              <span>{t('nav.logout')}</span>
+              <LogOut className="w-5 h-5 mr-3" />
+              {t('nav.logout')}
             </Button>
           </div>
         </div>

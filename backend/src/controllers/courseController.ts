@@ -7,8 +7,9 @@ import { logger } from '../utils/logger';
 import { ApiResponse, Progress } from '../types';
 import { quizGradingService } from '../services/quizGradingService';
 import { certificateService } from '../services/certificateService';
-import { gamificationService } from '../services/gamificationService';
+
 import { notificationService } from '../services/notificationService';
+import { databases } from '../config/database';
 
 export class CourseController {
   // Get all published courses
@@ -16,6 +17,9 @@ export class CourseController {
     try {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 10;
+      const search = req.query.search as string;
+      const category = req.query.category as string;
+      const level = req.query.level as string;
 
       // Use basic find method instead of findPublished
       const result = await courseModel.findAll({
@@ -23,76 +27,204 @@ export class CourseController {
         skip: (page - 1) * limit
       });
 
-      // Filter for published courses
-      const publishedCourses = result.docs.filter((course: any) => course.status === 'published');
+      // Filter for published and approved courses
+      const publishedCourses = result.docs.filter((course: any) => course.status === 'published' || course.status === 'approved');
 
-      // Check enrollment status for each course if user is authenticated
-      let coursesWithEnrollment = publishedCourses;
-      if (req.user) {
-        logger.info('Checking enrollment status for user:', { userId: req.user.id, coursesCount: publishedCourses.length });
-        
-        coursesWithEnrollment = await Promise.all(
-          publishedCourses.map(async (course: any) => {
-            try {
-              const enrollment = await enrollmentModel.findByUserAndCourse(req.user!.id, course._id || course.id);
-              const isEnrolled = !!enrollment;
-              
-              logger.info('Course enrollment check:', { 
-                courseId: course._id || course.id, 
-                courseTitle: course.title,
-                userId: req.user!.id,
-                isEnrolled,
-                enrollmentId: enrollment?._id,
-                progress: enrollment?.progress || 0
-              });
-              
-              return {
-                ...course,
-                isEnrolled,
-                enrollment: enrollment ? {
-                  id: enrollment._id,
-                  enrolledAt: enrollment.enrolledAt,
-                  progress: enrollment.progress || 0,
-                  status: enrollment.status
-                } : null,
-                progress: enrollment?.progress || 0
-              };
-            } catch (error) {
-              logger.warn('Failed to check enrollment for course:', { courseId: course._id || course.id, error });
-              return {
-                ...course,
-                isEnrolled: false,
-                enrollment: null,
-                progress: 0
-              };
+      // Enhanced enrollment data fetching for all users
+      logger.info('Fetching enrollment data for courses:', { coursesCount: publishedCourses.length });
+      
+      const coursesWithEnrollment = await Promise.all(
+        publishedCourses.map(async (course: any) => {
+          try {
+            // Validate course data structure
+            if (!course._id && !course.id) {
+              logger.warn('Course missing ID:', { course });
+              return null;
             }
-          })
+            
+            // Get real-time enrollment count from enrollments database
+            let enrollmentCount = 0;
+            let isEnrolled = false;
+            let enrollment = null;
+
+            try {
+              // Get course enrollments count
+              const enrollmentsResult = await databases.enrollments.view('enrollments', 'by_course', {
+                key: course._id || course.id,
+                include_docs: false,
+              });
+              enrollmentCount = enrollmentsResult.rows.length;
+
+                              // Check if current user is enrolled (if authenticated)
+                if (req.user) {
+                  logger.info('Checking enrollment for user:', {
+                    userId: req.user.id,
+                    courseId: course._id || course.id,
+                    courseTitle: course.title
+                  });
+                  
+                  const userEnrollment = await enrollmentModel.findByUserAndCourse(req.user.id, course._id || course.id);
+                  
+                  logger.info('Enrollment check result:', {
+                    userId: req.user.id,
+                    courseId: course._id || course.id,
+                    userEnrollment: userEnrollment ? {
+                      id: userEnrollment._id,
+                      status: userEnrollment.status,
+                      progress: userEnrollment.progress
+                    } : null
+                  });
+                  
+                  // Fallback: If findByUserAndCourse returns null, try direct database query
+                  if (!userEnrollment) {
+                    logger.info('Trying fallback enrollment check...');
+                    try {
+                      const fallbackResult = await databases.enrollments.view('enrollments', 'by_user', {
+                        key: req.user.id,
+                        include_docs: true,
+                      });
+                      
+                      const fallbackEnrollment = fallbackResult.rows.find(row => {
+                        const doc = row.doc as any;
+                        return doc && doc.courseId === (course._id || course.id);
+                      });
+                      
+                      if (fallbackEnrollment && fallbackEnrollment.doc) {
+                        const doc = fallbackEnrollment.doc as any;
+                        logger.info('Fallback enrollment found:', {
+                          userId: req.user.id,
+                          courseId: course._id || course.id,
+                          enrollmentId: doc._id
+                        });
+                        isEnrolled = true;
+                        enrollment = {
+                          id: doc._id,
+                          enrolledAt: doc.enrolledAt,
+                          progress: doc.progress || 0,
+                          status: doc.status
+                        };
+                      }
+                    } catch (fallbackError) {
+                      logger.warn('Fallback enrollment check failed:', fallbackError);
+                    }
+                  } else {
+                    isEnrolled = true;
+                    enrollment = {
+                      id: userEnrollment._id,
+                      enrolledAt: userEnrollment.enrolledAt,
+                      progress: userEnrollment.progress || 0,
+                      status: userEnrollment.status
+                    };
+                  }
+                }
+            } catch (enrollmentError) {
+              logger.warn('Failed to fetch enrollment data for course:', { 
+                courseId: course._id || course.id, 
+                error: enrollmentError 
+              });
+              // Fallback to stored enrollment count
+              enrollmentCount = course.enrollmentCount || 0;
+            }
+
+            logger.info('Course enrollment data:', { 
+              courseId: course._id || course.id, 
+              courseTitle: course.title,
+              enrollmentCount,
+              isEnrolled: req.user ? isEnrolled : 'N/A (not authenticated)',
+              userId: req.user?.id || 'anonymous'
+            });
+            
+            // Debug: Log final values before return
+            logger.info('Final course object values:', {
+              courseId: course._id || course.id,
+              courseTitle: course.title,
+              finalIsEnrolled: isEnrolled,
+              finalEnrollment: enrollment,
+              finalProgress: enrollment?.progress || 0
+            });
+            
+            // Create a clean course object without enrollment properties first
+            const { isEnrolled: _, enrollment: __, progress: ___, ...cleanCourse } = course;
+            
+            // Build the final course object with enrollment data
+            const finalCourseObject = {
+              ...cleanCourse,
+              enrollmentCount, // Use real-time count
+              students: enrollmentCount, // For backward compatibility
+              isEnrolled: isEnrolled,
+              enrollment: enrollment,
+              progress: enrollment?.progress || 0
+            };
+            
+            // Debug: Log the final object being returned
+            logger.info('Final course object being returned:', {
+              courseId: course._id || course.id,
+              courseTitle: course.title,
+              hasIsEnrolled: 'isEnrolled' in finalCourseObject,
+              isEnrolledValue: finalCourseObject.isEnrolled,
+              hasEnrollment: 'enrollment' in finalCourseObject,
+              enrollmentValue: finalCourseObject.enrollment,
+              hasProgress: 'progress' in finalCourseObject,
+              progressValue: finalCourseObject.progress
+            });
+            
+            return finalCourseObject;
+          } catch (error) {
+            logger.warn('Failed to process course enrollment data:', { 
+              courseId: course._id || course.id, 
+              error 
+            });
+            return {
+              ...course,
+              enrollmentCount: course.enrollmentCount || 0,
+              students: course.enrollmentCount || 0,
+              isEnrolled: false,
+              enrollment: null,
+              progress: 0
+            };
+          }
+        })
+      );
+      
+      // Filter out null courses (invalid data)
+      const validCourses = coursesWithEnrollment.filter(course => course !== null);
+      
+      const enrolledCount = validCourses.filter((c: any) => c.isEnrolled).length;
+      logger.info('Enrollment data fetch complete:', { 
+        totalCourses: validCourses.length,
+        enrolledCourses: enrolledCount,
+        userId: req.user?.id || 'anonymous'
+      });
+
+      // Apply additional filters
+      let filteredCourses = validCourses;
+
+      if (category && category !== 'all') {
+        filteredCourses = filteredCourses.filter((course: any) => course.category === category);
+      }
+
+      if (level && level !== 'all') {
+        filteredCourses = filteredCourses.filter((course: any) => course.level === level);
+      }
+
+      if (search) {
+        const searchTerm = search.toLowerCase();
+        filteredCourses = filteredCourses.filter((course: any) => 
+          course.title.toLowerCase().includes(searchTerm) ||
+          course.description.toLowerCase().includes(searchTerm) ||
+          course.category.toLowerCase().includes(searchTerm)
         );
-        
-        const enrolledCount = coursesWithEnrollment.filter((c: any) => c.isEnrolled).length;
-        logger.info('Enrollment status check complete:', { 
-          userId: req.user.id, 
-          totalCourses: coursesWithEnrollment.length,
-          enrolledCourses: enrolledCount
-        });
-      } else {
-        coursesWithEnrollment = publishedCourses.map((course: any) => ({
-          ...course,
-          isEnrolled: false,
-          enrollment: null,
-          progress: 0
-        }));
       }
 
       const response: ApiResponse = {
         success: true,
         data: {
-          courses: coursesWithEnrollment,
+          courses: filteredCourses,
           pagination: {
             page,
             limit,
-            total: coursesWithEnrollment.length,
-            pages: Math.ceil(coursesWithEnrollment.length / limit)
+            total: filteredCourses.length,
+            pages: Math.ceil(filteredCourses.length / limit)
           }
         }
       };
@@ -618,15 +750,54 @@ export class CourseController {
 
       const instructorCourses = result.docs.filter((course: any) => course.instructorId === req.user!.id);
 
+      // Enhance courses with real-time enrollment data
+      const enhancedCourses = await Promise.all(
+        instructorCourses.map(async (course: any) => {
+          try {
+            // Get real-time enrollment count
+            let enrollmentCount = 0;
+            try {
+              const enrollmentsResult = await databases.enrollments.view('enrollments', 'by_course', {
+                key: course._id || course.id,
+                include_docs: false,
+              });
+              enrollmentCount = enrollmentsResult.rows.length;
+            } catch (enrollmentError) {
+              logger.warn('Failed to fetch enrollment count for instructor course:', { 
+                courseId: course._id || course.id, 
+                error: enrollmentError 
+              });
+              enrollmentCount = course.enrollmentCount || 0;
+            }
+
+            return {
+              ...course,
+              enrollmentCount,
+              students: enrollmentCount, // For backward compatibility
+            };
+          } catch (error) {
+            logger.warn('Failed to enhance instructor course with enrollment data:', { 
+              courseId: course._id || course.id, 
+              error 
+            });
+            return {
+              ...course,
+              enrollmentCount: course.enrollmentCount || 0,
+              students: course.enrollmentCount || 0,
+            };
+          }
+        })
+      );
+
       const response: ApiResponse = {
         success: true,
         data: {
-          courses: instructorCourses,
+          courses: enhancedCourses,
           pagination: {
             page,
             limit,
-            total: instructorCourses.length,
-            pages: Math.ceil(instructorCourses.length / limit)
+            total: enhancedCourses.length,
+            pages: Math.ceil(enhancedCourses.length / limit)
           }
         }
       };
@@ -714,6 +885,16 @@ export class CourseController {
       };
 
       const enrollment = await enrollmentModel.create(enrollmentData);
+
+      // Sync course enrollment count using the sync service
+      try {
+        const { EnrollmentSyncService } = await import('../services/enrollmentSyncService');
+        await EnrollmentSyncService.syncCourseEnrollmentCount(courseId);
+        logger.info('Course enrollment count synced after enrollment:', { courseId });
+      } catch (syncError) {
+        logger.warn('Failed to sync course enrollment count:', { courseId, error: syncError });
+        // Don't fail the enrollment if sync fails
+      }
 
       // Create initial progress record
       try {
@@ -1407,7 +1588,7 @@ export class CourseController {
 
         // Award gamification points for quiz completion
         try {
-          await gamificationService.awardQuizCompletion(req.user.id, courseId, quizId, score, passed);
+  
         } catch (gamificationError) {
           logger.warn('Failed to award gamification points for quiz completion:', gamificationError);
         }
@@ -1997,6 +2178,23 @@ export class CourseController {
         }
       }
 
+      // Get instructor avatar if instructorId exists
+      let instructorAvatar = null;
+      if (course.instructorId) {
+        try {
+          const instructor = await userModel.findById(course.instructorId);
+          if (instructor && instructor.avatar) {
+            instructorAvatar = instructor.avatar;
+          }
+        } catch (error) {
+          logger.warn('Failed to fetch instructor avatar:', { 
+            courseId, 
+            instructorId: course.instructorId, 
+            error 
+          });
+        }
+      }
+
       // Calculate course statistics
       const totalSections = course.sections?.length || 0;
       const totalLessons = course.totalLessons || 0;
@@ -2083,6 +2281,8 @@ export class CourseController {
             thumbnail: course.thumbnail,
             previewVideo: course.previewVideo,
             instructorName: course.instructorName,
+            instructorId: course.instructorId,
+            instructorAvatar,
             category: course.category,
             level: course.level,
             language: course.language,
@@ -2394,15 +2594,7 @@ export class CourseController {
         lastWatched: new Date().toISOString()
       } as Partial<Progress>);
 
-      // Award gamification points for lesson completion
-      if (isCompleted || percentageWatched >= 90) {
-        try {
-          await gamificationService.awardModuleCompletion(req.user.id, courseId, lessonId);
-          logger.info('🎯 Gamification points awarded for lesson completion');
-        } catch (gamificationError) {
-          logger.warn('⚠️ Failed to award gamification points for lesson completion:', gamificationError);
-        }
-      }
+
 
       // Verify the update was successful
       const verificationProgress = await progressModel.findByUserAndCourse(req.user.id, courseId);
@@ -2470,12 +2662,7 @@ export class CourseController {
       // Update current lesson
       await progressModel.updateCurrentLesson(req.user.id, courseId, lessonId);
 
-      // Award gamification points for module completion
-      try {
-        await gamificationService.awardModuleCompletion(req.user.id, courseId, lessonId);
-      } catch (gamificationError) {
-        logger.warn('Failed to award gamification points for module completion:', gamificationError);
-      }
+
 
       // Calculate overall progress
       const course = await courseModel.findById(courseId);
@@ -2501,12 +2688,7 @@ export class CourseController {
           // Mark enrollment as completed
           await enrollmentModel.completeEnrollment(enrollment._id!);
           
-          // Award gamification points for course completion
-          try {
-            await gamificationService.awardCourseCompletion(req.user.id, courseId);
-          } catch (gamificationError) {
-            logger.warn('Failed to award gamification points for course completion:', gamificationError);
-          }
+
           
           // Get course and user data for certificate
           const course = await courseModel.findById(courseId);
@@ -2563,6 +2745,257 @@ export class CourseController {
       res.status(500).json({
         success: false,
         error: 'Failed to mark lesson as complete'
+      });
+    }
+  }
+
+  // Get published courses with enrollment data
+  async getPublishedCourses(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const search = req.query.search as string;
+      const category = req.query.category as string;
+      const level = req.query.level as string;
+
+      // Build query parameters
+      const queryParams: any = {
+        include_docs: true,
+        limit,
+        skip: (page - 1) * limit,
+      };
+
+      // Add search filter if provided
+      if (search) {
+        queryParams.startkey = search;
+        queryParams.endkey = search + '\ufff0';
+      }
+
+      // Get all courses and filter for published/approved status
+      const result = await databases.courses.view('courses', 'all_courses', {
+        include_docs: true,
+        limit: 1000, // Get all courses to filter properly
+      });
+
+      // Filter for published and approved courses (both should be available to learners)
+      const publishedCourses = result.rows
+        .map((row: any) => row.doc)
+        .filter((course: any) => course.status === 'published' || course.status === 'approved');
+
+
+
+      // Apply pagination manually
+      const startIndex = (page - 1) * limit;
+      const endIndex = startIndex + limit;
+      const paginatedCourses = publishedCourses.slice(startIndex, endIndex);
+
+
+
+
+
+      // Enhanced enrollment data fetching for all users
+      let coursesWithEnrollment = paginatedCourses;
+      
+      // Always fetch enrollment data for course cards (for all user types)
+      logger.info('Fetching enrollment data for courses:', { coursesCount: paginatedCourses.length });
+      
+      coursesWithEnrollment = await Promise.all(
+        paginatedCourses.map(async (course: any) => {
+          try {
+            // Validate course data structure
+            if (!course._id && !course.id) {
+              logger.warn('Course missing ID:', { course });
+              return null;
+            }
+            
+            // Get real-time enrollment count from enrollments database
+            let enrollmentCount = 0;
+            let isEnrolled = false;
+            let enrollment = null;
+
+            try {
+              // Get course enrollments count
+              const enrollmentsResult = await databases.enrollments.view('enrollments', 'by_course', {
+                key: course._id || course.id,
+                include_docs: false,
+              });
+              enrollmentCount = enrollmentsResult.rows.length;
+
+              // Check if current user is enrolled (if authenticated)
+              if (req.user) {
+                logger.info('Checking enrollment for user:', {
+                  userId: req.user.id,
+                  courseId: course._id || course.id,
+                  courseTitle: course.title
+                });
+                
+                const userEnrollment = await enrollmentModel.findByUserAndCourse(req.user.id, course._id || course.id);
+                
+                logger.info('Enrollment check result:', {
+                  userId: req.user.id,
+                  courseId: course._id || course.id,
+                  userEnrollment: userEnrollment ? {
+                    id: userEnrollment._id,
+                    status: userEnrollment.status,
+                    progress: userEnrollment.progress
+                  } : null
+                });
+                
+                // Fallback: If findByUserAndCourse returns null, try direct database query
+                if (!userEnrollment) {
+                  logger.info('Trying fallback enrollment check...');
+                  try {
+                    const fallbackResult = await databases.enrollments.view('enrollments', 'by_user', {
+                      key: req.user.id,
+                      include_docs: true,
+                    });
+                    
+                    const fallbackEnrollment = fallbackResult.rows.find(row => {
+                      const doc = row.doc as any;
+                      return doc && doc.courseId === (course._id || course.id);
+                    });
+                    
+                    if (fallbackEnrollment && fallbackEnrollment.doc) {
+                      const doc = fallbackEnrollment.doc as any;
+                      logger.info('Fallback enrollment found:', {
+                        userId: req.user.id,
+                        courseId: course._id || course.id,
+                        enrollmentId: doc._id
+                      });
+                      isEnrolled = true;
+                      enrollment = {
+                        id: doc._id,
+                        enrolledAt: doc.enrolledAt,
+                        progress: doc.progress || 0,
+                        status: doc.status
+                      };
+                    }
+                  } catch (fallbackError) {
+                    logger.warn('Fallback enrollment check failed:', fallbackError);
+                  }
+                } else {
+                  isEnrolled = true;
+                  enrollment = {
+                    id: userEnrollment._id,
+                    enrolledAt: userEnrollment.enrolledAt,
+                    progress: userEnrollment.progress || 0,
+                    status: userEnrollment.status
+                  };
+                }
+              }
+            } catch (enrollmentError) {
+              logger.warn('Failed to fetch enrollment data for course:', { 
+                courseId: course._id || course.id, 
+                error: enrollmentError 
+              });
+              // Fallback to stored enrollment count
+              enrollmentCount = course.enrollmentCount || 0;
+            }
+
+            logger.info('Course enrollment data:', { 
+              courseId: course._id || course.id, 
+              courseTitle: course.title,
+              enrollmentCount,
+              isEnrolled: req.user ? isEnrolled : 'N/A (not authenticated)',
+              userId: req.user?.id || 'anonymous'
+            });
+            
+            // Debug: Log final values before return
+            logger.info('Final course object values:', {
+              courseId: course._id || course.id,
+              courseTitle: course.title,
+              finalIsEnrolled: isEnrolled,
+              finalEnrollment: enrollment,
+              finalProgress: enrollment?.progress || 0
+            });
+            
+            // Create a clean course object without enrollment properties first
+            const { isEnrolled: _, enrollment: __, progress: ___, ...cleanCourse } = course;
+            
+            // Build the final course object with enrollment data
+            const finalCourseObject = {
+              ...cleanCourse,
+              enrollmentCount, // Use real-time count
+              students: enrollmentCount, // For backward compatibility
+              isEnrolled: isEnrolled,
+              enrollment: enrollment,
+              progress: enrollment?.progress || 0
+            };
+            
+            // Debug: Log the final object being returned
+            logger.info('Final course object being returned:', {
+              courseId: course._id || course.id,
+              courseTitle: course.title,
+              hasIsEnrolled: 'isEnrolled' in finalCourseObject,
+              isEnrolledValue: finalCourseObject.isEnrolled,
+              hasEnrollment: 'enrollment' in finalCourseObject,
+              enrollmentValue: finalCourseObject.enrollment,
+              hasProgress: 'progress' in finalCourseObject,
+              progressValue: finalCourseObject.progress
+            });
+            
+            return finalCourseObject;
+          } catch (error) {
+            logger.warn('Failed to process course enrollment data:', { 
+              courseId: course._id || course.id, 
+              error 
+            });
+            return {
+              ...course,
+              enrollmentCount: course.enrollmentCount || 0,
+              students: course.enrollmentCount || 0,
+              isEnrolled: false,
+              enrollment: null,
+              progress: 0
+            };
+          }
+        })
+      );
+      
+      // Filter out null courses (invalid data)
+      const validCourses = coursesWithEnrollment.filter(course => course !== null);
+      
+      const enrolledCount = validCourses.filter((c: any) => c.isEnrolled).length;
+      logger.info('Enrollment data fetch complete:', { 
+        totalCourses: validCourses.length,
+        enrolledCourses: enrolledCount,
+        userId: req.user?.id || 'anonymous'
+      });
+
+      // Apply additional filters
+      let filteredCourses = validCourses;
+
+      if (category && category !== 'all') {
+        filteredCourses = filteredCourses.filter((course: any) => course.category === category);
+      }
+
+      if (level && level !== 'all') {
+        filteredCourses = filteredCourses.filter((course: any) => course.level === level);
+      }
+
+      // Get total count for pagination (including both published and approved courses)
+      const total = publishedCourses.length;
+      const pages = Math.ceil(total / limit);
+
+      const response: ApiResponse = {
+        success: true,
+        data: {
+          courses: filteredCourses,
+          pagination: {
+            page,
+            limit,
+            total,
+            pages,
+          },
+        },
+      };
+
+      res.json(response);
+    } catch (error) {
+      logger.error('Failed to retrieve courses:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to retrieve courses'
       });
     }
   }

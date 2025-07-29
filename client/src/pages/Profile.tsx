@@ -21,7 +21,9 @@ import {
   RefreshCw,
   CheckCircle,
   Settings,
-  BookOpen
+  BookOpen,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
 
 interface ProfileData {
@@ -39,13 +41,30 @@ interface ProfileData {
 }
 
 const Profile: React.FC = () => {
-  const { user } = useAuth();
+  const { user, isOfflineMode } = useAuth();
   const { t } = useLanguage();
+  
+  // Safe translation function that handles missing keys gracefully
+  const safeT = (key: string, fallback?: string) => {
+    try {
+      const translation = t(key);
+      // If the translation returns the key itself, it means the key is missing
+      if (translation === key) {
+        console.warn(`Missing translation key: ${key}`);
+        return fallback || key;
+      }
+      return translation;
+    } catch (error) {
+      console.warn(`Translation error for key: ${key}`, error);
+      return fallback || key;
+    }
+  };
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isOffline, setIsOffline] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -66,88 +85,212 @@ const Profile: React.FC = () => {
     }
   }, [message]);
 
+  // Detect offline mode
+  useEffect(() => {
+    const checkOfflineMode = () => {
+      const offline = isOfflineMode || !navigator.onLine;
+      setIsOffline(offline);
+      if (offline) {
+        console.log('Profile page in offline mode');
+      }
+    };
+
+    checkOfflineMode();
+    window.addEventListener('online', checkOfflineMode);
+    window.addEventListener('offline', checkOfflineMode);
+
+    return () => {
+      window.removeEventListener('online', checkOfflineMode);
+      window.removeEventListener('offline', checkOfflineMode);
+    };
+  }, [isOfflineMode]);
+
   const loadProfile = async () => {
     try {
       setLoading(true);
       
-      // Try to fetch fresh profile data from the backend
-      try {
-        const response = await apiClient.getProfile();
+      // Check if we're in offline mode
+      if (isOffline || isOfflineMode || !navigator.onLine) {
+        console.log('Loading profile from offline cache');
+        setIsOffline(true);
         
-        if (response.success && response.data && response.data.user) {
-          const backendUser = response.data.user;
-          
-          const profileData = {
-            id: backendUser.id || backendUser._id,
-            name: backendUser.name || '',
-            email: backendUser.email || '',
-            phone: backendUser.profile?.phone || '',
-            bio: backendUser.profile?.bio || '',
-            location: backendUser.profile?.location || '',
-            role: backendUser.role || 'learner',
-            status: backendUser.status || 'active',
-            createdAt: backendUser.createdAt || new Date().toISOString(),
-            lastLogin: backendUser.lastLogin || new Date().toISOString(),
-            avatar: backendUser.avatar || backendUser.profile?.avatar || ''
-          };
-          
-          setProfile(profileData);
-          setFormData({
-            name: profileData.name,
-            email: profileData.email,
-            phone: profileData.phone,
-            bio: profileData.bio,
-            location: profileData.location,
-            avatar: profileData.avatar
+        // Try to load from cached user data
+        if (user?.id) {
+          const cachedUser = await getCachedUser(user.id);
+          if (cachedUser) {
+            console.log('Profile loaded from cache');
+            setProfile({
+              id: cachedUser.id,
+              name: cachedUser.name,
+              email: cachedUser.email,
+              phone: (cachedUser as any).phone,
+              bio: (cachedUser as any).bio,
+              location: (cachedUser as any).location,
+              role: cachedUser.role,
+              status: (cachedUser as any).status || 'active',
+              createdAt: (cachedUser as any).createdAt || new Date().toISOString(),
+              lastLogin: (cachedUser as any).lastLogin,
+              avatar: cachedUser.avatar || undefined
+            });
+            setFormData({
+              name: cachedUser.name,
+              email: cachedUser.email,
+              phone: (cachedUser as any).phone || '',
+              bio: (cachedUser as any).bio || '',
+              location: (cachedUser as any).location || '',
+              avatar: cachedUser.avatar || ''
+            });
+            setLoading(false);
+            return;
+          }
+        }
+        
+        // Fallback to AuthContext user data
+        if (user) {
+          console.log('Using AuthContext user data as fallback');
+          setProfile({
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            phone: (user as any).phone,
+            bio: (user as any).bio,
+            location: (user as any).location,
+            role: user.role,
+            status: 'active',
+            createdAt: new Date().toISOString(),
+            lastLogin: new Date().toISOString(),
+            avatar: user.avatar || undefined
           });
+          setFormData({
+            name: user.name,
+            email: user.email,
+            phone: (user as any).phone || '',
+            bio: (user as any).bio || '',
+            location: (user as any).location || '',
+            avatar: user.avatar || ''
+          });
+          setLoading(false);
           return;
         }
-      } catch (backendError) {
-        console.warn('Backend profile fetch failed, using auth context:', backendError);
+        
+        setLoading(false);
+        setMessage({ type: 'error', text: 'Unable to load profile data while offline' });
+        return;
       }
 
-      // Fallback to auth context if backend fails
-      if (user) {
+      // Online mode - fetch fresh data
+      console.log('Loading profile from API');
+      const response = await apiClient.getProfile();
+      
+      console.log('API Response:', response);
+      
+      if (response.success && response.data) {
+        // The backend returns { data: { user: {...} } }
+        const userData = response.data.user || response.data;
+        console.log('Profile loaded from API, userData:', userData);
+        
+        // Handle different response structures
         const profileData = {
-          id: user.id || (user as any)._id || '',
-          name: user.name || '',
-          email: user.email || '',
-          phone: user.profile?.phone || '',
-          bio: user.profile?.bio || '',
-          location: user.profile?.location || '',
-          role: user.role || 'learner',
-          status: (user as any).status || 'active',
-          createdAt: (user as any).createdAt || new Date().toISOString(),
-          lastLogin: (user as any).lastLogin || new Date().toISOString(),
-          avatar: (user as any).avatar || user.profile?.avatar || ''
+          id: userData.id || userData._id || user?.id,
+          name: userData.name || userData.fullName || '',
+          email: userData.email || '',
+          phone: userData.phone || userData.profile?.phone || '',
+          bio: userData.bio || userData.profile?.bio || '',
+          location: userData.location || userData.profile?.location || '',
+          role: userData.role || 'learner',
+          status: userData.status || 'active',
+          createdAt: userData.createdAt || new Date().toISOString(),
+          lastLogin: userData.lastLogin || new Date().toISOString(),
+          avatar: userData.avatar || userData.profile?.avatar || ''
         };
+        
+        console.log('Processed profile data:', profileData);
         
         setProfile(profileData);
         setFormData({
           name: profileData.name,
           email: profileData.email,
-          phone: profileData.phone,
-          bio: profileData.bio,
-          location: profileData.location,
-          avatar: profileData.avatar
+          phone: profileData.phone || '',
+          bio: profileData.bio || '',
+          location: profileData.location || '',
+          avatar: profileData.avatar || ''
         });
         
-        // Cache user data for offline access (learners only)
-        if (user.role === 'learner') {
-          try {
-            await cacheUser(user);
-            console.log('✅ Profile data cached for offline access');
-          } catch (cacheError) {
-            console.warn('Failed to cache profile data:', cacheError);
-          }
+        // Cache the user data for offline access
+        try {
+          await cacheUser(userData);
+          console.log('Profile cached for offline access');
+        } catch (cacheError) {
+          console.warn('Failed to cache profile:', cacheError);
         }
+      } else {
+        console.error('API response indicates failure:', response);
+        throw new Error(response.message || response.error || 'Failed to load profile data');
       }
     } catch (error) {
-      console.error('Failed to load profile:', error);
-      setMessage({
-        type: 'error',
-        text: t('Failed to load profile. Please try again.')
-      });
+      console.error('Error loading profile:', error);
+      
+      // Try to load from cache as fallback
+      if (user?.id) {
+        try {
+          const cachedUser = await getCachedUser(user.id);
+          if (cachedUser) {
+            console.log('Loading from cache as fallback');
+            setProfile({
+              id: cachedUser.id,
+              name: cachedUser.name,
+              email: cachedUser.email,
+              phone: (cachedUser as any).phone,
+              bio: (cachedUser as any).bio,
+              location: (cachedUser as any).location,
+              role: cachedUser.role,
+              status: (cachedUser as any).status || 'active',
+              createdAt: (cachedUser as any).createdAt || new Date().toISOString(),
+              lastLogin: (cachedUser as any).lastLogin,
+              avatar: cachedUser.avatar || undefined
+            });
+            setFormData({
+              name: cachedUser.name,
+              email: cachedUser.email,
+              phone: (cachedUser as any).phone || '',
+              bio: (cachedUser as any).bio || '',
+              location: (cachedUser as any).location || '',
+              avatar: cachedUser.avatar || ''
+            });
+            return;
+          }
+        } catch (cacheError) {
+          console.warn('Failed to load from cache:', cacheError);
+        }
+      }
+      
+      // Final fallback to AuthContext user data
+      if (user) {
+        console.log('Using AuthContext user data as final fallback');
+        setProfile({
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          phone: (user as any).phone,
+          bio: (user as any).bio,
+          location: (user as any).location,
+          role: user.role,
+          status: 'active',
+          createdAt: new Date().toISOString(),
+          lastLogin: new Date().toISOString(),
+          avatar: user.avatar || undefined
+        });
+        setFormData({
+          name: user.name,
+          email: user.email,
+          phone: (user as any).phone || '',
+          bio: (user as any).bio || '',
+          location: (user as any).location || '',
+          avatar: user.avatar || ''
+        });
+      } else {
+        setMessage({ type: 'error', text: 'Failed to load profile data. Please try refreshing the page.' });
+      }
     } finally {
       setLoading(false);
     }
@@ -161,7 +304,7 @@ const Profile: React.FC = () => {
   const handleCancel = () => {
     setEditing(false);
     setMessage(null);
-    // Reset form data to original profile values
+    // Reset form data to original values
     if (profile) {
       setFormData({
         name: profile.name,
@@ -175,54 +318,64 @@ const Profile: React.FC = () => {
   };
 
   const handleSave = async () => {
+    if (isOffline) {
+      setMessage({ type: 'error', text: 'Cannot update profile while offline. Please connect to the internet and try again.' });
+      return;
+    }
+
     try {
       setSaving(true);
       setMessage(null);
 
-      const response = await apiClient.updateProfile({
-        name: formData.name,
-        avatar: formData.avatar,
-        profile: {
-          phone: formData.phone,
-          bio: formData.bio,
-          location: formData.location,
-          avatar: formData.avatar
-        }
-      });
-
+      const response = await apiClient.updateProfile(formData);
+      
       if (response.success) {
-        setMessage({
-          type: 'success',
-          text: t('Profile updated successfully!')
-        });
+        setProfile(prev => prev ? { ...prev, ...formData } : null);
         setEditing(false);
-        await loadProfile(); // Reload to get fresh data
+        setMessage({ type: 'success', text: 'Profile updated successfully' });
+        
+        // Update cached user data
+        if (user) {
+          const updatedUser = { ...user, ...formData };
+          await updateCachedUser(updatedUser);
+          console.log('Updated profile cached');
+        }
       } else {
-        throw new Error(response.error || t('Failed to update profile'));
+        throw new Error(response.message || 'Failed to update profile');
       }
     } catch (error) {
-      console.error('Profile update error:', error);
-      setMessage({
-        type: 'error',
-        text: error instanceof Error ? error.message : t('Failed to update profile')
-      });
+      console.error('Error updating profile:', error);
+      setMessage({ type: 'error', text: 'Failed to update profile. Please try again.' });
     } finally {
       setSaving(false);
     }
   };
 
-  const handleChange = (field: keyof typeof formData, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleAvatarUpload = (url: string) => {
-    setFormData(prev => ({
-      ...prev,
-      avatar: url
-    }));
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'active': return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400';
+      case 'inactive': return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400';
+      case 'suspended': return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400';
+      default: return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400';
+    }
+  };
+
+  const getRoleDisplayName = (role: string) => {
+    try {
+      switch (role.toLowerCase()) {
+        case 'learner': return safeT('profile.student', 'Student');
+        case 'tutor': return safeT('profile.instructor', 'Instructor');
+        case 'admin': return safeT('profile.administrator', 'Administrator');
+        default: return role;
+      }
+    } catch (error) {
+      console.warn('Translation error for role:', role, error);
+      return role;
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -233,16 +386,7 @@ const Profile: React.FC = () => {
         day: 'numeric'
       });
     } catch {
-      return t('Unknown');
-    }
-  };
-
-  const getRoleDisplayName = (role: string) => {
-    switch (role) {
-      case 'learner': return t('Learner');
-      case 'tutor': return t('Instructor');
-      case 'admin': return t('Administrator');
-      default: return role;
+      return safeT('profile.unknown', 'Unknown');
     }
   };
 
@@ -252,7 +396,7 @@ const Profile: React.FC = () => {
         <div className="text-center">
           <LoadingSpinner size="lg" className="text-blue-600 dark:text-blue-400" />
           <p className="text-gray-600 dark:text-gray-400 mt-4 text-lg">
-            {t('Loading your profile...')}
+            {safeT('profile.loading', 'Loading your profile...')}
           </p>
         </div>
       </div>
@@ -265,24 +409,45 @@ const Profile: React.FC = () => {
         <Card className="p-8 text-center max-w-md border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
           <User className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-            {t('Profile not found')}
+            Profile Not Found
           </h3>
           <p className="text-gray-600 dark:text-gray-400 mb-6">
-            {t('Unable to load your profile information')}
+            Unable to load your profile information. This might be due to a network issue or missing data.
           </p>
-          <Button 
-            onClick={loadProfile}
-            className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white"
-          >
-            {t('Try Again')}
-          </Button>
+          <div className="space-y-3">
+            <Button onClick={loadProfile} className="w-full">
+              Try Again
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={() => window.location.reload()} 
+              className="w-full"
+            >
+              Reload Page
+            </Button>
+          </div>
         </Card>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto">
+    <div className="space-y-8 max-w-4xl mx-auto p-6">
+      {/* Offline Indicator */}
+      {isOffline && (
+        <div className="bg-blue-50 dark:bg-blue-900/10 border-l-4 border-blue-400 rounded-r-lg p-3">
+          <div className="flex items-center space-x-2">
+            <WifiOff className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            <span className="text-blue-800 dark:text-blue-200 text-sm font-medium">
+              Offline Mode
+            </span>
+            <span className="text-blue-600 dark:text-blue-400 text-sm">
+              • Viewing cached data • Updates disabled
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900 border border-blue-200 dark:border-gray-700 rounded-2xl p-8">
         <div className="flex flex-col md:flex-row md:items-center gap-6">
@@ -290,7 +455,7 @@ const Profile: React.FC = () => {
           <div className="flex-shrink-0">
             {editing ? (
               <ProfilePictureUpload
-                onImageUploaded={handleAvatarUpload}
+                onImageUploaded={(url: string) => handleInputChange('avatar', url)}
                 currentImageUrl={formData.avatar}
                 userName={profile.name}
                 size="lg"
@@ -345,7 +510,7 @@ const Profile: React.FC = () => {
               </Badge>
               <Badge variant="success" className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 px-3 py-1">
                 <CheckCircle className="w-4 h-4 mr-2" />
-                {t('Active')}
+                {safeT('profile.active', 'Active')}
               </Badge>
             </div>
             <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
@@ -359,16 +524,17 @@ const Profile: React.FC = () => {
             {!editing ? (
               <Button
                 onClick={handleEdit}
+                disabled={isOffline}
                 className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white px-6 py-2"
               >
                 <Edit3 className="w-4 h-4 mr-2" />
-                {t('Edit Profile')}
+                {safeT('profile.editProfile', 'Edit Profile')}
               </Button>
             ) : (
               <div className="flex gap-2">
                 <Button
                   onClick={handleSave}
-                  disabled={saving}
+                  disabled={saving || isOffline}
                   className="bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 text-white px-4 py-2"
                 >
                   {saving ? (
@@ -376,7 +542,7 @@ const Profile: React.FC = () => {
                   ) : (
                     <Save className="w-4 h-4 mr-2" />
                   )}
-                  {t('Save')}
+                  {safeT('profile.save', 'Save')}
                 </Button>
                 <Button
                   onClick={handleCancel}
@@ -384,7 +550,7 @@ const Profile: React.FC = () => {
                   className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 px-4 py-2"
                 >
                   <X className="w-4 h-4 mr-2" />
-                  {t('Cancel')}
+                  {safeT('profile.cancel', 'Cancel')}
                 </Button>
               </div>
             )}
@@ -415,26 +581,27 @@ const Profile: React.FC = () => {
         <Card className="p-6 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
           <div className="flex items-center gap-2 mb-6">
             <User className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{t('Personal Information')}</h2>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{safeT('profile.personalInformation', 'Personal Information')}</h2>
           </div>
           
           <div className="space-y-6">
             {/* Name */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('Full Name')}
+                {safeT('profile.fullName', 'Full Name')}
               </label>
               {editing ? (
                 <Input
                   type="text"
                   value={formData.name}
-                  onChange={(e) => handleChange('name', e.target.value)}
+                  onChange={(e) => handleInputChange('name', e.target.value)}
+                  disabled={isOffline}
                   className="w-full border-gray-300 dark:border-gray-600 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400"
-                  placeholder={t('Enter your full name')}
+                  placeholder={safeT('profile.enterFullName', 'Enter your full name')}
                 />
               ) : (
                 <p className="text-gray-900 dark:text-white py-2 px-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                  {profile.name || t('Not provided')}
+                  {profile.name || safeT('profile.notProvided', 'Not provided')}
                 </p>
               )}
             </div>
@@ -442,32 +609,33 @@ const Profile: React.FC = () => {
             {/* Email */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('Email Address')}
+                {safeT('profile.emailAddress', 'Email Address')}
               </label>
               <p className="text-gray-900 dark:text-white py-2 px-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                 {profile.email}
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                {t('Email cannot be changed')}
+                {safeT('profile.emailCannotBeChanged', 'Email cannot be changed')}
               </p>
             </div>
 
             {/* Phone */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('Phone Number')}
+                {safeT('profile.phoneNumber', 'Phone Number')}
               </label>
               {editing ? (
                 <Input
                   type="tel"
                   value={formData.phone}
-                  onChange={(e) => handleChange('phone', e.target.value)}
+                  onChange={(e) => handleInputChange('phone', e.target.value)}
+                  disabled={isOffline}
                   className="w-full border-gray-300 dark:border-gray-600 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400"
-                  placeholder={t('Enter your phone number')}
+                  placeholder={safeT('profile.enterPhoneNumber', 'Enter your phone number')}
                 />
               ) : (
                 <p className="text-gray-900 dark:text-white py-2 px-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                  {profile.phone || t('Not provided')}
+                  {profile.phone || safeT('profile.notProvided', 'Not provided')}
                 </p>
               )}
             </div>
@@ -475,19 +643,20 @@ const Profile: React.FC = () => {
             {/* Location */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('Location')}
+                {safeT('profile.location', 'Location')}
               </label>
               {editing ? (
                 <Input
                   type="text"
                   value={formData.location}
-                  onChange={(e) => handleChange('location', e.target.value)}
+                  onChange={(e) => handleInputChange('location', e.target.value)}
+                  disabled={isOffline}
                   className="w-full border-gray-300 dark:border-gray-600 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400"
-                  placeholder={t('Enter your location')}
+                  placeholder={safeT('profile.enterLocation', 'Enter your location')}
                 />
               ) : (
                 <p className="text-gray-900 dark:text-white py-2 px-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                  {profile.location || t('Not provided')}
+                  {profile.location || safeT('profile.notProvided', 'Not provided')}
                 </p>
               )}
             </div>
@@ -500,26 +669,27 @@ const Profile: React.FC = () => {
           <Card className="p-6 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
             <div className="flex items-center gap-2 mb-6">
               <BookOpen className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{t('About')}</h2>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{safeT('profile.about', 'About')}</h2>
             </div>
             
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('Bio')}
+                {safeT('profile.bio', 'Bio')}
               </label>
               {editing ? (
                 <textarea
                   value={formData.bio}
-                  onChange={(e) => handleChange('bio', e.target.value)}
+                  onChange={(e) => handleInputChange('bio', e.target.value)}
                   rows={4}
+                  disabled={isOffline}
                   className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400 resize-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  placeholder={t('Tell us about yourself...')}
+                  placeholder={safeT('profile.tellUsAboutYourself', 'Tell us about yourself...')}
                 />
               ) : (
                 <div className="text-gray-900 dark:text-white py-3 px-3 bg-gray-50 dark:bg-gray-700 rounded-lg min-h-[100px]">
                   {profile.bio || (
                     <span className="text-gray-500 dark:text-gray-400 italic">
-                      {t('No bio provided yet')}
+                      {safeT('profile.noBioProvidedYet', 'No bio provided yet')}
                     </span>
                   )}
                 </div>
@@ -531,14 +701,14 @@ const Profile: React.FC = () => {
           <Card className="p-6 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
             <div className="flex items-center gap-2 mb-6">
               <Settings className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{t('Account Information')}</h2>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{safeT('profile.accountInformation', 'Account Information')}</h2>
             </div>
             
             <div className="space-y-4">
               <div className="flex items-center justify-between py-3 border-b border-gray-100 dark:border-gray-700">
                 <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('Member Since')}</span>
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{safeT('profile.memberSince', 'Member Since')}</span>
                 </div>
                 <span className="text-sm text-gray-900 dark:text-white">{formatDate(profile.createdAt)}</span>
               </div>
@@ -546,22 +716,14 @@ const Profile: React.FC = () => {
               <div className="flex items-center justify-between py-3 border-b border-gray-100 dark:border-gray-700">
                 <div className="flex items-center gap-2">
                   <RefreshCw className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('Last Login')}</span>
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{safeT('profile.lastLogin', 'Last Login')}</span>
                 </div>
                 <span className="text-sm text-gray-900 dark:text-white">
-                  {profile.lastLogin ? formatDate(profile.lastLogin) : t('Unknown')}
+                  {profile.lastLogin ? formatDate(profile.lastLogin) : safeT('profile.unknown', 'Unknown')}
                 </span>
               </div>
               
-              <div className="flex items-center justify-between py-3">
-                <div className="flex items-center gap-2">
-                  <User className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('Account Status')}</span>
-                </div>
-                <Badge variant="success" className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-xs">
-                  {t('Active')}
-                </Badge>
-              </div>
+
             </div>
           </Card>
         </div>

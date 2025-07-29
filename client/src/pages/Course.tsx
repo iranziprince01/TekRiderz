@@ -5,18 +5,19 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { 
   apiClient, 
   getCourseProgress, 
-  getCourseQuizzes, 
-  submitQuiz
+  getCourseQuizzes
 } from '../utils/api';
 import { getPassingScore } from '../utils/quizSettings';
 import { useProgressService } from '../services/progressService';
 import { 
   cacheModule, 
-  getCachedModulesByCourse, 
-  getCourseOffline,
-  cacheLearnerData,
   cacheCourse,
-  ensureCourseOfflineAccess
+  ensureCourseOfflineAccess,
+  getEnrolledCoursesOffline,
+  cacheEnrolledCourses,
+  getCourseOffline,
+  autoCacheCourseOnAccess,
+  forceCacheAllEnrolledCourses
 } from '../offline/cacheService';
 import { getOfflineCourseData } from '../offline/offlineEssentials';
 import { getCoursePermissions } from '../utils/coursePermissions';
@@ -44,6 +45,8 @@ interface Course {
   totalLessons?: number;
   totalDuration?: number;
   instructorName: string;
+  instructorId?: string;
+  instructorAvatar?: string;
   learningObjectives?: string[];
 }
 
@@ -57,7 +60,7 @@ interface Module {
   pdfUrl?: string; // PDF lecture notes URL
   order: number;
   isCompleted: boolean;
-  isUnlocked: boolean;
+  isUnlocked: boolean; // Required for component compatibility
   nextModuleId?: string;
   hasQuiz?: boolean;
 }
@@ -75,7 +78,7 @@ interface Quiz {
   isCompleted: boolean;
   bestScore?: number;
     attempts: number;
-  isUnlocked: boolean;
+  isUnlocked: boolean; // Required for component compatibility
   settings?: {
     timeLimit?: number;
     passingScore: number;
@@ -149,6 +152,49 @@ const Course: React.FC = () => {
     }
   }, [courseId]); // Only depend on courseId, not fetchCourseData
 
+  // Proactive caching: Cache all enrolled courses when user is online
+  useEffect(() => {
+    const cacheAllEnrolledCourses = async () => {
+      if (user?.role === 'learner' && navigator.onLine && !isOfflineMode) {
+        try {
+          console.log('🔄 Proactive caching: Caching all enrolled courses for offline access...');
+          const result = await forceCacheAllEnrolledCourses(user);
+          if (result.success) {
+            console.log('✅ Proactive caching completed:', result.message);
+          } else {
+            console.warn('⚠️ Proactive caching failed:', result.message);
+          }
+        } catch (error) {
+          console.warn('⚠️ Proactive caching error:', error);
+        }
+      }
+    };
+
+    // Cache courses after a short delay to avoid blocking the UI
+    const timeoutId = setTimeout(cacheAllEnrolledCourses, 2000);
+    
+    return () => clearTimeout(timeoutId);
+  }, [user, isOfflineMode]);
+
+  // Auto-cache current course when accessed (if enrolled)
+  useEffect(() => {
+    const autoCacheCurrentCourse = async () => {
+      if (courseData && user?.role === 'learner' && courseData.isEnrolled && navigator.onLine && !isOfflineMode) {
+        try {
+          console.log('🔄 Auto-caching current course for offline access...');
+          await autoCacheCourseOnAccess(courseData.course, courseData.modules, user);
+          console.log('✅ Current course auto-cached successfully');
+        } catch (error) {
+          console.warn('⚠️ Auto-caching current course failed:', error);
+        }
+      }
+    };
+    
+    // Cache after a short delay to ensure course data is loaded
+    const timeoutId = setTimeout(autoCacheCurrentCourse, 2000);
+    return () => clearTimeout(timeoutId);
+  }, [courseData, user, isOfflineMode]);
+
   // Handle success message from navigation
   useEffect(() => {
     if (location.state?.message) {
@@ -190,23 +236,23 @@ const Course: React.FC = () => {
     setLoading(true);
     setError('');
 
-    // Check if we're in offline mode and user is a learner
-    if ((isOfflineMode || !navigator.onLine) && user?.role === 'learner') {
+    // Check if we're in offline mode (for all users, not just learners)
+    if (isOfflineMode || !navigator.onLine) {
       console.log('🔄 Loading cached course data (offline mode)');
       setIsOffline(true);
       
       try {
-        // First, ensure the course is available offline
-        const offlineCourse = await ensureCourseOfflineAccess(courseId!);
+        // First, try to get the course directly from cache
+        const cachedCourse = await getCourseOffline(courseId!);
         
-        if (offlineCourse) {
-          console.log('📚 Ensuring offline course access:', offlineCourse.title);
+        if (cachedCourse) {
+          console.log('📚 Found cached course:', cachedCourse.title);
           
           // Use the enhanced offline course data function
           const offlineData = await getOfflineCourseData(courseId!);
           
           if (offlineData) {
-            console.log('📚 Found cached course:', offlineData.course.title);
+            console.log('📚 Found cached course data:', offlineData.course.title);
             
             // Create course data with cached information
             const courseData: CourseData = {
@@ -226,7 +272,7 @@ const Course: React.FC = () => {
               modules: offlineData.modules,
               quizzes: [], // No quizzes in offline mode
               grades: [], // No grades in offline mode
-              isEnrolled: true, // Assume enrolled for offline access
+              isEnrolled: offlineData.course.isEnrolled || false,
               userProgress: {
                 completedLessons: offlineData.modules.filter(m => m.isCompleted).length,
                 totalLessons: offlineData.modules.length,
@@ -246,7 +292,7 @@ const Course: React.FC = () => {
           }
         }
         
-        // If we get here, something went wrong
+        // If we get here, the course is not cached
         setError('Course not available offline. Please connect online to access this course.');
         setLoading(false);
         return;
@@ -395,7 +441,7 @@ const Course: React.FC = () => {
                     pdfUrl: lesson.content.documentUrl || lesson.content.pdfUrl, // Include PDF URL if available (check both documentUrl and pdfUrl)
                     order: moduleOrder,
                     isCompleted,
-                    isUnlocked: isFirstModule || prevModuleCompleted,
+                    isUnlocked: true, // All modules are unlocked by default
                     nextModuleId: undefined, // Will be set below
                     hasQuiz: !!(lesson.quiz || section.moduleQuiz)
                   });
@@ -409,14 +455,10 @@ const Course: React.FC = () => {
         }
       }
 
-      // Set next module IDs and fix unlock logic
+      // Set next module IDs
       modules.forEach((module, index) => {
         if (index < modules.length - 1) {
           module.nextModuleId = modules[index + 1].id;
-        }
-        // Fix unlock logic: unlock next module if current is completed
-        if (index > 0) {
-          module.isUnlocked = modules[index - 1].isCompleted;
         }
       });
 
@@ -473,7 +515,8 @@ const Course: React.FC = () => {
             isCompleted: quizScore?.passed || false,
             bestScore: quizScore?.bestPercentage,
             attempts: quizScore?.totalAttempts || 0,
-            isUnlocked: true, // Always unlocked regardless of module completion
+            isUnlocked: true,
+
             settings: {
               timeLimit: quiz.timeLimit,
               passingScore: getPassingScore(quiz.passingScore),
@@ -508,7 +551,7 @@ const Course: React.FC = () => {
                   isCompleted: quizScore?.passed || false,
                   bestScore: quizScore?.bestPercentage,
                   attempts: quizScore?.totalAttempts || 0,
-                  isUnlocked: true // Always unlocked
+                  isUnlocked: true
                 });
               }
             });
@@ -532,7 +575,7 @@ const Course: React.FC = () => {
               isCompleted: quizScore?.passed || false,
               bestScore: quizScore?.bestPercentage,
               attempts: quizScore?.totalAttempts || 0,
-              isUnlocked: true // Always unlocked
+              isUnlocked: true
             });
           }
         });
@@ -553,7 +596,7 @@ const Course: React.FC = () => {
           isCompleted: finalScore?.passed || false,
           bestScore: finalScore?.bestPercentage,
           attempts: finalScore?.totalAttempts || 0,
-          isUnlocked: true // Always unlocked regardless of module completion
+          isUnlocked: true
         });
       }
 
@@ -603,9 +646,7 @@ const Course: React.FC = () => {
       console.log('All quizzes loaded:', {
         totalQuizzes: quizzes.length,
         moduleQuizzes: quizzes.filter(q => q.type === 'module').length,
-        finalAssessments: quizzes.filter(q => q.type === 'final').length,
-        unlockedQuizzes: quizzes.filter(q => q.isUnlocked).length,
-        allUnlocked: quizzes.every(q => q.isUnlocked)
+        finalAssessments: quizzes.filter(q => q.type === 'final').length
       });
 
       // Grades are now handled by CourseAssessments component
@@ -655,8 +696,7 @@ const Course: React.FC = () => {
         console.log('Fixing module completion inconsistency: progress is 100% but not all modules marked complete');
         adjustedModules = modules.map(module => ({
           ...module,
-            isCompleted: true,
-          isUnlocked: true
+          isCompleted: true
         }));
         
         // Recalculate completed modules after fixing the inconsistency
@@ -682,8 +722,7 @@ const Course: React.FC = () => {
       if (finalProgress === 100 && finalCompletedModules < adjustedModules.length && adjustedModules.length > 0) {
         adjustedModules = adjustedModules.map(module => ({
           ...module,
-          isCompleted: true,
-          isUnlocked: true
+          isCompleted: true
         }));
         
         console.log('Final consistency check: forced all modules to completed state');
@@ -712,8 +751,7 @@ const Course: React.FC = () => {
               if (finalProgress === 100) {
                 adjustedModules = adjustedModules.map(module => ({
                   ...module,
-                  isCompleted: true,
-              isUnlocked: true
+                  isCompleted: true
                 }));
               }
             }
@@ -787,45 +825,41 @@ const Course: React.FC = () => {
 
       setCourseData(finalCourseData);
 
-      // Cache course data for offline access (learners only)
-      if (user?.role === 'learner' && isEnrolled) {
+      // Auto-cache course data for offline access with enhanced error handling
+      try {
+        console.log('🔄 Auto-caching course for offline access:', {
+          courseId: course.id || course._id,
+          courseTitle: course.title,
+          modulesCount: adjustedModules.length,
+          userId: user?.id
+        });
+        
+        await autoCacheCourseOnAccess(course, adjustedModules, user);
+        console.log('✅ Course auto-cached successfully for offline access');
+        
+        // Verify caching was successful
         try {
-          console.log('💾 Caching course data for offline access...');
-          
-          // Cache the course
-          const courseForCache = {
-            ...course,
-            _id: course.id || course._id,
-            id: course.id || course._id,
-            isEnrolled: true,
-            enrollment: {
-              id: `enrollment_${course.id || course._id}`,
-              enrolledAt: new Date().toISOString(),
-              progress: userProgress.overallProgress,
-              status: 'active'
-            },
-            offlineAccessible: true,
-            lastCached: new Date().toISOString()
-          };
-          
-          await cacheCourse(courseForCache);
-          
-          // Cache modules
-          for (const module of adjustedModules) {
-            const moduleForCache = {
-              ...module,
-              _id: module.id,
-              courseId: course.id || course._id,
-              isCompleted: module.isCompleted,
-              isUnlocked: module.isUnlocked
-            };
-            await cacheModule(moduleForCache);
+          const courseId = course.id || course._id;
+          if (!courseId) {
+            console.warn('⚠️ Course ID not found - cannot verify cache');
+            return;
           }
-          
-          console.log(`✅ Cached course and ${adjustedModules.length} modules for offline access`);
-        } catch (cacheError) {
-          console.warn('Failed to cache course data for offline access:', cacheError);
+          const cachedCourse = await getCourseOffline(courseId);
+          if (cachedCourse) {
+            console.log('✅ Verification: Course successfully cached and retrievable offline');
+          } else {
+            console.warn('⚠️ Verification failed: Course not found in cache after auto-caching');
+          }
+        } catch (verifyError) {
+          console.warn('⚠️ Failed to verify course cache:', verifyError);
         }
+      } catch (cacheError: any) {
+        console.error('❌ Failed to auto-cache course data for offline access:', {
+          error: cacheError?.message || cacheError,
+          courseId: course.id || course._id,
+          courseTitle: course.title
+        });
+        // Don't block the UI if caching fails, but log the error
       }
 
     } catch (err: any) {
@@ -862,6 +896,32 @@ const Course: React.FC = () => {
 
   const { markComplete } = useProgressService();
 
+  const handleForceCacheAllCourses = async () => {
+    if (!user) return;
+    
+    try {
+      setLoading(true);
+      console.log('🔄 Force caching all enrolled courses...');
+      
+      const result = await forceCacheAllEnrolledCourses(user);
+      
+      if (result.success) {
+        setSuccess(`Successfully cached ${result.cached} courses for offline access!`);
+        console.log('✅ Force caching completed:', result.message);
+      } else {
+        setError(`Failed to cache courses: ${result.message}`);
+        console.error('❌ Force caching failed:', result.message);
+      }
+    } catch (error) {
+      console.error('❌ Error during force caching:', error);
+      setError('Failed to cache courses. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+
   const handleMarkModuleComplete = async (moduleId: string) => {
     if (!courseData) return;
 
@@ -875,11 +935,7 @@ const Course: React.FC = () => {
           if (module.id === moduleId) {
             return { ...module, isCompleted: true };
           }
-          // Unlock next module
-          const currentIndex = courseData.modules.findIndex(m => m.id === moduleId);
-          if (courseData.modules.findIndex(m => m.id === module.id) === currentIndex + 1) {
-            return { ...module, isUnlocked: true };
-          }
+
           return module;
         });
 
@@ -1007,8 +1063,21 @@ const Course: React.FC = () => {
     return (
       <div className="max-w-2xl mx-auto mt-8">
         <Alert variant="error">
-          <AlertCircle className="w-4 h-4" />
-          {error}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <AlertCircle className="w-4 h-4" />
+              <span>{error}</span>
+            </div>
+            {!isOffline && user?.role === 'learner' && (
+              <button
+                onClick={handleForceCacheAllCourses}
+                disabled={loading}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                {loading ? 'Caching...' : 'Cache All Courses'}
+              </button>
+            )}
+          </div>
         </Alert>
       </div>
     );
@@ -1054,6 +1123,7 @@ const Course: React.FC = () => {
                 course={courseData.course}
                 isEnrolled={courseData.isEnrolled}
                 userProgress={courseData.userProgress}
+
               />
             } 
           />
@@ -1120,11 +1190,15 @@ const ModulePageWrapper: React.FC<{
     );
   }
 
+    const currentModuleIndex = courseData.modules.findIndex(m => m.id === moduleId);
+    
     return (
     <ModulePage 
       module={module}
       courseId={courseData.course.id}
       onMarkComplete={onMarkComplete}
+      modules={courseData.modules}
+      currentModuleIndex={currentModuleIndex}
     />
   );
 };

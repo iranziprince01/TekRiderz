@@ -1,7 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { getLearnerOfflineStatus } from '../../offline/cacheService';
 import { getEssentialOfflineStatus } from '../../offline/offlineEssentials';
+import { Button } from '../ui/Button';
+import { LoadingSpinner } from '../ui/LoadingSpinner';
+import { 
+  Wifi, 
+  WifiOff, 
+  Database, 
+  HardDrive, 
+  RefreshCw, 
+  AlertTriangle,
+  CheckCircle,
+  X,
+  Info,
+  Settings
+} from 'lucide-react';
 
 interface CacheStatus {
   staticCache: boolean;
@@ -12,15 +27,36 @@ interface CacheStatus {
 
 interface OfflineStatusProps {
   showDetails?: boolean;
+  position?: 'bottom-right' | 'top-right' | 'bottom-left' | 'top-left';
 }
 
-const OfflineStatus: React.FC<OfflineStatusProps> = ({ showDetails = false }) => {
-  const { isOfflineMode } = useAuth();
+const OfflineStatus: React.FC<OfflineStatusProps> = ({ 
+  showDetails = false, 
+  position = 'bottom-right' 
+}) => {
+  const { isOfflineMode, user } = useAuth();
+  const { t } = useLanguage();
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [cacheStatus, setCacheStatus] = useState<CacheStatus | null>(null);
   const [learnerStatus, setLearnerStatus] = useState<any>(null);
   const [essentialStatus, setEssentialStatus] = useState<any>(null);
   const [isExpanded, setIsExpanded] = useState(showDetails);
+  const [isLoading, setIsLoading] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+
+  // Position classes
+  const getPositionClasses = () => {
+    switch (position) {
+      case 'top-right':
+        return 'top-4 right-4';
+      case 'bottom-left':
+        return 'bottom-4 left-4';
+      case 'top-left':
+        return 'top-4 left-4';
+      default:
+        return 'bottom-4 right-4';
+    }
+  };
 
   useEffect(() => {
     const checkCacheStatus = async () => {
@@ -46,8 +82,10 @@ const OfflineStatus: React.FC<OfflineStatusProps> = ({ showDetails = false }) =>
 
     const checkLearnerStatus = async () => {
       try {
-        const status = await getLearnerOfflineStatus();
-        setLearnerStatus(status);
+        if (user?.role === 'learner') {
+          const status = await getLearnerOfflineStatus();
+          setLearnerStatus(status);
+        }
       } catch (error) {
         console.error('Failed to check learner status:', error);
       }
@@ -62,18 +100,23 @@ const OfflineStatus: React.FC<OfflineStatusProps> = ({ showDetails = false }) =>
       }
     };
 
-    checkCacheStatus();
-    checkLearnerStatus();
-    checkEssentialStatus();
+    const updateAllStatus = async () => {
+      setIsLoading(true);
+      await Promise.all([
+        checkCacheStatus(),
+        checkLearnerStatus(),
+        checkEssentialStatus()
+      ]);
+      setLastUpdate(new Date());
+      setIsLoading(false);
+    };
 
-    const interval = setInterval(() => {
-      checkCacheStatus();
-      checkLearnerStatus();
-      checkEssentialStatus();
-    }, 30000); // Check every 30 seconds
+    updateAllStatus();
+
+    const interval = setInterval(updateAllStatus, 30000); // Check every 30 seconds
 
     return () => clearInterval(interval);
-  }, []);
+  }, [user?.role]);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -88,37 +131,85 @@ const OfflineStatus: React.FC<OfflineStatusProps> = ({ showDetails = false }) =>
     };
   }, []);
 
-  if (!isExpanded && !isOfflineMode && isOnline) {
-    return null; // Don't show when online and not in offline mode
+  // Don't show when online and not in offline mode, unless explicitly requested
+  if (!isExpanded && !isOfflineMode && isOnline && !showDetails) {
+    return null;
   }
 
+  const handleRefresh = () => {
+    window.location.reload();
+  };
+
+  const handleClearCache = async () => {
+    if (confirm('Are you sure you want to clear all cached data? This will remove offline content.')) {
+      try {
+        if ('caches' in window) {
+          const cacheNames = await caches.keys();
+          await Promise.all(cacheNames.map(name => caches.delete(name)));
+          setCacheStatus({
+            staticCache: false,
+            dynamicCache: false,
+            cacheEntries: 0,
+            lastUpdated: new Date().toLocaleTimeString()
+          });
+        }
+      } catch (error) {
+        console.error('Failed to clear cache:', error);
+      }
+    }
+  };
+
+  const getStatusColor = () => {
+    if (isOnline && !isOfflineMode) return 'bg-green-500';
+    if (isOnline && isOfflineMode) return 'bg-yellow-500';
+    return 'bg-red-500';
+  };
+
+  const getStatusText = () => {
+    if (isOnline && !isOfflineMode) return 'Online';
+    if (isOnline && isOfflineMode) return 'Online (Offline Mode)';
+    return 'Offline';
+  };
+
+  const getStatusIcon = () => {
+    if (isOnline && !isOfflineMode) return <Wifi className="w-4 h-4" />;
+    if (isOnline && isOfflineMode) return <Wifi className="w-4 h-4" />;
+    return <WifiOff className="w-4 h-4" />;
+  };
+
   return (
-    <div className={`fixed bottom-4 right-4 z-50 transition-all duration-300 ${
+    <div className={`fixed ${getPositionClasses()} z-50 transition-all duration-300 ${
       isExpanded ? 'w-80' : 'w-auto'
     }`}>
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
           <div className="flex items-center space-x-2">
-            <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-400' : 'bg-red-400'}`}></div>
+            <div className={`w-2 h-2 rounded-full ${getStatusColor()}`}></div>
             <span className="font-medium text-sm">
-              {isOnline ? 'Online' : 'Offline'} Mode
+              {getStatusText()} Mode
             </span>
           </div>
-          <button
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="text-white hover:text-gray-200 transition-colors"
-          >
-            {isExpanded ? '−' : '+'}
-          </button>
+          <div className="flex items-center space-x-2">
+            {isLoading && <LoadingSpinner size="sm" className="text-white" />}
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="text-white hover:text-gray-200 transition-colors"
+            >
+              {isExpanded ? <X className="w-4 h-4" /> : <Info className="w-4 h-4" />}
+            </button>
+          </div>
         </div>
 
         {/* Content */}
         {isExpanded && (
-          <div className="p-4 space-y-3">
+          <div className="p-4 space-y-4">
             {/* Network Status */}
             <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-600 dark:text-gray-300">Network:</span>
+              <div className="flex items-center space-x-2">
+                {getStatusIcon()}
+                <span className="text-gray-600 dark:text-gray-300">Network:</span>
+              </div>
               <span className={`font-medium ${isOnline ? 'text-green-600' : 'text-red-600'}`}>
                 {isOnline ? 'Connected' : 'Disconnected'}
               </span>
@@ -126,9 +217,12 @@ const OfflineStatus: React.FC<OfflineStatusProps> = ({ showDetails = false }) =>
 
             {/* Cache Status */}
             {cacheStatus && (
-              <>
+              <div className="space-y-3">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-300">Cache Status:</span>
+                  <div className="flex items-center space-x-2">
+                    <Database className="w-4 h-4 text-gray-400" />
+                    <span className="text-gray-600 dark:text-gray-300">Cache:</span>
+                  </div>
                   <span className={`font-medium ${cacheStatus.cacheEntries > 0 ? 'text-green-600' : 'text-yellow-600'}`}>
                     {cacheStatus.cacheEntries} entries
                   </span>
@@ -136,28 +230,52 @@ const OfflineStatus: React.FC<OfflineStatusProps> = ({ showDetails = false }) =>
                 
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600 dark:text-gray-300">Static Cache:</span>
-                  <span className={`font-medium ${cacheStatus.staticCache ? 'text-green-600' : 'text-red-600'}`}>
-                    {cacheStatus.staticCache ? 'Ready' : 'Missing'}
-                  </span>
+                  <div className="flex items-center space-x-1">
+                    {cacheStatus.staticCache ? (
+                      <CheckCircle className="w-3 h-3 text-green-500" />
+                    ) : (
+                      <AlertTriangle className="w-3 h-3 text-yellow-500" />
+                    )}
+                    <span className={`font-medium ${cacheStatus.staticCache ? 'text-green-600' : 'text-yellow-600'}`}>
+                      {cacheStatus.staticCache ? 'Ready' : 'Missing'}
+                    </span>
+                  </div>
                 </div>
                 
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600 dark:text-gray-300">Dynamic Cache:</span>
-                  <span className={`font-medium ${cacheStatus.dynamicCache ? 'text-green-600' : 'text-red-600'}`}>
-                    {cacheStatus.dynamicCache ? 'Ready' : 'Missing'}
-                  </span>
+                  <div className="flex items-center space-x-1">
+                    {cacheStatus.dynamicCache ? (
+                      <CheckCircle className="w-3 h-3 text-green-500" />
+                    ) : (
+                      <AlertTriangle className="w-3 h-3 text-yellow-500" />
+                    )}
+                    <span className={`font-medium ${cacheStatus.dynamicCache ? 'text-green-600' : 'text-yellow-600'}`}>
+                      {cacheStatus.dynamicCache ? 'Ready' : 'Missing'}
+                    </span>
+                  </div>
                 </div>
-              </>
+              </div>
             )}
 
             {/* Learner Status */}
-            {learnerStatus && (
-              <>
+            {learnerStatus && user?.role === 'learner' && (
+              <div className="space-y-3">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-300">Offline Data:</span>
-                  <span className={`font-medium ${learnerStatus.hasOfflineData ? 'text-green-600' : 'text-red-600'}`}>
-                    {learnerStatus.hasOfflineData ? 'Available' : 'Not Available'}
-                  </span>
+                  <div className="flex items-center space-x-2">
+                    <HardDrive className="w-4 h-4 text-gray-400" />
+                    <span className="text-gray-600 dark:text-gray-300">Offline Data:</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    {learnerStatus.hasOfflineData ? (
+                      <CheckCircle className="w-3 h-3 text-green-500" />
+                    ) : (
+                      <AlertTriangle className="w-3 h-3 text-red-500" />
+                    )}
+                    <span className={`font-medium ${learnerStatus.hasOfflineData ? 'text-green-600' : 'text-red-600'}`}>
+                      {learnerStatus.hasOfflineData ? 'Available' : 'Not Available'}
+                    </span>
+                  </div>
                 </div>
                 
                 <div className="flex items-center justify-between text-sm">
@@ -175,45 +293,67 @@ const OfflineStatus: React.FC<OfflineStatusProps> = ({ showDetails = false }) =>
                     </span>
                   </div>
                 )}
-              </>
+              </div>
             )}
 
             {/* Essential Status */}
             {essentialStatus && (
-              <>
+              <div className="space-y-3">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600 dark:text-gray-300">Local Data:</span>
-                  <span className={`font-medium ${essentialStatus.hasLocalData ? 'text-green-600' : 'text-red-600'}`}>
-                    {essentialStatus.hasLocalData ? 'Available' : 'Not Available'}
-                  </span>
+                  <div className="flex items-center space-x-1">
+                    {essentialStatus.hasLocalData ? (
+                      <CheckCircle className="w-3 h-3 text-green-500" />
+                    ) : (
+                      <AlertTriangle className="w-3 h-3 text-red-500" />
+                    )}
+                    <span className={`font-medium ${essentialStatus.hasLocalData ? 'text-green-600' : 'text-red-600'}`}>
+                      {essentialStatus.hasLocalData ? 'Available' : 'Not Available'}
+                    </span>
+                  </div>
                 </div>
                 
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600 dark:text-gray-300">Course Access:</span>
-                  <span className={`font-medium ${essentialStatus.canAccessCourses ? 'text-green-600' : 'text-yellow-600'}`}>
-                    {essentialStatus.canAccessCourses ? 'Ready' : 'Limited'}
-                  </span>
-                </div>
-                
-                {essentialStatus.lastSync && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600 dark:text-gray-300">Last Activity:</span>
-                    <span className="font-medium text-gray-800 dark:text-gray-200">
-                      {essentialStatus.lastSync}
+                  <div className="flex items-center space-x-1">
+                    {essentialStatus.canAccessCourses ? (
+                      <CheckCircle className="w-3 h-3 text-green-500" />
+                    ) : (
+                      <AlertTriangle className="w-3 h-3 text-yellow-500" />
+                    )}
+                    <span className={`font-medium ${essentialStatus.canAccessCourses ? 'text-green-600' : 'text-yellow-600'}`}>
+                      {essentialStatus.canAccessCourses ? 'Ready' : 'Limited'}
                     </span>
                   </div>
-                )}
-              </>
+                </div>
+              </div>
             )}
 
+            {/* Last Update */}
+            <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
+              Last updated: {lastUpdate.toLocaleTimeString()}
+            </div>
+
             {/* Actions */}
-            <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
-              <button
-                onClick={() => window.location.reload()}
-                className="w-full bg-blue-500 text-white py-2 px-3 rounded text-sm hover:bg-blue-600 transition-colors"
+            <div className="pt-2 border-t border-gray-200 dark:border-gray-700 space-y-2">
+              <Button
+                onClick={handleRefresh}
+                size="sm"
+                className="w-full"
               >
+                <RefreshCw className="w-4 h-4 mr-2" />
                 Refresh Page
-              </button>
+              </Button>
+              
+              <Button
+                onClick={handleClearCache}
+                variant="outline"
+                size="sm"
+                className="w-full"
+              >
+                <Settings className="w-4 h-4 mr-2" />
+                Clear Cache
+              </Button>
             </div>
           </div>
         )}

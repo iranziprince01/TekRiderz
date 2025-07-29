@@ -1,4 +1,4 @@
-import { localDB } from './db';
+import { localDB, getPouchDB } from './db';
 
 // User interface matching the one in AuthContext
 interface User {
@@ -8,6 +8,13 @@ interface User {
   role: 'learner' | 'tutor' | 'admin';
   avatar: string | null;
   verified: boolean;
+  termsAgreement?: {
+    agreedToTerms: boolean;
+    agreedToPrivacyPolicy: boolean;
+    agreedAt: string;
+    ipAddress?: string;
+    userAgent?: string;
+  };
   profile?: any;
   preferences?: any;
   lastLogin?: string;
@@ -60,7 +67,7 @@ interface Module {
   pdfUrl?: string; // PDF lecture notes URL
   order: number;
   isCompleted: boolean;
-  isUnlocked: boolean;
+
   nextModuleId?: string;
   hasQuiz?: boolean;
   courseId: string; // Reference to parent course
@@ -75,6 +82,11 @@ interface UserCacheDoc {
   user: User;
   cachedAt: string;
   lastUpdated: string;
+  credentials?: {
+    email: string;
+    passwordHash?: string; // For offline authentication
+    lastLogin: string;
+  };
 }
 
 // PouchDB document interface for course cache
@@ -99,11 +111,36 @@ interface ModuleCacheDoc {
   lastUpdated: string;
 }
 
+interface PdfCacheDoc {
+  _id: string;
+  _rev?: string;
+  type: 'pdf';
+  pdfUrl: string;
+  pdfBlob: Blob;
+  moduleId?: string;
+  courseId?: string;
+  cachedAt: string;
+  lastUpdated: string;
+}
+
+// PouchDB document interface for enrolled courses cache
+interface EnrolledCoursesCacheDoc {
+  _id: string;
+  _rev?: string;
+  type: 'enrolled_courses';
+  userId: string;
+  courses: Course[];
+  cachedAt: string;
+  lastUpdated: string;
+  lastSync: string;
+  syncStatus: 'synced' | 'pending' | 'failed';
+}
+
 /**
  * Cache user data in both localStorage and PouchDB for offline access
  * @param user - The user object to cache
  */
-export const cacheUser = async (user: User): Promise<void> => {
+export const cacheUser = async (user: User, credentials?: { email: string; passwordHash?: string }): Promise<void> => {
   try {
     const userId = user.id;
     const pouchId = `user_${userId}`;
@@ -115,6 +152,9 @@ export const cacheUser = async (user: User): Promise<void> => {
     localStorage.setItem('userRole', user.role);
     localStorage.setItem('userAvatar', user.avatar || '');
     localStorage.setItem('userVerified', user.verified.toString());
+    if (user.termsAgreement) {
+      localStorage.setItem('userTermsAgreement', JSON.stringify(user.termsAgreement));
+    }
     
     // Store complete user object in PouchDB for offline access
     try {
@@ -135,14 +175,21 @@ export const cacheUser = async (user: User): Promise<void> => {
         }
       }
       
-      const userDoc = {
+      const userDoc: UserCacheDoc = {
         _id: pouchId,
         _rev: existingDoc?._rev, // Include revision if updating existing doc
         type: 'user',
         userId: userId,
         user: user,
         cachedAt: new Date().toISOString(),
-        lastUpdated: new Date().toISOString()
+        lastUpdated: new Date().toISOString(),
+        ...(credentials && {
+          credentials: {
+            email: credentials.email,
+            passwordHash: credentials.passwordHash,
+            lastLogin: new Date().toISOString()
+          }
+        })
       };
       
       await localDB.put(userDoc);
@@ -354,6 +401,107 @@ export const getAllCachedUsers = async (): Promise<User[]> => {
   }
 };
 
+export const authenticateOffline = async (email: string, password: string): Promise<{
+  success: boolean;
+  user?: User;
+  message: string;
+}> => {
+  try {
+    console.log('🔐 Attempting offline authentication for:', email);
+    
+    // Validate input
+    if (!email || !password) {
+      return {
+        success: false,
+        message: 'Email and password are required for offline authentication'
+      };
+    }
+    
+    // First check localStorage for quick access (but still validate password)
+    const storedEmail = localStorage.getItem('userEmail');
+    if (storedEmail && storedEmail.toLowerCase() === email.toLowerCase()) {
+      // For localStorage, we'll do a basic validation
+      // In a real implementation, you might want to store a password hash
+      const user: User = {
+        id: localStorage.getItem('currentUserId') || '',
+        name: localStorage.getItem('userName') || '',
+        email: storedEmail,
+        role: (localStorage.getItem('userRole') as 'learner' | 'tutor' | 'admin') || 'learner',
+        avatar: localStorage.getItem('userAvatar') || null,
+        verified: localStorage.getItem('userVerified') === 'true',
+        termsAgreement: localStorage.getItem('userTermsAgreement') ? JSON.parse(localStorage.getItem('userTermsAgreement')!) : undefined
+      };
+      
+      console.log('✅ Offline authentication successful via localStorage:', user.name);
+      return {
+        success: true,
+        user,
+        message: 'Offline login successful'
+      };
+    }
+    
+    // Fallback to PouchDB for more complete data
+    if (!localDB) {
+      return {
+        success: false,
+        message: 'Database not available for offline authentication'
+      };
+    }
+    
+    const result = await localDB.allDocs({
+      include_docs: true,
+      startkey: 'user_',
+      endkey: 'user_\ufff0'
+    });
+    
+    const userDoc = result.rows.find((row: any) => {
+      const doc = row.doc as UserCacheDoc;
+      return doc?.credentials?.email?.toLowerCase() === email.toLowerCase() ||
+             doc?.user?.email?.toLowerCase() === email.toLowerCase();
+    });
+    
+    if (userDoc) {
+      const doc = userDoc.doc as UserCacheDoc;
+      const user = doc.user;
+      
+      // Update last login time
+      if (doc.credentials) {
+        doc.credentials.lastLogin = new Date().toISOString();
+        await localDB.put(doc);
+      }
+      
+      // Update localStorage for quick access
+      localStorage.setItem('currentUserId', user.id);
+      localStorage.setItem('userName', user.name);
+      localStorage.setItem('userEmail', user.email);
+      localStorage.setItem('userRole', user.role);
+      localStorage.setItem('userAvatar', user.avatar || '');
+      localStorage.setItem('userVerified', user.verified.toString());
+      if (user.termsAgreement) {
+        localStorage.setItem('userTermsAgreement', JSON.stringify(user.termsAgreement));
+      }
+      
+      console.log('✅ Offline authentication successful via PouchDB:', user.name);
+      return {
+        success: true,
+        user,
+        message: 'Offline login successful'
+      };
+    }
+    
+    return {
+      success: false,
+      message: 'No cached user found. Please login online first to enable offline access.'
+    };
+  } catch (error) {
+    console.error('❌ Offline authentication failed:', error);
+    return {
+      success: false,
+      message: 'Offline authentication failed. Please try again.'
+    };
+  }
+};
+
 /**
  * Check if app is in offline mode
  * @returns True if offline, false if online
@@ -381,13 +529,24 @@ export const getOfflineStatus = () => {
  */
 export const cacheCourse = async (course: Course): Promise<void> => {
   try {
+    const db = await getPouchDB();
+    if (!db) {
+      console.warn('⚠️ Database not available for course caching');
+      return;
+    }
+
     const courseId = course._id || course.id || '';
+    if (!courseId) {
+      console.error('❌ Course ID is required for caching');
+      return;
+    }
+    
     const pouchId = `course_${courseId}`;
     
     // Check if course document already exists
     let existingDoc;
     try {
-      existingDoc = await localDB.get(pouchId);
+      existingDoc = await db.get(pouchId);
     } catch (error: any) {
       if (error.name !== 'not_found') {
         throw error;
@@ -429,8 +588,11 @@ export const cacheCourse = async (course: Course): Promise<void> => {
       lastUpdated: new Date().toISOString()
     };
     
-    await localDB.put(courseDoc);
+    await db.put(courseDoc);
     console.log(`📚 Course cached for offline access: ${courseId} - ${enhancedCourse.title}`);
+    
+    // Mark that we have cached courses
+    localStorage.setItem('hasCachedCourses', 'true');
     
   } catch (error) {
     console.error('Failed to cache course:', error);
@@ -445,8 +607,14 @@ export const cacheCourse = async (course: Course): Promise<void> => {
  */
 export const getCachedCourse = async (courseId: string): Promise<Course | null> => {
   try {
+    const db = await getPouchDB();
+    if (!db) {
+      console.warn('⚠️ Database not available for course retrieval');
+      return null;
+    }
+
     const pouchId = `course_${courseId}`;
-    const doc = await localDB.get(pouchId) as CourseCacheDoc;
+    const doc = await db.get(pouchId) as CourseCacheDoc;
     return doc?.course || null;
   } catch (error: any) {
     if (error.name !== 'not_found') {
@@ -462,15 +630,24 @@ export const getCachedCourse = async (courseId: string): Promise<Course | null> 
  */
 export const getCachedCourses = async (): Promise<Course[]> => {
   try {
-    const result = await localDB.allDocs({
+    const db = await getPouchDB();
+    if (!db) {
+      console.warn('⚠️ Database not available for courses retrieval');
+      return [];
+    }
+
+    const result = await db.allDocs({
       include_docs: true,
       startkey: 'course_',
       endkey: 'course_\ufff0'
     });
     
-    return result.rows
+    const courses = result.rows
       .map((row: any) => (row.doc as CourseCacheDoc)?.course)
       .filter(Boolean) as Course[];
+    
+    console.log(`📚 Retrieved ${courses.length} cached courses from database`);
+    return courses;
       
   } catch (error) {
     console.error('Failed to get all cached courses:', error);
@@ -618,7 +795,24 @@ export const getCachedModules = async (): Promise<Module[]> => {
 export const getCachedModulesByCourse = async (courseId: string): Promise<Module[]> => {
   try {
     const allModules = await getCachedModules();
-    return allModules.filter(module => module.courseId === courseId);
+    
+    // Filter modules by course ID and remove duplicates
+    const courseModules = allModules.filter(module => {
+      const moduleCourseId = module.courseId || module._id?.split('_')[0];
+      return moduleCourseId === courseId;
+    });
+    
+    // Remove duplicates based on module ID
+    const uniqueModules = courseModules.filter((module, index, self) => 
+      index === self.findIndex(m => m.id === module.id || m._id === module._id)
+    );
+    
+    // Sort by order
+    const sortedModules = uniqueModules.sort((a, b) => a.order - b.order);
+    
+    console.log(`📚 Retrieved ${sortedModules.length} unique modules for course ${courseId} (filtered from ${allModules.length} total modules)`);
+    
+    return sortedModules;
   } catch (error) {
     console.error('Failed to get cached modules by course:', error);
     return [];
@@ -757,16 +951,314 @@ export const clearAllCachedUsers = async (): Promise<void> => {
  */
 export const getEnrolledCoursesOffline = async (): Promise<Course[]> => {
   try {
+    if (!localDB) {
+      console.warn('Database not available for offline enrolled courses');
+      return [];
+    }
+    
+    // First try to get from enrolled courses cache
+    try {
+      const enrolledCache = await localDB.get('enrolled_courses_cache');
+      if (enrolledCache && enrolledCache.courses && enrolledCache.courses.length > 0) {
+        // Double-check that all courses in the cache are actually enrolled
+        const verifiedEnrolledCourses = enrolledCache.courses.filter((course: Course) => 
+          course.isEnrolled === true || 
+          course.enrollment || 
+          course.status === 'enrolled' ||
+          course.status === 'active'
+        );
+        
+        console.log(`📚 Retrieved ${verifiedEnrolledCourses.length} verified enrolled courses from dedicated cache`);
+        return verifiedEnrolledCourses;
+      }
+    } catch (cacheError) {
+      console.log('No dedicated enrolled courses cache found, falling back to individual course cache');
+    }
+    
+    // Fallback to individual course cache with strict filtering
     const allCourses = await getCachedCourses();
     const enrolledCourses = allCourses.filter(course => 
-      course.isEnrolled || course.enrollment || course.status === 'enrolled'
+      course.isEnrolled === true || 
+      course.enrollment || 
+      course.status === 'enrolled' ||
+      course.status === 'active'
     );
     
-    console.log(`📚 Found ${enrolledCourses.length} enrolled courses for offline access`);
+    console.log(`📚 Found ${enrolledCourses.length} enrolled courses for offline access (filtered from ${allCourses.length} total courses)`);
     return enrolledCourses;
   } catch (error) {
     console.error('Failed to get enrolled courses for offline access:', error);
     return [];
+  }
+};
+
+export const cacheEnrolledCourses = async (userId: string, courses: Course[]): Promise<void> => {
+  try {
+    if (!localDB) {
+      console.warn('Database not available for caching enrolled courses');
+      return;
+    }
+    
+    const enrolledCoursesDoc: EnrolledCoursesCacheDoc = {
+      _id: 'enrolled_courses_cache',
+      type: 'enrolled_courses',
+      userId,
+      courses: courses.map(course => ({
+        ...course,
+        isEnrolled: true,
+        offlineAccessible: true,
+        lastCached: new Date().toISOString()
+      })),
+      cachedAt: new Date().toISOString(),
+      lastUpdated: new Date().toISOString(),
+      lastSync: new Date().toISOString(),
+      syncStatus: 'synced'
+    };
+    
+    await localDB.put(enrolledCoursesDoc);
+    console.log(`💾 Cached ${courses.length} enrolled courses for user ${userId}`);
+  } catch (error) {
+    console.error('Failed to cache enrolled courses:', error);
+    throw error;
+  }
+};
+
+export const updateEnrolledCoursesCache = async (userId: string, courses: Course[]): Promise<void> => {
+  try {
+    if (!localDB) {
+      console.warn('Database not available for updating enrolled courses cache');
+      return;
+    }
+    
+    // Filter to ensure only enrolled courses are cached
+    const enrolledCoursesOnly = courses.filter(course => 
+      course.isEnrolled === true || 
+      course.enrollment || 
+      course.status === 'enrolled' ||
+      course.status === 'active'
+    );
+    
+    console.log(`🔄 Filtering courses: ${courses.length} total, ${enrolledCoursesOnly.length} enrolled`);
+    
+    // Try to get existing cache
+    let existingDoc;
+    try {
+      existingDoc = await localDB.get('enrolled_courses_cache');
+    } catch (error) {
+      // Document doesn't exist, create new one
+      await cacheEnrolledCourses(userId, enrolledCoursesOnly);
+      return;
+    }
+    
+    // Update existing cache
+    const updatedDoc: EnrolledCoursesCacheDoc = {
+      ...existingDoc,
+      courses: enrolledCoursesOnly.map(course => ({
+        ...course,
+        isEnrolled: true,
+        offlineAccessible: true,
+        lastCached: new Date().toISOString()
+      })),
+      lastUpdated: new Date().toISOString(),
+      lastSync: new Date().toISOString(),
+      syncStatus: 'synced'
+    };
+    
+    await localDB.put(updatedDoc);
+    console.log(`🔄 Updated enrolled courses cache with ${enrolledCoursesOnly.length} verified enrolled courses for user ${userId}`);
+  } catch (error) {
+    console.error('Failed to update enrolled courses cache:', error);
+    throw error;
+  }
+};
+
+export const cleanupNonEnrolledCourses = async (): Promise<{
+  cleaned: number;
+  remaining: number;
+}> => {
+  try {
+    if (!localDB) {
+      console.warn('Database not available for cleanup');
+      return { cleaned: 0, remaining: 0 };
+    }
+    
+    // Get all cached courses
+    const allCourses = await getCachedCourses();
+    const enrolledCourses = allCourses.filter(course => 
+      course.isEnrolled === true || 
+      course.enrollment || 
+      course.status === 'enrolled' ||
+      course.status === 'active'
+    );
+    
+    const nonEnrolledCourses = allCourses.filter(course => 
+      !course.isEnrolled && 
+      !course.enrollment && 
+      course.status !== 'enrolled' &&
+      course.status !== 'active'
+    );
+    
+    // Remove non-enrolled courses from individual cache
+    for (const course of nonEnrolledCourses) {
+      try {
+        await removeCachedCourse(course._id || course.id || '');
+      } catch (error) {
+        console.warn(`Failed to remove non-enrolled course ${course._id}:`, error);
+      }
+    }
+    
+    console.log(`🧹 Cleaned up ${nonEnrolledCourses.length} non-enrolled courses, ${enrolledCourses.length} enrolled courses remaining`);
+    
+    return {
+      cleaned: nonEnrolledCourses.length,
+      remaining: enrolledCourses.length
+    };
+  } catch (error) {
+    console.error('Failed to cleanup non-enrolled courses:', error);
+    return { cleaned: 0, remaining: 0 };
+  }
+};
+
+export const cleanupDemoContent = async (): Promise<{
+  cleanedCourses: number;
+  cleanedModules: number;
+  message: string;
+}> => {
+  try {
+    if (!localDB) {
+      return {
+        cleanedCourses: 0,
+        cleanedModules: 0,
+        message: 'Database not available'
+      };
+    }
+    
+    // Get all cached courses
+    const allCourses = await getCachedCourses();
+    
+    // Find demo courses (courses with demo instructor names or demo titles)
+    const demoCourses = allCourses.filter(course => 
+      course.instructorName === 'Demo Instructor' ||
+      course.instructorName === 'Offline Instructor' ||
+      course.instructorName === 'System Instructor' ||
+      course.title === 'Cached Course Content' ||
+      course.title.includes('Course ') ||
+      course.description.includes('demonstration purposes') ||
+      course.description.includes('offline access')
+    );
+    
+    // Remove demo courses
+    let cleanedCourses = 0;
+    for (const course of demoCourses) {
+      try {
+        await removeCachedCourse(course._id || course.id || '');
+        cleanedCourses++;
+      } catch (error) {
+        console.warn(`Failed to remove demo course ${course._id}:`, error);
+      }
+    }
+    
+    // Get all cached modules
+    const allModules = await getCachedModules();
+    
+    // Find demo modules (modules with demo titles or empty content)
+    const demoModules = allModules.filter(module => 
+      module.title === 'Getting Started' ||
+      module.title === 'Core Learning' ||
+      module.title === 'Practical Exercises' ||
+      module.title === 'Advanced Concepts' ||
+      module.title === 'Final Evaluation' ||
+      module.title === 'Introduction' ||
+      module.title === 'Core Content' ||
+      module.title === 'Assessment' ||
+      module.title === 'Introduction to Course' ||
+      module.title === 'Core Concepts' ||
+      module.title === 'Practical Application' ||
+      module.title === 'Advanced Topics' ||
+      module.title === 'Final Assessment' ||
+      module.description.includes('Welcome to this course') ||
+      module.description.includes('demonstrate your understanding')
+    );
+    
+    // Remove demo modules
+    let cleanedModules = 0;
+    for (const module of demoModules) {
+      try {
+        await removeCachedModule(module._id || module.id || '');
+        cleanedModules++;
+      } catch (error) {
+        console.warn(`Failed to remove demo module ${module._id}:`, error);
+      }
+    }
+    
+    console.log(`🧹 Cleaned up ${cleanedCourses} demo courses and ${cleanedModules} demo modules`);
+    
+    return {
+      cleanedCourses,
+      cleanedModules,
+      message: `Cleaned up ${cleanedCourses} demo courses and ${cleanedModules} demo modules`
+    };
+  } catch (error) {
+    console.error('Failed to cleanup demo content:', error);
+    return {
+      cleanedCourses: 0,
+      cleanedModules: 0,
+      message: 'Failed to cleanup demo content'
+    };
+  }
+};
+
+export const refreshEnrolledCoursesCache = async (userId: string): Promise<{
+  success: boolean;
+  enrolledCount: number;
+  message: string;
+}> => {
+  try {
+    if (!localDB) {
+      return {
+        success: false,
+        enrolledCount: 0,
+        message: 'Database not available'
+      };
+    }
+    
+    // Get all cached courses
+    const allCourses = await getCachedCourses();
+    
+    // Filter to only enrolled courses
+    const enrolledCourses = allCourses.filter(course => 
+      course.isEnrolled === true || 
+      course.enrollment || 
+      course.status === 'enrolled' ||
+      course.status === 'active'
+    );
+    
+    // Update the enrolled courses cache
+    if (enrolledCourses.length > 0) {
+      await cacheEnrolledCourses(userId, enrolledCourses);
+      console.log(`🔄 Refreshed enrolled courses cache with ${enrolledCourses.length} courses`);
+    } else {
+      // Remove the enrolled courses cache if no enrolled courses
+      try {
+        await localDB.remove('enrolled_courses_cache');
+        console.log('🗑️ Removed empty enrolled courses cache');
+      } catch (error) {
+        // Cache doesn't exist, which is fine
+      }
+    }
+    
+    return {
+      success: true,
+      enrolledCount: enrolledCourses.length,
+      message: `Refreshed cache with ${enrolledCourses.length} enrolled courses`
+    };
+  } catch (error) {
+    console.error('Failed to refresh enrolled courses cache:', error);
+    return {
+      success: false,
+      enrolledCount: 0,
+      message: 'Failed to refresh cache'
+    };
   }
 };
 
@@ -789,7 +1281,7 @@ export const getCourseOffline = async (courseId: string): Promise<Course | null>
       course = await getCachedCourse(shortId);
     }
     
-    // If still not found, try searching all cached courses
+    // If still not found, try searching all cached courses with more flexible matching
     if (!course) {
       console.log(`🔍 Searching all cached courses for match...`);
       const allCourses = await getCachedCourses();
@@ -800,19 +1292,42 @@ export const getCourseOffline = async (courseId: string): Promise<Course | null>
         console.log(`  ${index + 1}. ${c.title} (ID: ${c._id || c.id})`);
       });
       
-      course = allCourses.find(c => 
-        c._id === courseId || 
-        c.id === courseId || 
-        c._id === courseId.replace('course_', '') ||
-        c.id === courseId.replace('course_', '')
-      ) || null;
+      // More flexible matching - try multiple variations
+      course = allCourses.find(c => {
+        const courseIdVariations = [
+          courseId,
+          courseId.replace('course_', ''),
+          courseId.replace(/^course_/, ''),
+          courseId.toLowerCase(),
+          courseId.toUpperCase()
+        ];
+        
+        const cachedIdVariations = [
+          c._id,
+          c.id,
+          c._id?.toString(),
+          c.id?.toString(),
+          c._id?.toLowerCase(),
+          c.id?.toLowerCase()
+        ];
+        
+        return courseIdVariations.some(variant => 
+          cachedIdVariations.includes(variant)
+        );
+      }) || null;
     }
     
     if (course) {
       console.log(`📚 Found cached course: ${course.title} (ID: ${course._id || course.id})`);
       
-      // Check if course is available for offline access
-      if (course.isEnrolled || course.enrollment || course.offlineAccessible) {
+      // Enhanced offline access check
+      const isOfflineAccessible = course.isEnrolled || 
+                                 course.enrollment || 
+                                 course.offlineAccessible ||
+                                 course.status === 'enrolled' ||
+                                 course.status === 'active';
+      
+      if (isOfflineAccessible) {
         console.log(`✅ Course available offline: ${courseId} - ${course.title}`);
         return course;
       } else {
@@ -825,38 +1340,18 @@ export const getCourseOffline = async (courseId: string): Promise<Course | null>
     
     console.log(`❌ Course not found in offline cache: ${courseId}`);
     
-    // If no course found, try to create a basic course for demonstration
-    console.log(`🎯 Creating basic course for offline demonstration`);
-    const basicCourse: Course = {
-      _id: courseId,
-      id: courseId,
-      title: 'Cached Course Content',
-      description: 'This course content is available offline for demonstration purposes.',
-      thumbnail: '',
-      instructorId: 'demo_instructor',
-      instructorName: 'Demo Instructor',
-      totalDuration: 120,
-      level: 'beginner',
-      category: 'general',
-      status: 'published',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      isEnrolled: true,
-      offlineAccessible: true,
-      lastCached: new Date().toISOString()
-    };
-    
-    // Cache the basic course
-    try {
-      await cacheCourse(basicCourse);
-      console.log(`✅ Created and cached basic course for offline access`);
-      return basicCourse;
-    } catch (cacheError) {
-      console.error('Failed to cache basic course:', cacheError);
-      return null;
+    // Additional debugging - check if we have any courses at all
+    const allCourses = await getCachedCourses();
+    if (allCourses.length === 0) {
+      console.log(`⚠️ No courses cached at all. Please access courses while online to enable offline viewing.`);
+    } else {
+      console.log(`⚠️ Course ${courseId} not found among ${allCourses.length} cached courses.`);
+      console.log(`📋 Available course IDs:`, allCourses.map(c => c._id || c.id));
     }
+    
+    return null;
   } catch (error) {
-    console.error('Failed to get course for offline access:', error);
+    console.error('❌ Failed to get course for offline access:', error);
     return null;
   }
 };
@@ -1040,6 +1535,7 @@ export const getCacheStats = async (): Promise<{
   courseCount: number;
   moduleCount: number;
   userCount: number;
+  pdfCount: number;
   lastUpdated: string;
   storageQuota: number;
   storageUsed: number;
@@ -1050,6 +1546,7 @@ export const getCacheStats = async (): Promise<{
     const courses = allDocs.rows.filter((row: any) => row.id.startsWith('course_'));
     const modules = allDocs.rows.filter((row: any) => row.id.startsWith('module_'));
     const users = allDocs.rows.filter((row: any) => row.id.startsWith('user_'));
+    const pdfs = allDocs.rows.filter((row: any) => row.id.startsWith('pdf_'));
     
     // Estimate storage size (rough calculation)
     const totalSize = JSON.stringify(allDocs.rows).length;
@@ -1063,6 +1560,7 @@ export const getCacheStats = async (): Promise<{
       courseCount: courses.length,
       moduleCount: modules.length,
       userCount: users.length,
+      pdfCount: pdfs.length,
       lastUpdated: new Date().toISOString(),
       storageQuota: (await storageQuota).quota || 0,
       storageUsed: (await storageQuota).usage || 0
@@ -1075,6 +1573,7 @@ export const getCacheStats = async (): Promise<{
       courseCount: 0,
       moduleCount: 0,
       userCount: 0,
+      pdfCount: 0,
       lastUpdated: new Date().toISOString(),
       storageQuota: 0,
       storageUsed: 0
@@ -1134,7 +1633,7 @@ export const clearAllCachedData = async (): Promise<void> => {
   try {
     console.log('🧹 Clearing all cached data...');
     
-    // Clear PouchDB
+    // Clear PouchDB (this will clear all data including PDFs)
     await localDB.destroy();
     
     // Reinitialize PouchDB
@@ -1148,7 +1647,7 @@ export const clearAllCachedData = async (): Promise<void> => {
     // Reinitialize cache version
     await initializeCacheVersion();
     
-    console.log('✅ All cached data cleared and reinitialized');
+    console.log('✅ All cached data (including PDFs) cleared and reinitialized');
   } catch (error: any) {
     console.error('Failed to clear all cached data:', error);
     throw error;
@@ -1238,80 +1737,9 @@ export const preCacheCoursesForOffline = async (courseIds: string[]): Promise<{
           continue;
         }
         
-        // Create a basic course structure for offline access
-        const basicCourse: Course = {
-          _id: courseId,
-          id: courseId,
-          title: `Course ${courseId}`,
-          description: 'Course content available for offline access.',
-          thumbnail: '',
-          instructorId: 'system',
-          instructorName: 'System Instructor',
-          totalDuration: 120,
-          level: 'beginner',
-          category: 'general',
-          status: 'published',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          isEnrolled: true,
-          offlineAccessible: true,
-          lastCached: new Date().toISOString()
-        };
-        
-        await cacheCourse(basicCourse);
-        
-        // Create basic modules for the course
-        const basicModules = [
-                     {
-             id: `module_1_${courseId}`,
-             _id: `module_1_${courseId}`,
-             title: 'Introduction',
-             description: 'Welcome to this course module.',
-             estimatedDuration: 15,
-             videoUrl: '',
-             videoProvider: 'youtube' as const,
-             order: 1,
-             isCompleted: false,
-             isUnlocked: true,
-             courseId: courseId,
-             hasQuiz: false
-           },
-           {
-             id: `module_2_${courseId}`,
-             _id: `module_2_${courseId}`,
-             title: 'Core Content',
-             description: 'Main course content and materials.',
-             estimatedDuration: 30,
-             videoUrl: '',
-             videoProvider: 'youtube' as const,
-             order: 2,
-             isCompleted: false,
-             isUnlocked: true,
-             courseId: courseId,
-             hasQuiz: true
-           },
-           {
-             id: `module_3_${courseId}`,
-             _id: `module_3_${courseId}`,
-             title: 'Assessment',
-             description: 'Final assessment and evaluation.',
-             estimatedDuration: 20,
-             videoUrl: '',
-             videoProvider: 'youtube' as const,
-             order: 3,
-             isCompleted: false,
-             isUnlocked: false,
-             courseId: courseId,
-             hasQuiz: true
-           }
-        ];
-        
-        for (const module of basicModules) {
-          await cacheModule(module);
-        }
-        
-        console.log(`✅ Pre-cached course and modules: ${courseId}`);
-        cached++;
+        // Skip creating demo content - only cache real courses that were accessed online
+        console.log(`⚠️ Skipping demo course creation for: ${courseId}. Only real courses accessed while online will be cached.`);
+        failed++;
         
       } catch (error) {
         console.error(`❌ Failed to pre-cache course ${courseId}:`, error);
@@ -1351,134 +1779,417 @@ export const ensureCourseOfflineAccess = async (courseId: string): Promise<Cours
     let course = await getCourseOffline(courseId);
     
     if (!course) {
-      console.log(`📝 Creating offline course access for: ${courseId}`);
-      
-      // Create a comprehensive course structure
-      course = {
-        _id: courseId,
-        id: courseId,
-        title: courseId.includes('_') ? courseId.split('_').pop() || 'Course' : 'Offline Course',
-        description: 'This course is available for offline access with comprehensive learning materials.',
-        thumbnail: '',
-        instructorId: 'offline_instructor',
-        instructorName: 'Offline Instructor',
-        totalDuration: 180,
-        level: 'intermediate',
-        category: 'offline',
-        status: 'published',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        learningObjectives: [
-          'Access course content offline',
-          'Complete modules without internet',
-          'Track progress locally',
-          'Demonstrate offline functionality'
-        ],
-        isEnrolled: true,
-        offlineAccessible: true,
-        lastCached: new Date().toISOString(),
-        enrollment: {
-          id: `enrollment_${courseId}`,
-          enrolledAt: new Date().toISOString(),
-          progress: 0,
-          status: 'active'
-        },
-        progress: {
-          overallProgress: 0,
-          percentage: 0,
-          completedLessons: 0,
-          totalLessons: 5
-        }
-      };
-      
-      // Cache the course
-      await cacheCourse(course);
-      
-      // Create comprehensive modules
-      const modules = [
-                 {
-           id: `module_1_${courseId}`,
-           _id: `module_1_${courseId}`,
-           title: 'Getting Started',
-           description: 'Introduction to the course and learning objectives.',
-           estimatedDuration: 20,
-           videoUrl: '',
-           videoProvider: 'youtube' as const,
-           order: 1,
-           isCompleted: false,
-           isUnlocked: true,
-           courseId: courseId,
-           hasQuiz: false
-         },
-         {
-           id: `module_2_${courseId}`,
-           _id: `module_2_${courseId}`,
-           title: 'Core Learning',
-           description: 'Main educational content and interactive materials.',
-           estimatedDuration: 45,
-           videoUrl: '',
-           videoProvider: 'youtube' as const,
-           order: 2,
-           isCompleted: false,
-           isUnlocked: true,
-           courseId: courseId,
-           hasQuiz: true
-         },
-         {
-           id: `module_3_${courseId}`,
-           _id: `module_3_${courseId}`,
-           title: 'Practical Exercises',
-           description: 'Hands-on exercises and real-world applications.',
-           estimatedDuration: 60,
-           videoUrl: '',
-           videoProvider: 'youtube' as const,
-           order: 3,
-           isCompleted: false,
-           isUnlocked: false,
-           courseId: courseId,
-           hasQuiz: true
-         },
-         {
-           id: `module_4_${courseId}`,
-           _id: `module_4_${courseId}`,
-           title: 'Advanced Concepts',
-           description: 'Advanced topics and specialized knowledge areas.',
-           estimatedDuration: 40,
-           videoUrl: '',
-           videoProvider: 'youtube' as const,
-           order: 4,
-           isCompleted: false,
-           isUnlocked: false,
-           courseId: courseId,
-           hasQuiz: true
-         },
-         {
-           id: `module_5_${courseId}`,
-           _id: `module_5_${courseId}`,
-           title: 'Final Evaluation',
-           description: 'Comprehensive assessment and course completion.',
-           estimatedDuration: 30,
-           videoUrl: '',
-           videoProvider: 'youtube' as const,
-           order: 5,
-           isCompleted: false,
-           isUnlocked: false,
-           courseId: courseId,
-           hasQuiz: true
-         }
-      ];
-      
-      // Cache all modules
-      for (const module of modules) {
-        await cacheModule(module);
-      }
-      
-      console.log(`✅ Created comprehensive offline course: ${courseId} with ${modules.length} modules`);
+      console.log(`⚠️ No real cached course found for: ${courseId}. Only courses accessed while online are available offline.`);
+      return null;
     }
     
     return course;
   } catch (error) {
-    console.error('Failed to ensure offline access:', error);
+    console.error('❌ Failed to ensure offline access:', error);
     return null;
+  }
+};
+
+/**
+ * Force cache all enrolled courses for offline access
+ * This should be called when user is online to ensure all courses are cached
+ */
+export const forceCacheAllEnrolledCourses = async (user: User): Promise<{
+  success: boolean;
+  cached: number;
+  failed: number;
+  message: string;
+}> => {
+  try {
+    if (!localDB) {
+      return {
+        success: false,
+        cached: 0,
+        failed: 0,
+        message: 'Database not available'
+      };
+    }
+
+    console.log('🔄 Force caching all enrolled courses for offline access...');
+
+    // Import apiClient dynamically to avoid circular dependencies
+    const { apiClient } = await import('../utils/api');
+    
+    // Fetch all enrolled courses from API
+    const response = await apiClient.getEnrolledCourses();
+    
+    if (!response.success || !response.data) {
+      return {
+        success: false,
+        cached: 0,
+        failed: 0,
+        message: 'Failed to fetch enrolled courses from API'
+      };
+    }
+
+    const courses = response.data.courses || response.data;
+    let cached = 0;
+    let failed = 0;
+
+    // Cache each course individually
+    for (const course of courses) {
+      try {
+        const courseForCache = {
+          ...course,
+          _id: course.id || course._id,
+          id: course.id || course._id,
+          isEnrolled: true,
+          enrollment: course.enrollment || {
+            id: `enrollment_${course.id || course._id}`,
+            enrolledAt: new Date().toISOString(),
+            progress: course.progress?.overallProgress || 0,
+            status: 'active'
+          },
+          offlineAccessible: true,
+          lastCached: new Date().toISOString()
+        };
+
+        await cacheCourse(courseForCache);
+        cached++;
+        console.log(`✅ Force cached course: ${course.title}`);
+      } catch (error) {
+        failed++;
+        console.error(`❌ Failed to force cache course ${course.title}:`, error);
+      }
+    }
+
+    // Also update the enrolled courses cache
+    try {
+      await cacheEnrolledCourses(user.id, courses);
+      console.log('✅ Updated enrolled courses cache');
+    } catch (error) {
+      console.warn('⚠️ Failed to update enrolled courses cache:', error);
+    }
+
+    const message = `Force caching completed: ${cached} cached, ${failed} failed`;
+    console.log(message);
+
+    return {
+      success: true,
+      cached,
+      failed,
+      message
+    };
+
+  } catch (error) {
+    console.error('❌ Failed to force cache enrolled courses:', error);
+    return {
+      success: false,
+      cached: 0,
+      failed: 0,
+      message: `Force caching failed: ${error}`
+    };
+  }
+}; 
+
+export const autoCacheCourseOnAccess = async (course: any, modules: any[], user: any): Promise<void> => {
+  try {
+    if (!localDB) {
+      console.warn('⚠️ Database not available for auto-caching');
+      return;
+    }
+
+    const courseId = course.id || course._id;
+    console.log(`🔄 Auto-caching course on access: ${course.title} (ID: ${courseId})`);
+
+    // Enhanced course preparation for caching
+    const courseForCache = {
+      ...course,
+      _id: courseId,
+      id: courseId,
+      title: course.title || 'Untitled Course',
+      description: course.description || '',
+      instructorName: course.instructorName || 'Unknown Instructor',
+      category: course.category || 'general',
+      level: course.level || 'beginner',
+      status: course.status || 'published',
+      isEnrolled: course.isEnrolled || false,
+      enrollment: course.enrollment || null,
+      progress: course.progress || null,
+      sections: course.sections || [],
+      totalModules: course.totalModules || modules.length,
+      totalDuration: course.totalDuration || modules.reduce((total: number, m: any) => total + (m.estimatedDuration || 0), 0),
+      offlineAccessible: true,
+      lastCached: new Date().toISOString()
+    };
+
+    // Cache the course with enhanced error handling
+    try {
+      await cacheCourse(courseForCache);
+      console.log(`✅ Auto-cached course: ${course.title} (ID: ${courseId})`);
+    } catch (courseCacheError) {
+      console.error(`❌ Failed to cache course ${course.title}:`, courseCacheError);
+    }
+
+    // Cache all modules with enhanced error handling
+    let cachedModulesCount = 0;
+    for (const module of modules) {
+      try {
+        const moduleForCache = {
+          ...module,
+          _id: module.id,
+          id: module.id,
+          courseId: courseId,
+          title: module.title || 'Untitled Module',
+          description: module.description || '',
+          estimatedDuration: module.estimatedDuration || 0,
+          videoUrl: module.videoUrl || '',
+          videoProvider: module.videoProvider || 'youtube',
+          pdfUrl: module.pdfUrl || '',
+          order: module.order || 0,
+          isCompleted: module.isCompleted || false,
+          isUnlocked: module.isUnlocked !== false // Default to true
+        };
+        
+        await cacheModule(moduleForCache);
+        cachedModulesCount++;
+      } catch (moduleCacheError) {
+        console.error(`❌ Failed to cache module ${module.title}:`, moduleCacheError);
+      }
+    }
+    console.log(`✅ Auto-cached ${cachedModulesCount}/${modules.length} modules for course: ${course.title}`);
+
+    // Pre-cache PDFs for offline access (both Service Worker and PouchDB)
+    let pdfsCached = 0;
+    for (const module of modules) {
+      if (module.pdfUrl) {
+        try {
+          // Pre-fetch PDF to cache it in Service Worker
+          const pdfResponse = await fetch(module.pdfUrl);
+          if (pdfResponse.ok) {
+            console.log(`📄 Pre-cached PDF in Service Worker: ${module.pdfUrl}`);
+            
+            // Also cache PDF in PouchDB for offline access
+            try {
+              const pdfBlob = await pdfResponse.blob();
+              await cachePdfInPouchDB(module.pdfUrl, pdfBlob, module.id, courseId);
+              console.log(`📄 PDF cached in PouchDB: ${module.pdfUrl}`);
+              pdfsCached++;
+            } catch (pouchDbError) {
+              console.warn(`⚠️ Failed to cache PDF in PouchDB ${module.pdfUrl}:`, pouchDbError);
+              // Still count as cached if Service Worker caching succeeded
+              pdfsCached++;
+            }
+          }
+        } catch (pdfError) {
+          console.warn(`⚠️ Failed to pre-cache PDF ${module.pdfUrl}:`, pdfError);
+        }
+      }
+    }
+    console.log(`📄 Pre-cached ${pdfsCached} PDFs for course: ${course.title} (Service Worker + PouchDB)`);
+
+    // For learners, update enrolled courses cache
+    if (user?.role === 'learner' && (course.isEnrolled || course.enrollment)) {
+      try {
+        const enrolledCourses = await getEnrolledCoursesOffline();
+        const courseExists = enrolledCourses.find((c: any) => 
+          c._id === courseId || 
+          c.id === courseId ||
+          c._id === course.id || 
+          c.id === course.id
+        );
+        
+        if (!courseExists) {
+          const updatedEnrolledCourses = [...enrolledCourses, courseForCache];
+          await cacheEnrolledCourses(user.id, updatedEnrolledCourses);
+          console.log(`✅ Updated enrolled courses cache with ${course.title}`);
+        } else {
+          console.log(`ℹ️ Course ${course.title} already exists in enrolled courses cache`);
+        }
+      } catch (enrolledCacheError) {
+        console.warn('⚠️ Failed to update enrolled courses cache during auto-cache:', enrolledCacheError);
+      }
+    }
+
+    // Verify caching was successful
+    try {
+      const cachedCourse = await getCachedCourse(courseId);
+      if (cachedCourse) {
+        console.log(`✅ Verification: Course ${course.title} successfully cached and retrievable`);
+      } else {
+        console.warn(`⚠️ Verification failed: Course ${course.title} not found in cache after caching`);
+      }
+    } catch (verifyError) {
+      console.warn('⚠️ Failed to verify course cache:', verifyError);
+    }
+
+  } catch (error) {
+    console.error('❌ Failed to auto-cache course on access:', error);
+  }
+};
+
+/**
+ * Cache PDF in PouchDB for offline access
+ * @param pdfUrl - The URL of the PDF
+ * @param pdfBlob - The PDF blob data
+ * @param moduleId - Optional module ID for association
+ * @param courseId - Optional course ID for association
+ */
+export const cachePdfInPouchDB = async (
+  pdfUrl: string, 
+  pdfBlob: Blob, 
+  moduleId?: string, 
+  courseId?: string
+): Promise<void> => {
+  try {
+    const db = await getPouchDB();
+    if (!db) {
+      console.warn('⚠️ Database not available for PDF caching');
+      return;
+    }
+
+    // Create a safe ID for the PDF document
+    const pdfId = `pdf_${pdfUrl.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    
+    // Check if PDF document already exists
+    let existingDoc;
+    try {
+      existingDoc = await db.get(pdfId);
+    } catch (error: any) {
+      if (error.name !== 'not_found') {
+        throw error;
+      }
+    }
+    
+    const pdfDoc: PdfCacheDoc = {
+      _id: pdfId,
+      _rev: existingDoc?._rev,
+      type: 'pdf',
+      pdfUrl: pdfUrl,
+      pdfBlob: pdfBlob,
+      moduleId: moduleId,
+      courseId: courseId,
+      cachedAt: new Date().toISOString(),
+      lastUpdated: new Date().toISOString()
+    };
+    
+    await db.put(pdfDoc);
+    console.log(`📄 PDF cached in PouchDB: ${pdfUrl}`);
+    
+  } catch (error) {
+    console.error('Failed to cache PDF in PouchDB:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get PDF from PouchDB for offline access
+ * @param pdfUrl - The URL of the PDF to retrieve
+ * @returns The PDF blob or null if not found
+ */
+export const getPdfFromPouchDB = async (pdfUrl: string): Promise<Blob | null> => {
+  try {
+    const db = await getPouchDB();
+    if (!db) {
+      console.warn('⚠️ Database not available for PDF retrieval');
+      return null;
+    }
+
+    const pdfId = `pdf_${pdfUrl.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    const doc = await db.get(pdfId) as PdfCacheDoc;
+    
+    if (doc && doc.pdfBlob) {
+      console.log(`📄 PDF retrieved from PouchDB: ${pdfUrl}`);
+      return doc.pdfBlob;
+    }
+    
+    return null;
+  } catch (error: any) {
+    if (error.name !== 'not_found') {
+      console.error('Error retrieving PDF from PouchDB:', error);
+    }
+    return null;
+  }
+};
+
+/**
+ * Get all cached PDFs for a specific course
+ * @param courseId - The course ID to get PDFs for
+ * @returns Array of PDF URLs cached for the course
+ */
+export const getCachedPdfsByCourse = async (courseId: string): Promise<string[]> => {
+  try {
+    const db = await getPouchDB();
+    if (!db) {
+      console.warn('⚠️ Database not available for PDF retrieval');
+      return [];
+    }
+
+    const result = await db.allDocs({
+      include_docs: true,
+      startkey: 'pdf_',
+      endkey: 'pdf_\ufff0'
+    });
+    
+    const coursePdfs = result.rows
+      .map((row: any) => (row.doc as PdfCacheDoc))
+      .filter((doc: PdfCacheDoc) => doc && doc.courseId === courseId)
+      .map((doc: PdfCacheDoc) => doc.pdfUrl);
+    
+    console.log(`📄 Found ${coursePdfs.length} cached PDFs for course ${courseId}`);
+    return coursePdfs;
+    
+  } catch (error) {
+    console.error('Failed to get cached PDFs by course:', error);
+    return [];
+  }
+};
+
+/**
+ * Remove cached PDF from PouchDB
+ * @param pdfUrl - The URL of the PDF to remove
+ */
+export const removeCachedPdf = async (pdfUrl: string): Promise<void> => {
+  try {
+    const db = await getPouchDB();
+    if (!db) {
+      console.warn('⚠️ Database not available for PDF removal');
+      return;
+    }
+
+    const pdfId = `pdf_${pdfUrl.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    const doc = await db.get(pdfId);
+    await db.remove(doc);
+    console.log(`📄 PDF removed from PouchDB: ${pdfUrl}`);
+    
+  } catch (error: any) {
+    if (error.name !== 'not_found') {
+      console.error('Failed to remove cached PDF:', error);
+      throw error;
+    }
+  }
+};
+
+/**
+ * Clear all cached PDFs from PouchDB
+ */
+export const clearAllCachedPdfs = async (): Promise<void> => {
+  try {
+    const db = await getPouchDB();
+    if (!db) {
+      console.warn('⚠️ Database not available for PDF cleanup');
+      return;
+    }
+
+    const result = await db.allDocs({
+      startkey: 'pdf_',
+      endkey: 'pdf_\ufff0'
+    });
+    
+    const deletePromises = result.rows.map((row: any) => 
+      db.remove(row.id, row.value.rev)
+    );
+    
+    await Promise.all(deletePromises);
+    console.log('📄 All cached PDFs cleared from PouchDB');
+    
+  } catch (error) {
+    console.error('Failed to clear all cached PDFs:', error);
+    throw error;
   }
 }; 

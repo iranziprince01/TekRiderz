@@ -185,7 +185,11 @@ export const CourseCreation: React.FC = () => {
     modules: [],
     tags: [],
     requirements: [],
-    learningObjectives: [],
+    learningObjectives: [
+      language === 'rw' 
+        ? 'Umenya ibintu by\'ingenzi by\'inyigisho'
+        : 'Understand key concepts of the course'
+    ],
     targetAudience: ''
   });
 
@@ -308,7 +312,9 @@ export const CourseCreation: React.FC = () => {
   // Validation functions
   const validateStep1 = () => {
     return courseData.title.trim() !== '' && 
-           courseData.description.trim() !== '';
+           courseData.description.trim() !== '' &&
+           courseData.learningObjectives.length > 0 &&
+           courseData.learningObjectives.every(obj => obj.trim() !== '');
   };
 
 
@@ -755,6 +761,63 @@ export const CourseCreation: React.FC = () => {
                 className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/20 dark:focus:ring-blue-400/20 focus:border-blue-500 dark:focus:border-blue-400 transition-all duration-200 bg-gray-50 dark:bg-gray-700 focus:bg-white dark:focus:bg-gray-600 resize-none text-gray-900 dark:text-white"
                 required
               />
+            </div>
+
+            {/* Learning Objectives */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">
+                {language === 'rw' ? 'Ibihezo by\'Inyigisho' : 'Learning Objectives'} *
+              </label>
+              <div className="space-y-3">
+                {courseData.learningObjectives.map((objective, index) => (
+                  <div key={index} className="flex items-center gap-3">
+                    <input
+                      type="text"
+                      value={objective}
+                      onChange={(e) => {
+                        const newObjectives = [...courseData.learningObjectives];
+                        newObjectives[index] = e.target.value;
+                        setCourseData(prev => ({ ...prev, learningObjectives: newObjectives }));
+                      }}
+                      placeholder={language === 'rw' 
+                        ? `Ibihezo ${index + 1} (e.g., Umenya ibintu by\'ingenzi...)`
+                        : `Objective ${index + 1} (e.g., Understand key concepts...)`
+                      }
+                      className="flex-1 px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/20 dark:focus:ring-blue-400/20 focus:border-blue-500 dark:focus:border-blue-400 transition-all duration-200 bg-gray-50 dark:bg-gray-700 focus:bg-white dark:focus:bg-gray-600 text-gray-900 dark:text-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newObjectives = courseData.learningObjectives.filter((_, i) => i !== index);
+                        setCourseData(prev => ({ ...prev, learningObjectives: newObjectives }));
+                      }}
+                      className="p-3 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors duration-200"
+                      title={language === 'rw' ? 'Siba' : 'Remove'}
+                    >
+                      <Trash2 className="h-5 w-5" />
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCourseData(prev => ({
+                      ...prev,
+                      learningObjectives: [...prev.learningObjectives, '']
+                    }));
+                  }}
+                  className="flex items-center gap-2 px-4 py-3 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors duration-200 border-2 border-dashed border-blue-300 dark:border-blue-600"
+                >
+                  <Plus className="h-5 w-5" />
+                  {language === 'rw' ? 'Ongeramo Ibihezo' : 'Add Learning Objective'}
+                </button>
+              </div>
+              <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                {language === 'rw' 
+                  ? 'Shyiramo ibihezo by\'ingenzi by\'inyigisho ryawe. Ibi bizakorwa kugaragazwa ku banyeshuri.'
+                  : 'Add the main learning objectives of your course. These will be displayed to students.'
+                }
+              </p>
             </div>
 
             {/* Category and Level */}

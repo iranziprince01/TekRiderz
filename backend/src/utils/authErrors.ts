@@ -9,6 +9,7 @@ export enum AuthErrorType {
   INVALID_ROLE = 'INVALID_ROLE',
   INVALID_NAME = 'INVALID_NAME',
   TEMP_EMAIL_BLOCKED = 'TEMP_EMAIL_BLOCKED',
+  TERMS_NOT_AGREED = 'TERMS_NOT_AGREED',
   REGISTRATION_FAILED = 'REGISTRATION_FAILED',
   
   // Login errors
@@ -111,6 +112,15 @@ export const AuthErrorMessages: Record<AuthErrorType, {
       'Use a permanent email address',
       'Try Gmail, Outlook, or your school/work email',
       'Contact support if you need help'
+    ]
+  },
+  [AuthErrorType.TERMS_NOT_AGREED]: {
+    user: 'You must agree to the Terms and Conditions and Privacy Policy.',
+    technical: 'Registration blocked: terms agreement not provided',
+    suggestions: [
+      'Check the box to agree to our terms',
+      'Read the Terms and Conditions and Privacy Policy',
+      'Contact support if you have questions about our terms'
     ]
   },
   [AuthErrorType.REGISTRATION_FAILED]: {
@@ -445,6 +455,7 @@ export class AuthErrorUtil {
       case AuthErrorType.INVALID_ROLE:
       case AuthErrorType.INVALID_NAME:
       case AuthErrorType.TEMP_EMAIL_BLOCKED:
+      case AuthErrorType.TERMS_NOT_AGREED:
       case AuthErrorType.OTP_REQUIRED:
       case AuthErrorType.OTP_INVALID:
       case AuthErrorType.OTP_EXPIRED:

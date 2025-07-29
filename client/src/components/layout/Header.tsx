@@ -51,7 +51,7 @@ const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50 shadow-sm">
+    <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 fixed top-0 left-0 right-0 z-50 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Left side - Logo and Mobile Menu */}
@@ -137,6 +137,11 @@ const Header: React.FC<HeaderProps> = ({
 
             {user ? (
               <>
+                {/* Notification Bell */}
+                <div className="relative">
+                  <NotificationBell />
+                </div>
+
                 {/* Profile Menu */}
                 <div className="relative ml-3">
                   <Button
@@ -169,7 +174,7 @@ const Header: React.FC<HeaderProps> = ({
                             <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.email}</p>
                             <div className="flex items-center mt-1">
                               <div className="h-2 w-2 bg-green-500 rounded-full mr-2" />
-                              <span className="text-xs text-gray-500 dark:text-gray-400">Online</span>
+                              <span className="text-xs text-gray-500 dark:text-gray-400">{t('learner.online')}</span>
                             </div>
                           </div>
                         </div>

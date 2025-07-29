@@ -20,15 +20,10 @@ export const databases = {
   courses: couch.db.use('courses'),       // Course content and metadata
   enrollments: couch.db.use('enrollments'), // Course enrollments
   progress: couch.db.use('progress'),     // Student learning progress
-  certificates: couch.db.use('certificates'), // Certificate metadata and URLs
-  analytics: couch.db.use('analytics'),   // Basic platform analytics
-  assessments: couch.db.use('assessments'), // Quizzes and assessments
-  grades: couch.db.use('grades'),         // Student grades and scores
   notifications: couch.db.use('notifications'), // In-app notifications and alerts
   
   // Essential support databases
   otp: couch.db.use('otp'),              // Authentication codes
-  // files removed - using external services only
 };
 
 // Legacy export for backward compatibility
@@ -41,14 +36,16 @@ export const connectToDatabases = async (): Promise<void> => {
   try {
     logger.info('Connecting to CouchDB...');
     
-    // Check existing databases
-    const existingDatabases = await couch.db.list();
+    // Check existing databases with retry logic
+    const existingDatabases = await retryOperation(async () => {
+      return await couch.db.list();
+    }, 3, 'Database list retrieval');
+    
     logger.info('Existing databases:', existingDatabases);
     
     // Required databases for basic e-learning platform
     const requiredDatabases = [
-      'users', 'courses', 'enrollments', 'certificates',
-      'analytics', 'assessments', 'grades', 'notifications', 'otp', 'files'
+      'users', 'courses', 'enrollments', 'progress', 'notifications', 'otp'
     ];
 
     // Check if all required databases exist
@@ -57,10 +54,12 @@ export const connectToDatabases = async (): Promise<void> => {
     if (missingDatabases.length > 0) {
       logger.warn('Missing databases:', missingDatabases);
       
-      // Create missing databases if needed
+      // Create missing databases if needed with retry logic
       for (const dbName of missingDatabases) {
         try {
-          await couch.db.create(dbName);
+          await retryOperation(async () => {
+            await couch.db.create(dbName);
+          }, 3, `Database creation: ${dbName}`);
           logger.info(`Created database: ${dbName}`);
         } catch (error: any) {
           if (error.statusCode !== 412) { // 412 = database already exists
@@ -75,11 +74,14 @@ export const connectToDatabases = async (): Promise<void> => {
 
     // Create design documents and views for essential databases only
     await createDesignDocuments();
+    await createOTPDesignDocuments();
 
-    // Test connections to essential databases only
+    // Test connections to essential databases only with retry logic
     for (const [name, database] of Object.entries(databases)) {
       try {
-        await database.info();
+        await retryOperation(async () => {
+          await database.info();
+        }, 3, `Database connection test: ${name}`);
         logger.info(`Connected to database: ${name}`);
       } catch (error) {
         logger.error(`Failed to connect to database ${name}:`, error);
@@ -94,17 +96,81 @@ export const connectToDatabases = async (): Promise<void> => {
   }
 };
 
+// Retry operation utility for better stability
+const retryOperation = async <T>(
+  operation: () => Promise<T>, 
+  maxRetries: number, 
+  operationName: string
+): Promise<T> => {
+  let lastError: any;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      logger.warn(`${operationName} failed (attempt ${attempt}/${maxRetries}):`, error);
+      
+      if (attempt < maxRetries) {
+        // Exponential backoff: wait 1s, 2s, 4s...
+        const delay = Math.pow(2, attempt - 1) * 1000;
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  
+  throw new Error(`${operationName} failed after ${maxRetries} attempts: ${lastError?.message || lastError}`);
+};
+
 // Create necessary indexes for optimal query performance
 const createDatabaseIndexes = async (): Promise<void> => {
   try {
-    await createUserIndexes();
-
-    await createOTPIndexes();
+    logger.info('Creating database indexes for optimal performance...');
     
-    logger.info('Database indexes created successfully');
+    // Add health monitoring
+    await setupHealthMonitoring();
+    
+    logger.info('Database indexes and health monitoring setup complete');
   } catch (error) {
     logger.error('Failed to create database indexes:', error);
-    // Don't throw - indexes are for performance, not functionality
+  }
+};
+
+// Database health monitoring for stable connections
+const setupHealthMonitoring = async (): Promise<void> => {
+  try {
+    logger.info('Setting up database health monitoring...');
+    
+    // Test all database connections
+    const healthChecks = await Promise.allSettled([
+      databases.users.info(),
+      databases.courses.info(),
+      databases.enrollments.info(),
+      databases.progress.info(),
+      databases.notifications.info(),
+      databases.otp.info()
+    ]);
+    
+    const results = healthChecks.map((result, index) => {
+      const dbNames = ['users', 'courses', 'enrollments', 'progress', 'notifications', 'otp'];
+      return {
+        database: dbNames[index],
+        status: result.status === 'fulfilled' ? 'healthy' : 'unhealthy',
+        error: result.status === 'rejected' ? result.reason : null
+      };
+    });
+    
+    const healthyCount = results.filter(r => r.status === 'healthy').length;
+    const totalCount = results.length;
+    
+    logger.info(`Database health check complete: ${healthyCount}/${totalCount} databases healthy`, { results });
+    
+    if (healthyCount < totalCount) {
+      logger.warn('Some databases are unhealthy:', results.filter(r => r.status === 'unhealthy'));
+    }
+    
+  } catch (error) {
+    logger.error('Failed to setup health monitoring:', error);
   }
 };
 
@@ -116,10 +182,6 @@ const createDesignDocuments = async (): Promise<void> => {
     await createEnrollmentDesignDocuments();
     await createProgressDesignDocuments();
 
-    await createAnalyticsDesignDocuments();
-    await createAssessmentDesignDocuments();
-    await createGradeDesignDocuments();
-    await createCertificateDesignDocuments();
     await createNotificationDesignDocuments();
     
     logger.info('Essential design documents created successfully');
@@ -350,190 +412,7 @@ const createProgressDesignDocuments = async (): Promise<void> => {
 
 
 
-// Create analytics design documents
-const createAnalyticsDesignDocuments = async (): Promise<void> => {
-  const analyticsDb = databases.analytics;
-  
-  try {
-    const designDoc: any = {
-      _id: '_design/analytics',
-      views: {
-        by_entity: {
-          map: `function(doc) {
-            if (doc.type === 'analytics' && doc.entityType && doc.entityId) {
-              emit([doc.entityType, doc.entityId], null);
-            }
-          }`
-        },
-        by_event: {
-          map: `function(doc) {
-            if (doc.type === 'analytics' && doc.event) {
-              emit(doc.event, null);
-            }
-          }`
-        }
-      }
-    };
 
-    try {
-      const existing = await analyticsDb.get('_design/analytics');
-      designDoc._rev = existing._rev;
-    } catch (error) {
-      // Design doc doesn't exist, will create new one
-    }
-
-    await analyticsDb.insert(designDoc);
-    logger.info('Analytics design document created/updated successfully');
-  } catch (error: any) {
-    if (error.statusCode !== 409) {
-      logger.error('Failed to create analytics design document:', error);
-    }
-  }
-};
-
-// Create assessment design documents
-const createAssessmentDesignDocuments = async (): Promise<void> => {
-  const assessmentsDb = databases.assessments;
-  
-  try {
-    const designDoc: any = {
-      _id: '_design/assessments',
-      views: {
-        by_course: {
-          map: `function(doc) {
-            if (doc.type === 'assessment' && doc.courseId) {
-              emit(doc.courseId, null);
-            }
-          }`
-        },
-        by_user: {
-          map: `function(doc) {
-            if (doc.type === 'assessment_attempt' && doc.userId) {
-              emit(doc.userId, null);
-            }
-          }`
-        }
-      }
-    };
-
-    try {
-      const existing = await assessmentsDb.get('_design/assessments');
-      designDoc._rev = existing._rev;
-    } catch (error) {
-      // Design doc doesn't exist, will create new one
-    }
-
-    await assessmentsDb.insert(designDoc);
-    logger.info('Assessment design document created/updated successfully');
-  } catch (error: any) {
-    if (error.statusCode !== 409) {
-      logger.error('Failed to create assessment design document:', error);
-    }
-  }
-};
-
-// Create grade design documents
-const createGradeDesignDocuments = async (): Promise<void> => {
-  const gradesDb = databases.grades;
-  
-  try {
-    const designDoc: any = {
-      _id: '_design/grades',
-      views: {
-        by_user: {
-          map: `function(doc) {
-            if (doc.type === 'grade' && doc.userId) {
-              emit(doc.userId, null);
-            }
-          }`
-        },
-        by_course: {
-          map: `function(doc) {
-            if (doc.type === 'grade' && doc.courseId) {
-              emit(doc.courseId, null);
-            }
-          }`
-        },
-        by_assessment: {
-          map: `function(doc) {
-            if (doc.type === 'grade' && doc.assessmentId) {
-              emit(doc.assessmentId, null);
-            }
-          }`
-        }
-      }
-    };
-
-    try {
-      const existing = await gradesDb.get('_design/grades');
-      designDoc._rev = existing._rev;
-    } catch (error) {
-      // Design doc doesn't exist, will create new one
-    }
-
-    await gradesDb.insert(designDoc);
-    logger.info('Grade design document created/updated successfully');
-  } catch (error: any) {
-    if (error.statusCode !== 409) {
-      logger.error('Failed to create grade design document:', error);
-    }
-  }
-};
-
-// Create certificate design documents
-const createCertificateDesignDocuments = async (): Promise<void> => {
-  const certificatesDb = databases.certificates;
-  
-  try {
-    const designDoc: any = {
-      _id: '_design/certificates',
-      views: {
-        by_user: {
-          map: `function(doc) {
-            if (doc.type === 'certificate' && doc.userId) {
-              emit(doc.userId, null);
-            }
-          }`
-        },
-        by_course: {
-          map: `function(doc) {
-            if (doc.type === 'certificate' && doc.courseId) {
-              emit(doc.courseId, null);
-            }
-          }`
-        },
-        by_certificate_id: {
-          map: `function(doc) {
-            if (doc.type === 'certificate' && doc.certificateId) {
-              emit(doc.certificateId, null);
-            }
-          }`
-        },
-        valid_certificates: {
-          map: `function(doc) {
-            if (doc.type === 'certificate' && doc.status === 'valid') {
-              emit([doc.userId, doc.courseId], null);
-            }
-          }`
-        }
-      }
-    };
-
-    try {
-      const existing = await certificatesDb.get('_design/certificates');
-      designDoc._rev = existing._rev;
-    } catch (error) {
-      // Design doc doesn't exist, will create new one
-    }
-
-    await certificatesDb.insert(designDoc);
-    logger.info('Certificate design document created/updated successfully');
-  } catch (error: any) {
-    if (error.statusCode !== 409) {
-      logger.error('Failed to create certificate design document:', error);
-    }
-  }
-};
 
 // Create notification design documents
 const createNotificationDesignDocuments = async (): Promise<void> => {
@@ -627,6 +506,54 @@ const createUserIndexes = async (): Promise<void> => {
 };
 
 
+
+// Create OTP design documents
+const createOTPDesignDocuments = async (): Promise<void> => {
+  const otpDb = databases.otp;
+  
+  try {
+    const designDoc = {
+      _id: '_design/otp',
+      views: {
+        by_email: {
+          map: `function(doc) {
+            if (doc.type === 'otp' && doc.email) {
+              emit(doc.email, null);
+            }
+          }`
+        },
+        by_expiry: {
+          map: `function(doc) {
+            if (doc.type === 'otp' && doc.expiresAt) {
+              emit(doc.expiresAt, null);
+            }
+          }`
+        },
+        active_otps: {
+          map: `function(doc) {
+            if (doc.type === 'otp' && doc.expiresAt && doc.expiresAt > new Date().toISOString()) {
+              emit(doc.email, null);
+            }
+          }`
+        }
+      }
+    };
+
+    try {
+      const existing = await otpDb.get('_design/otp');
+      (designDoc as any)._rev = existing._rev;
+    } catch (error) {
+      // Design doc doesn't exist, will create new one
+    }
+
+    await otpDb.insert(designDoc);
+    logger.info('OTP design document created/updated successfully');
+  } catch (error: any) {
+    if (error.statusCode !== 409) {
+      logger.error('Failed to create OTP design document:', error);
+    }
+  }
+};
 
 // Create OTP-specific indexes
 const createOTPIndexes = async (): Promise<void> => {

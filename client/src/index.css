@@ -24,6 +24,7 @@ body {
   color: #111827;
   background-color: #f9fafb;
   transition: background-color 0.3s ease;
+  overflow-x: hidden;
 }
 
 .dark body {

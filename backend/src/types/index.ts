@@ -22,6 +22,13 @@ export interface User extends BaseDocument {
   avatar?: string;
   verified: boolean;
   lastLogin?: string;
+  termsAgreement?: {
+    agreedToTerms: boolean;
+    agreedToPrivacyPolicy: boolean;
+    agreedAt: string;
+    ipAddress?: string;
+    userAgent?: string;
+  };
   profile: {
     bio?: string;
     expertise?: string[];
@@ -416,10 +423,7 @@ export interface CourseLesson {
     heatmapEnabled: boolean;
   };
   
-  // Gamification
-  points?: number;
-  badges?: string[];
-  achievements?: string[];
+
 }
 
 // Enhanced CourseSection (Module) with better organization
@@ -771,23 +775,12 @@ export interface Progress extends BaseDocument {
     longestSession: number;
     totalActiveTime: number;
     lastActiveAt: string;
-    streakDays: number;
+
     completionVelocity: number; // lessons per day
     interactionRate: number; // interactions per lesson
   };
   
-  // Achievement tracking
-  achievements: {
-    earnedAchievements: string[];
-    progressTowardsAchievements: {
-      [achievementId: string]: {
-        progress: number;
-        target: number;
-        unlocked: boolean;
-        unlockedAt?: string;
-      };
-    };
-  };
+
 }
 
 // OTP types
@@ -820,34 +813,7 @@ export interface Review extends BaseDocument {
   };
 }
 
-// Achievement types
-export type AchievementType = 'milestone' | 'streak' | 'completion' | 'skill' | 'community';
 
-export interface Achievement extends BaseDocument {
-  type: 'achievement';
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  category: AchievementType;
-  points: number;
-  requirements: {
-    type: string;
-    target: number;
-    criteria: any;
-  };
-  isActive: boolean;
-}
-
-export interface UserAchievement extends BaseDocument {
-  type: 'user_achievement';
-  id: string;
-  userId: string;
-  achievementId: string;
-  unlockedAt: string;
-  progress: number;
-  isCompleted: boolean;
-}
 
 // Notification types
 export type NotificationType = 
@@ -857,13 +823,14 @@ export type NotificationType =
   | 'error'
   | 'course_enrollment'
   | 'course_completion'
+  | 'course_approval'
   | 'assignment_reminder'
   | 'course_announcement'
   | 'discussion_reply'
   | 'question_answered'
   | 'system_update'
   | 'welcome_email'
-  | 'achievement_unlocked'
+
 
   | 'payment_received'
   | 'grade_posted'
@@ -873,7 +840,7 @@ export type NotificationType =
   | 'course_deadline'
   | 'maintenance_notice';
 
-export type NotificationCategory = 'course' | 'achievement' | 'system' | 'marketing' | 'reminder';
+export type NotificationCategory = 'course' | 'system' | 'marketing' | 'reminder';
 
 export type NotificationPriority = 'low' | 'medium' | 'high' | 'urgent';
 
@@ -894,7 +861,7 @@ export interface Notification extends BaseDocument {
     courseId?: string;
     lessonId?: string;
     quizId?: string;
-    achievementId?: string;
+
     [key: string]: any;
   };
 }

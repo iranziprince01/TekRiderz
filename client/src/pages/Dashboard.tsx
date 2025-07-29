@@ -11,6 +11,7 @@ import AdminCourses from '../dashboards/admin/AdminCourses';
 import AdminUsers from '../dashboards/admin/AdminUsers';
 import AdminAnalytics from '../dashboards/admin/AdminAnalytics';
 import Profile from './Profile';
+import Notifications from './Notifications';
 import TutorDashboard from '../dashboards/tutor/TutorDashboard';
 import TutorCourses from '../dashboards/tutor/TutorCourses';
 import TutorAnalytics from '../dashboards/tutor/TutorAnalytics';
@@ -40,6 +41,7 @@ const Dashboard = () => {
             <Route path="/courses" element={<AdminCourses />} />
             <Route path="/users" element={<AdminUsers />} />
             <Route path="/analytics" element={<AdminAnalytics />} />
+            <Route path="/notifications" element={<Notifications />} />
             <Route path="/profile" element={<Profile />} />
           </>
         )}
@@ -72,6 +74,11 @@ const Dashboard = () => {
                 <CourseCreation />
               </ErrorBoundary>
             } />
+            <Route path="/notifications" element={
+              <ErrorBoundary>
+                <Notifications />
+              </ErrorBoundary>
+            } />
             <Route path="/profile" element={
               <ErrorBoundary>
                 <Profile />
@@ -91,6 +98,11 @@ const Dashboard = () => {
             <Route path="/courses" element={
               <ErrorBoundary>
                 <LearnerCourses />
+              </ErrorBoundary>
+            } />
+            <Route path="/notifications" element={
+              <ErrorBoundary>
+                <Notifications />
               </ErrorBoundary>
             } />
             <Route path="/profile" element={

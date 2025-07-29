@@ -1,7 +1,7 @@
 import { progressModel } from '../models/Progress';
 import { courseModel } from '../models/Course';
 import { enrollmentModel } from '../models/Enrollment';
-import { gamificationService } from './gamificationService';
+
 import { logger } from '../utils/logger';
 import { Progress } from '../types';
 
@@ -127,15 +127,7 @@ export class ProgressConsistencyService {
         lastWatched: new Date().toISOString()
       } as Partial<Progress>);
 
-      // Award gamification points for completion
-      if (progressData.isCompleted || progressData.percentageWatched >= 90) {
-        try {
-          await gamificationService.awardModuleCompletion(userId, courseId, lessonId);
-          logger.info('🎯 Gamification points awarded for lesson completion');
-        } catch (gamificationError) {
-          logger.warn('⚠️ Failed to award gamification points:', gamificationError);
-        }
-      }
+
 
       // Verify the update
       const verificationProgress = await progressModel.findByUserAndCourse(userId, courseId);

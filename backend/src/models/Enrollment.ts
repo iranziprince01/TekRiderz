@@ -29,16 +29,48 @@ export class EnrollmentModel extends BaseModel<Enrollment> {
   // Find enrollment by user and course
   async findByUserAndCourse(userId: string, courseId: string): Promise<Enrollment | null> {
     try {
+      logger.info('Finding enrollment by user and course:', { userId, courseId });
+      
       const result = await databases.enrollments.view('enrollments', 'by_user', {
         key: userId,
         include_docs: true,
       });
 
-      const enrollment = result.rows.find(row => 
-        row.doc && (row.doc as any).courseId === courseId
-      );
+      logger.info('Enrollment view result:', { 
+        userId, 
+        courseId, 
+        totalRows: result.rows.length,
+        rows: result.rows.map(row => ({
+          id: row.doc?._id,
+          courseId: (row.doc as any)?.courseId,
+          status: (row.doc as any)?.status
+        }))
+      });
 
-      return enrollment ? enrollment.doc as Enrollment : null;
+      const enrollment = result.rows.find(row => {
+        const doc = row.doc as any;
+        const matches = doc && doc.courseId === courseId;
+        logger.info('Checking enrollment row:', { 
+          docCourseId: doc?.courseId, 
+          searchCourseId: courseId, 
+          matches 
+        });
+        return matches;
+      });
+
+      const foundEnrollment = enrollment ? enrollment.doc as Enrollment : null;
+      logger.info('Enrollment found:', { 
+        userId, 
+        courseId, 
+        found: !!foundEnrollment,
+        enrollmentData: foundEnrollment ? {
+          id: foundEnrollment._id,
+          status: foundEnrollment.status,
+          progress: foundEnrollment.progress
+        } : null
+      });
+
+      return foundEnrollment;
     } catch (error) {
       logger.error('Failed to find enrollment by user and course:', { userId, courseId, error });
       throw error;
@@ -277,6 +309,16 @@ export class EnrollmentModel extends BaseModel<Enrollment> {
           isReadOnly: true,
           completedAt: updateData.completedAt
         });
+
+        // Create completion notification
+        try {
+          const { NotificationService } = await import('../services/notificationService');
+          const notificationService = new NotificationService();
+          await notificationService.createCompletionNotification(currentEnrollment.userId, currentEnrollment.courseId);
+          logger.info('Completion notification created:', { userId: currentEnrollment.userId, courseId: currentEnrollment.courseId });
+        } catch (notificationError) {
+          logger.warn('Failed to create completion notification:', { userId: currentEnrollment.userId, courseId: currentEnrollment.courseId, error: notificationError });
+        }
 
       }
 

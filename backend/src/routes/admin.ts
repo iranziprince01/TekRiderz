@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { authenticate, adminOnly } from '../middleware/auth';
+import { authenticate, adminOnly, authorize } from '../middleware/auth';
 import { userModel } from '../models/User';
 import { courseModel } from '../models/Course';
 import { enrollmentModel } from '../models/Enrollment';
@@ -1245,6 +1245,7 @@ router.get('/courses', async (req: Request, res: Response) => {
           id: course._id || course.id,
           instructorName,
           instructorEmail,
+          instructorAvatar: instructor?.avatar || null,
         };
       })
     );
@@ -3747,7 +3748,72 @@ router.put('/notifications/:notificationId/read', async (req: Request, res: Resp
   }
 });
 
+// Sync enrollment counts
+router.post('/sync-enrollment-counts', authenticate, authorize('admin'), async (req: Request, res: Response) => {
+  try {
+    const { EnrollmentSyncService } = await import('../services/enrollmentSyncService');
+    
+    const result = await EnrollmentSyncService.syncAllEnrollmentCounts();
+    
+    logger.info('Admin triggered enrollment count sync:', result);
+    
+    res.json({
+      success: true,
+      message: 'Enrollment counts synced successfully',
+      data: result
+    });
+  } catch (error) {
+    logger.error('Failed to sync enrollment counts:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to sync enrollment counts'
+    });
+  }
+});
 
+// Verify enrollment counts
+router.get('/verify-enrollment-counts', authenticate, authorize('admin'), async (req: Request, res: Response) => {
+  try {
+    const { EnrollmentSyncService } = await import('../services/enrollmentSyncService');
+    
+    const result = await EnrollmentSyncService.verifyEnrollmentCounts();
+    
+    logger.info('Admin verified enrollment counts:', result);
+    
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    logger.error('Failed to verify enrollment counts:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to verify enrollment counts'
+    });
+  }
+});
+
+// Auto-sync enrollment counts
+router.post('/auto-sync-enrollment-counts', authenticate, authorize('admin'), async (req: Request, res: Response) => {
+  try {
+    const { EnrollmentSyncService } = await import('../services/enrollmentSyncService');
+    
+    await EnrollmentSyncService.autoSyncEnrollmentCounts();
+    
+    logger.info('Admin triggered auto-sync of enrollment counts');
+    
+    res.json({
+      success: true,
+      message: 'Auto-sync completed successfully'
+    });
+  } catch (error) {
+    logger.error('Failed to auto-sync enrollment counts:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to auto-sync enrollment counts'
+    });
+  }
+});
 
 export { router as adminRoutes };
 export default router; 

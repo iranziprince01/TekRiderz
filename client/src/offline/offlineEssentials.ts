@@ -222,11 +222,15 @@ export const getEssentialOfflineStatus = (): {
   canAccessCourses: boolean;
   lastSync: string | null;
   cachedUser?: any;
+  hasCachedCourses: boolean;
+  databaseStatus: 'ready' | 'initializing' | 'failed';
 } => {
   const isOffline = !navigator.onLine;
   const hasLocalData = localStorage.getItem('currentUserId') !== null && 
                       localStorage.getItem('userEmail') !== null;
   const lastSync = localStorage.getItem('lastSync');
+  const hasCachedCourses = localStorage.getItem('hasCachedCourses') === 'true';
+  
   const cachedUser = hasLocalData ? {
     id: localStorage.getItem('currentUserId'),
     name: localStorage.getItem('userName'),
@@ -235,64 +239,178 @@ export const getEssentialOfflineStatus = (): {
     verified: localStorage.getItem('userVerified') === 'true'
   } : null;
   
-  console.log('🔍 Offline status check:', {
+  // Check database status
+  let databaseStatus: 'ready' | 'initializing' | 'failed' = 'ready';
+  try {
+    const dbInfo = localStorage.getItem('pouchdb_status');
+    if (dbInfo === 'failed') {
+      databaseStatus = 'failed';
+    } else if (dbInfo === 'initializing') {
+      databaseStatus = 'initializing';
+    }
+  } catch (error) {
+    databaseStatus = 'failed';
+  }
+  
+  console.log('🔍 Enhanced offline status check:', {
     isOffline,
     hasLocalData,
-    cachedUser: cachedUser ? { name: cachedUser.name, email: cachedUser.email } : null
+    hasCachedCourses,
+    databaseStatus,
+    cachedUser: cachedUser ? { name: cachedUser.name, email: cachedUser.email, role: cachedUser.role } : null,
+    lastSync: lastSync ? new Date(lastSync).toLocaleString() : null
   });
   
   return {
     isOffline,
     hasLocalData,
-    canAccessCourses: isOffline && hasLocalData,
+    canAccessCourses: isOffline && hasLocalData && hasCachedCourses && databaseStatus === 'ready',
     lastSync: lastSync ? new Date(lastSync).toLocaleString() : null,
-    cachedUser
+    cachedUser,
+    hasCachedCourses,
+    databaseStatus
   };
 };
 
 /**
- * Essential offline error recovery
- * Handles common offline errors gracefully
+ * Enhanced offline error handling
+ * Provides comprehensive error recovery and user feedback
  */
 export const handleOfflineError = (error: any, context: string): {
   canRecover: boolean;
   message: string;
   action?: string;
+  severity: 'low' | 'medium' | 'high';
+  retryable: boolean;
 } => {
-  console.error(`Offline error in ${context}:`, error);
+  console.error(`❌ Offline error in ${context}:`, error);
 
-  // Network errors
-  if (error.name === 'NetworkError' || error.message?.includes('network')) {
+  // Network-related errors
+  if (error.name === 'NetworkError' || error.message?.includes('network') || error.message?.includes('fetch')) {
     return {
       canRecover: true,
-      message: 'Network connection lost. Working in offline mode.',
-      action: 'continue_offline'
+      message: 'Network connection lost. Please check your internet connection and try again.',
+      action: 'Check your internet connection and refresh the page.',
+      severity: 'medium',
+      retryable: true
     };
   }
 
-  // Database errors
+  // Database-related errors
   if (error.name === 'QuotaExceededError' || error.message?.includes('quota')) {
     return {
-      canRecover: false,
-      message: 'Storage quota exceeded. Please clear some data.',
-      action: 'clear_storage'
+      canRecover: true,
+      message: 'Storage space is full. Please clear some data and try again.',
+      action: 'Clear browser cache or remove some offline content.',
+      severity: 'high',
+      retryable: true
     };
   }
 
-  // Cache errors
-  if (error.name === 'NotFoundError' || error.message?.includes('not found')) {
+  if (error.name === 'IndexedDBError' || error.message?.includes('indexeddb')) {
     return {
       canRecover: true,
-      message: 'Some cached data is missing. Loading available content.',
-      action: 'load_available'
+      message: 'Local database error. Please refresh the page to reset.',
+      action: 'Refresh the page to reset the local database.',
+      severity: 'medium',
+      retryable: true
     };
   }
 
-  // Generic offline error
+  // Cache-related errors
+  if (error.name === 'CacheError' || error.message?.includes('cache')) {
+    return {
+      canRecover: true,
+      message: 'Cache error occurred. Some offline content may not be available.',
+      action: 'Refresh the page to rebuild the cache.',
+      severity: 'low',
+      retryable: true
+    };
+  }
+
+  // Authentication errors
+  if (error.status === 401 || error.message?.includes('unauthorized')) {
+    return {
+      canRecover: true,
+      message: 'Authentication expired. Please login again.',
+      action: 'Login again to continue.',
+      severity: 'medium',
+      retryable: false
+    };
+  }
+
+  if (error.status === 403 || error.message?.includes('forbidden')) {
+    return {
+      canRecover: false,
+      message: 'Access denied. You may not have permission to access this content.',
+      action: 'Contact support if you believe this is an error.',
+      severity: 'high',
+      retryable: false
+    };
+  }
+
+  // Data validation errors
+  if (error.name === 'ValidationError' || error.message?.includes('validation')) {
+    return {
+      canRecover: true,
+      message: 'Data validation error. Some content may be corrupted.',
+      action: 'Refresh the page to reload clean data.',
+      severity: 'medium',
+      retryable: true
+    };
+  }
+
+  // Timeout errors
+  if (error.name === 'TimeoutError' || error.message?.includes('timeout')) {
+    return {
+      canRecover: true,
+      message: 'Request timed out. Please try again.',
+      action: 'Try again in a few moments.',
+      severity: 'low',
+      retryable: true
+    };
+  }
+
+  // Rate limiting errors
+  if (error.status === 429 || error.message?.includes('rate limit')) {
+    return {
+      canRecover: true,
+      message: 'Too many requests. Please wait a moment and try again.',
+      action: 'Wait a few seconds before trying again.',
+      severity: 'low',
+      retryable: true
+    };
+  }
+
+  // Server errors
+  if (error.status >= 500) {
+    return {
+      canRecover: true,
+      message: 'Server error. Please try again later.',
+      action: 'Try again in a few minutes.',
+      severity: 'medium',
+      retryable: true
+    };
+  }
+
+  // Generic offline errors
+  if (!navigator.onLine) {
+    return {
+      canRecover: true,
+      message: 'You are currently offline. Some features may not be available.',
+      action: 'Connect to the internet for full functionality.',
+      severity: 'low',
+      retryable: true
+    };
+  }
+
+  // Unknown errors
   return {
-    canRecover: true,
-    message: 'Working in offline mode with limited functionality.',
-    action: 'continue_offline'
+    canRecover: false,
+    message: 'An unexpected error occurred. Please try refreshing the page.',
+    action: 'Refresh the page or contact support if the problem persists.',
+    severity: 'high',
+    retryable: true
   };
 };
 
@@ -383,23 +501,57 @@ export const initializeOfflineEssentials = async (): Promise<{
   try {
     console.log('🔧 Initializing offline essentials...');
     
-    // Initialize cache versioning first
+    // Set database status to initializing
+    localStorage.setItem('pouchdb_status', 'initializing');
+    
+    // Check if PouchDB is available
+    const { getPouchDB } = await import('./db');
+    const db = await getPouchDB();
+    
+    if (!db) {
+      localStorage.setItem('pouchdb_status', 'failed');
+      return {
+        success: false,
+        message: 'Database not available',
+        offlineReady: false
+      };
+    }
+    
+    // Test database connection
+    try {
+      const dbInfo = await db.info();
+      console.log('📊 Database info:', dbInfo);
+      
+      // Set database status to ready
+      localStorage.setItem('pouchdb_status', 'ready');
+    } catch (dbError) {
+      console.error('❌ Database connection test failed:', dbError);
+      localStorage.setItem('pouchdb_status', 'failed');
+      return {
+        success: false,
+        message: 'Database connection failed',
+        offlineReady: false
+      };
+    }
+    
+    // Initialize cache versioning
     await initializeCacheVersion();
     
     // Validate offline data
     const validation = await validateOfflineData();
     
-    if (!validation.canProceed) {
-      console.log('⚠️ Offline validation failed:', validation.issues.join(', '));
-      localStorage.setItem('lastSync', new Date().toISOString());
-      
-      return {
-        success: true,
-        message: 'Offline mode ready (limited functionality)',
-        offlineReady: true
-      };
+    // Check if we have cached courses
+    const { getCachedCourses } = await import('./cacheService');
+    const cachedCourses = await getCachedCourses();
+    
+    if (cachedCourses.length > 0) {
+      localStorage.setItem('hasCachedCourses', 'true');
+      console.log(`📚 Found ${cachedCourses.length} cached courses during initialization`);
+    } else {
+      localStorage.removeItem('hasCachedCourses');
+      console.log('📚 No cached courses found during initialization');
     }
-
+    
     // Set last sync timestamp
     localStorage.setItem('lastSync', new Date().toISOString());
     
@@ -407,14 +559,15 @@ export const initializeOfflineEssentials = async (): Promise<{
     
     return {
       success: true,
-      message: 'Offline mode ready for demonstration',
-      offlineReady: true
+      message: `Offline mode ready (${cachedCourses.length} courses cached)`,
+      offlineReady: validation.canProceed && cachedCourses.length > 0
     };
   } catch (error) {
     console.error('❌ Failed to initialize offline essentials:', error);
+    localStorage.setItem('pouchdb_status', 'failed');
     return {
       success: false,
-      message: 'Failed to initialize offline mode',
+      message: `Initialization failed: ${error}`,
       offlineReady: false
     };
   }
@@ -459,91 +612,10 @@ export const getOfflineCourseData = async (courseId: string): Promise<{
     let modules = await getCachedModulesByCourse(courseId);
     console.log(`📖 Found ${modules.length} cached modules for course`);
     
-    // If no modules found, try to create some basic modules for demonstration
+    // If no modules found, return empty array instead of creating demo modules
     if (modules.length === 0) {
-      console.log('No modules found, creating basic modules for offline access');
-      modules = [
-        {
-          id: `module_1_${courseId}`,
-          _id: `module_1_${courseId}`,
-          title: 'Introduction to Course',
-          description: 'Welcome to this course. This module provides an overview of what you will learn.',
-          estimatedDuration: 15,
-          videoUrl: '',
-          videoProvider: 'youtube',
-          order: 1,
-          isCompleted: false,
-          isUnlocked: true,
-          courseId: courseId,
-          hasQuiz: false
-        },
-        {
-          id: `module_2_${courseId}`,
-          _id: `module_2_${courseId}`,
-          title: 'Core Concepts',
-          description: 'Learn the fundamental concepts and principles covered in this course.',
-          estimatedDuration: 30,
-          videoUrl: '',
-          videoProvider: 'youtube',
-          order: 2,
-          isCompleted: false,
-          isUnlocked: true,
-          courseId: courseId,
-          hasQuiz: true
-        },
-        {
-          id: `module_3_${courseId}`,
-          _id: `module_3_${courseId}`,
-          title: 'Practical Application',
-          description: 'Apply what you have learned through hands-on exercises and projects.',
-          estimatedDuration: 45,
-          videoUrl: '',
-          videoProvider: 'youtube',
-          order: 3,
-          isCompleted: false,
-          isUnlocked: true,
-          courseId: courseId,
-          hasQuiz: true
-        },
-        {
-          id: `module_4_${courseId}`,
-          _id: `module_4_${courseId}`,
-          title: 'Advanced Topics',
-          description: 'Explore advanced concepts and techniques in this comprehensive module.',
-          estimatedDuration: 60,
-          videoUrl: '',
-          videoProvider: 'youtube',
-          order: 4,
-          isCompleted: false,
-          isUnlocked: false,
-          courseId: courseId,
-          hasQuiz: true
-        },
-        {
-          id: `module_5_${courseId}`,
-          _id: `module_5_${courseId}`,
-          title: 'Final Assessment',
-          description: 'Complete the final assessment to demonstrate your understanding of the course material.',
-          estimatedDuration: 30,
-          videoUrl: '',
-          videoProvider: 'youtube',
-          order: 5,
-          isCompleted: false,
-          isUnlocked: false,
-          courseId: courseId,
-          hasQuiz: true
-        }
-      ];
-      
-      // Cache the basic modules
-      try {
-        for (const module of modules) {
-          await cacheModule(module);
-        }
-        console.log('✅ Cached basic modules for offline access');
-      } catch (cacheError) {
-        console.warn('Failed to cache basic modules:', cacheError);
-      }
+      console.log('⚠️ No real cached modules found for course. Only modules accessed while online are available offline.');
+      modules = [];
     }
     
     // Get cached user progress
@@ -586,12 +658,15 @@ export const getOfflineCourseData = async (courseId: string): Promise<{
  */
 export const getCachedModulesByCourse = async (courseId: string): Promise<any[]> => {
   try {
-    if (!localDB) {
+    const { getPouchDB } = await import('./db');
+    const db = await getPouchDB();
+    
+    if (!db) {
       console.warn('Database not available for module cache');
       return [];
     }
     
-    const result = await localDB.allDocs({
+    const result = await db.allDocs({
       include_docs: true,
       startkey: 'module_',
       endkey: 'module_\ufff0'
@@ -604,5 +679,125 @@ export const getCachedModulesByCourse = async (courseId: string): Promise<any[]>
   } catch (error) {
     console.error('Failed to get cached modules by course:', error);
     return [];
+  }
+};
+
+/**
+ * Comprehensive offline system test
+ * Tests all components of the offline system
+ */
+export const testOfflineSystem = async (): Promise<{
+  success: boolean;
+  results: {
+    database: boolean;
+    cacheService: boolean;
+    localStorage: boolean;
+    serviceWorker: boolean;
+    courses: number;
+    modules: number;
+    users: number;
+    pdfs: number;
+  };
+  message: string;
+}> => {
+  const results = {
+    database: false,
+    cacheService: false,
+    localStorage: false,
+    serviceWorker: false,
+    courses: 0,
+    modules: 0,
+    users: 0,
+    pdfs: 0
+  };
+  
+  try {
+    console.log('🧪 Testing offline system...');
+    
+    // Test database
+    try {
+      const { getPouchDB } = await import('./db');
+      const db = await getPouchDB();
+      if (db) {
+        const dbInfo = await db.info();
+        console.log('✅ Database test passed:', dbInfo);
+        results.database = true;
+      }
+    } catch (error) {
+      console.error('❌ Database test failed:', error);
+    }
+    
+    // Test cache service
+    try {
+      const { getCachedCourses, getCachedModules, getAllCachedUsers, getCachedPdfsByCourse } = await import('./cacheService');
+      const courses = await getCachedCourses();
+      const modules = await getCachedModules();
+      const users = await getAllCachedUsers();
+      
+      // Count PDFs across all courses
+      let totalPdfs = 0;
+      for (const course of courses) {
+        const courseId = course.id || course._id;
+        if (courseId) {
+          const coursePdfs = await getCachedPdfsByCourse(courseId);
+          totalPdfs += coursePdfs.length;
+        }
+      }
+      
+      results.courses = courses.length;
+      results.modules = modules.length;
+      results.users = users.length;
+      results.pdfs = totalPdfs;
+      results.cacheService = true;
+      
+      console.log(`✅ Cache service test passed: ${courses.length} courses, ${modules.length} modules, ${users.length} users, ${totalPdfs} PDFs`);
+    } catch (error) {
+      console.error('❌ Cache service test failed:', error);
+    }
+    
+    // Test localStorage
+    try {
+      const testKey = 'offline_test_' + Date.now();
+      localStorage.setItem(testKey, 'test');
+      const testValue = localStorage.getItem(testKey);
+      localStorage.removeItem(testKey);
+      
+      if (testValue === 'test') {
+        results.localStorage = true;
+        console.log('✅ localStorage test passed');
+      }
+    } catch (error) {
+      console.error('❌ localStorage test failed:', error);
+    }
+    
+    // Test service worker
+    try {
+      if ('serviceWorker' in navigator) {
+        const registration = await navigator.serviceWorker.getRegistration();
+        if (registration && registration.active) {
+          results.serviceWorker = true;
+          console.log('✅ Service Worker test passed');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Service Worker test failed:', error);
+    }
+    
+    const success = results.database && results.cacheService && results.localStorage;
+    
+    return {
+      success,
+      results,
+      message: success 
+        ? `Offline system ready (${results.courses} courses, ${results.modules} modules, ${results.pdfs} PDFs cached)`
+        : 'Offline system has issues - check console for details'
+    };
+  } catch (error) {
+    console.error('❌ Offline system test failed:', error);
+    return {
+      success: false,
+      results,
+      message: `Test failed: ${error}`
+    };
   }
 }; 

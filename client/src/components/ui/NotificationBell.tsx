@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Bell, X, Check, Trash2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Bell, X, Check, Trash2, ArrowRight } from 'lucide-react';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { Badge } from './Badge';
@@ -57,7 +58,7 @@ export const NotificationBell: React.FC = () => {
 
       {/* Notification Panel */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50 max-h-96 overflow-hidden">
+        <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50 max-h-[500px] overflow-hidden flex flex-col min-h-[200px]">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -84,7 +85,7 @@ export const NotificationBell: React.FC = () => {
           </div>
 
           {/* Notifications List */}
-          <div className="max-h-64 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto max-h-64">
             {notifications.length === 0 ? (
               <div className="p-4 text-center text-gray-500 dark:text-gray-400">
                 No notifications yet
@@ -155,10 +156,19 @@ export const NotificationBell: React.FC = () => {
           </div>
 
           {/* Footer */}
-          <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700">
-            <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-              <span>Total: {stats.total}</span>
-              <span>Unread: {stats.unread}</span>
+          <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                <span>Total: {stats.total}</span>
+                <span className="ml-2">Unread: {stats.unread}</span>
+              </div>
+              <Link
+                to="/notifications"
+                onClick={() => setIsOpen(false)}
+                className="flex items-center text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors font-medium hover:underline"
+              >
+                View All →
+              </Link>
             </div>
           </div>
         </div>

@@ -294,35 +294,95 @@ class ProgressService {
         return true;
       }
       
-      // Send offline progress to server
+      // Calculate completed lessons and overall progress
       const completedLessons = Object.entries(offlineProgress.lessons)
         .filter(([_, lesson]) => lesson.isCompleted)
         .map(([lessonId, _]) => lessonId);
       
+      const totalLessons = Object.keys(offlineProgress.lessons).length;
+      const overallProgress = totalLessons > 0 ? Math.round((completedLessons.length / totalLessons) * 100) : 0;
+      
+      console.log('📊 Progress calculation:', {
+        completedLessons: completedLessons.length,
+        totalLessons,
+        overallProgress,
+        offlineProgress: offlineProgress.overallPercentage
+      });
+      
       if (completedLessons.length > 0) {
         try {
           // Update course progress on server
-          const response = await fetch(`/api/v1/users/progress/${courseId}`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
-            },
-            body: JSON.stringify({
-              progress: offlineProgress.overallPercentage,
-              completedLessons
-            })
+          const { apiClient } = await import('../utils/api');
+          
+          // Clean course ID - remove 'course_' prefix if present
+          const cleanCourseId = courseId.startsWith('course_') ? courseId.replace('course_', '') : courseId;
+          
+          console.log('🔄 Syncing progress with course ID:', { original: courseId, cleaned: cleanCourseId });
+          
+          // Send both individual lesson progress and overall course progress
+          const response = await apiClient.updateCourseProgress(cleanCourseId, {
+            progress: Math.max(overallProgress, offlineProgress.overallPercentage || 0),
+            completedLessons,
+            totalLessons,
+            lastActivity: new Date().toISOString()
           });
           
-          if (response.ok) {
-            console.log('✅ Progress synced successfully');
+          if (response.success) {
+            console.log('✅ Progress synced successfully to server');
+            
+            // Also update the cached course data to reflect the new progress
+            try {
+              const { updateCachedCourse } = await import('../offline/cacheService');
+              const { getCachedCourse } = await import('../offline/cacheService');
+              
+              const cachedCourse = await getCachedCourse(courseId);
+              if (cachedCourse) {
+                const updatedCourse = {
+                  ...cachedCourse,
+                  progress: {
+                    overallProgress: Math.max(overallProgress, offlineProgress.overallPercentage || 0),
+                    percentage: Math.max(overallProgress, offlineProgress.overallPercentage || 0),
+                    completedLessons: completedLessons.length,
+                    totalLessons
+                  }
+                };
+                
+                await updateCachedCourse(updatedCourse);
+                console.log('✅ Cached course progress updated');
+              }
+            } catch (cacheError) {
+              console.warn('⚠️ Failed to update cached course progress:', cacheError);
+            }
+            
+            // Force refresh of enrolled courses data to reflect the updated progress
+            try {
+              // Dispatch a custom event to trigger refresh in other components
+              window.dispatchEvent(new CustomEvent('courseProgressUpdated', {
+                detail: {
+                  courseId: cleanCourseId,
+                  progress: Math.max(overallProgress, offlineProgress.overallPercentage || 0),
+                  completedLessons: completedLessons.length,
+                  totalLessons
+                }
+              }));
+              console.log('✅ Course progress update event dispatched');
+            } catch (eventError) {
+              console.warn('⚠️ Failed to dispatch progress update event:', eventError);
+            }
+            
             return true;
           } else {
-            console.warn('⚠️ Failed to sync progress:', response.status);
+            console.warn('⚠️ Failed to sync progress:', response.error || response.message);
             return false;
           }
         } catch (error) {
           console.warn('⚠️ Sync request failed:', error);
+          console.error('❌ Detailed sync error:', {
+            courseId,
+            offlineProgress: offlineProgress?.overallPercentage,
+            completedLessons,
+            error: error instanceof Error ? error.message : error
+          });
           return false;
         }
       }

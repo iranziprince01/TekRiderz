@@ -502,7 +502,26 @@ router.get('/courses', authenticate, async (req: Request, res: Response) => {
           }
           
           const completedLessons = completedLessonsArray.length;
-          const totalLessons = course?.totalLessons || course?.sections?.length || 0;
+          
+          // Calculate total lessons safely
+          const calculateTotalLessons = (course: any) => {
+            if (course.totalLessons !== undefined) {
+              return course.totalLessons;
+            }
+            
+            if (course.sections && Array.isArray(course.sections)) {
+              return course.sections.reduce((total: number, section: any) => {
+                if (section.lessons && Array.isArray(section.lessons)) {
+                  return total + section.lessons.length;
+                }
+                return total;
+              }, 0);
+            }
+            
+            return 0;
+          };
+          
+          const totalLessons = calculateTotalLessons(course);
           
           // Get detailed progress information
           const detailedProgress = syncedProgress ? {
@@ -636,8 +655,26 @@ router.post('/enroll/:courseId', authenticate, async (req: Request, res: Respons
     // Create enrollment
     const enrollment = await enrollmentModel.enrollUser(req.user.id, courseId);
 
-    // Update course enrollment count
-    await courseModel.updateEnrollmentCount(courseId, 1);
+    // Create enrollment notification
+    try {
+      const { NotificationService } = await import('../services/notificationService');
+      const notificationService = new NotificationService();
+      await notificationService.createEnrollmentNotification(req.user.id, courseId);
+      logger.info('Enrollment notification created:', { userId: req.user.id, courseId });
+    } catch (notificationError) {
+      logger.warn('Failed to create enrollment notification:', { userId: req.user.id, courseId, error: notificationError });
+      // Don't fail the enrollment if notification fails
+    }
+
+    // Sync course enrollment count using the sync service
+    try {
+      const { EnrollmentSyncService } = await import('../services/enrollmentSyncService');
+      await EnrollmentSyncService.syncCourseEnrollmentCount(courseId);
+      logger.info('Course enrollment count synced after enrollment:', { courseId });
+    } catch (syncError) {
+      logger.warn('Failed to sync course enrollment count:', { courseId, error: syncError });
+      // Don't fail the enrollment if sync fails
+    }
 
     logger.info('User enrolled in course:', { userId: req.user.id, courseId, enrollmentId: enrollment._id });
 
@@ -740,9 +777,6 @@ router.get('/stats', authenticate, async (req: Request, res: Response) => {
     const totalTimeSpent = progress.progress.reduce((sum, p) => sum + p.timeSpent, 0);
     const totalLessonsCompleted = progress.progress.reduce((sum, p) => sum + p.completedLessons.length, 0);
     
-    // Get learning streak
-    const streak = await progressModel.getUserLearningStreak(req.user.id);
-
     const stats = {
       totalCourses,
       activeCourses,
@@ -752,7 +786,6 @@ router.get('/stats', authenticate, async (req: Request, res: Response) => {
       averageProgress: totalCourses > 0 ? Math.round(
         enrollments.enrollments.reduce((sum, e) => sum + e.progress, 0) / totalCourses
       ) : 0,
-      streak,
     };
 
     return res.json({
@@ -794,8 +827,7 @@ router.get('/progress', authenticate, async (req: Request, res: Response) => {
     const totalTimeSpent = progress.progress.reduce((sum, p) => sum + p.timeSpent, 0);
     const totalLessonsCompleted = progress.progress.reduce((sum, p) => sum + p.completedLessons.length, 0);
     
-    // Get learning streak
-    const streak = await progressModel.getUserLearningStreak(req.user.id);
+
     
     // Format progress data with course details
     const progressWithCourses = await Promise.all(
@@ -828,7 +860,7 @@ router.get('/progress', authenticate, async (req: Request, res: Response) => {
       overallProgress: totalCourses > 0 ? Math.round(
         enrollments.enrollments.reduce((sum, e) => sum + e.progress, 0) / totalCourses
       ) : 0,
-      streakDays: streak,
+      streakDays: 0, // Removed streak tracking
       studyTimeHours: Math.round(totalTimeSpent / 60),
       completedCourses,
       totalCourses,
@@ -942,176 +974,7 @@ router.get('/activity', authenticate, async (req: Request, res: Response) => {
   }
 });
 
-// Get user achievements
-router.get('/achievements', authenticate, async (req: Request, res: Response) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: 'Authentication required',
-      });
-    }
 
-    const limit = parseInt(req.query.limit as string) || 10;
-    
-    // Get user statistics
-    const enrollments = await enrollmentModel.getUserEnrollments(req.user.id, { limit: 1000 });
-    const progress = await progressModel.getUserProgress(req.user.id, { limit: 1000 });
-    const streak = await progressModel.getUserLearningStreak(req.user.id);
-    
-    const totalCourses = enrollments.enrollments.length;
-    const completedCourses = enrollments.enrollments.filter(e => e.status === 'completed').length;
-    const totalTimeSpent = progress.progress.reduce((sum, p) => sum + p.timeSpent, 0);
-    const totalLessonsCompleted = progress.progress.reduce((sum, p) => sum + p.completedLessons.length, 0);
-    
-    // Generate achievements based on user progress
-    const achievements = [];
-    
-    // Course completion achievements
-    if (completedCourses >= 1) {
-      achievements.push({
-        id: 'first_course',
-        title: 'First Course Completed',
-        description: 'Completed your first course',
-        icon: 'STAR',
-        category: 'learning',
-        earnedAt: enrollments.enrollments.find(e => e.status === 'completed')?.completedAt,
-        progress: 100,
-        maxProgress: 100,
-      });
-    }
-    
-    if (completedCourses >= 5) {
-      achievements.push({
-        id: 'five_courses',
-        title: 'Course Enthusiast',
-        description: 'Completed 5 courses',
-        icon: 'STAR',
-        category: 'learning',
-        earnedAt: new Date().toISOString(),
-        progress: 100,
-        maxProgress: 100,
-      });
-    }
-    
-    if (completedCourses >= 10) {
-      achievements.push({
-        id: 'ten_courses',
-        title: 'Learning Master',
-        description: 'Completed 10 courses',
-        icon: 'TROPHY',
-        category: 'learning',
-        earnedAt: new Date().toISOString(),
-        progress: 100,
-        maxProgress: 100,
-      });
-    }
-    
-    // Streak achievements
-    if (streak.currentStreak >= 7) {
-      achievements.push({
-        id: 'week_streak',
-        title: 'Week Warrior',
-        description: 'Maintained a 7-day learning streak',
-        icon: 'FIRE',
-        category: 'engagement',
-        earnedAt: new Date().toISOString(),
-        progress: 100,
-        maxProgress: 100,
-      });
-    }
-    
-    if (streak.currentStreak >= 30) {
-      achievements.push({
-        id: 'month_streak',
-        title: 'Monthly Champion',
-        description: 'Maintained a 30-day learning streak',
-        icon: 'STRONG',
-        category: 'engagement',
-        earnedAt: new Date().toISOString(),
-        progress: 100,
-        maxProgress: 100,
-      });
-    }
-    
-    // Time-based achievements
-    if (totalTimeSpent >= 600) { // 10 hours
-      achievements.push({
-        id: 'ten_hours',
-        title: 'Time Investor',
-        description: 'Spent 10 hours learning',
-        icon: 'CLOCK',
-        category: 'learning',
-        earnedAt: new Date().toISOString(),
-        progress: 100,
-        maxProgress: 100,
-      });
-    }
-    
-    // Lesson completion achievements
-    if (totalLessonsCompleted >= 50) {
-      achievements.push({
-        id: 'fifty_lessons',
-        title: 'Lesson Lover',
-        description: 'Completed 50 lessons',
-        icon: 'STAR',
-        category: 'learning',
-        earnedAt: new Date().toISOString(),
-        progress: 100,
-        maxProgress: 100,
-      });
-    }
-    
-    // Add progress-based achievements (not yet earned)
-    if (completedCourses < 5) {
-      achievements.push({
-        id: 'five_courses_progress',
-        title: 'Course Enthusiast',
-        description: 'Complete 5 courses',
-        icon: 'STAR',
-        category: 'learning',
-        earnedAt: null,
-        progress: completedCourses,
-        maxProgress: 5,
-      });
-    }
-    
-    if (streak.currentStreak < 7) {
-      achievements.push({
-        id: 'week_streak_progress',
-        title: 'Week Warrior',
-        description: 'Maintain a 7-day learning streak',
-        icon: 'FIRE',
-        category: 'engagement',
-        earnedAt: null,
-        progress: streak.currentStreak,
-        maxProgress: 7,
-      });
-    }
-
-    const stats = {
-      totalAchievements: achievements.filter(a => a.earnedAt).length,
-      totalPossible: achievements.length,
-      completedCourses,
-      totalTimeSpent: Math.round(totalTimeSpent / 60), // in hours
-      currentStreak: streak,
-    };
-
-    return res.json({
-      success: true,
-      data: {
-        achievements: achievements.slice(0, limit),
-        stats,
-      },
-    });
-  } catch (error) {
-    logger.error('Failed to get user achievements:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to retrieve user achievements',
-    });
-  }
-});
 
 // Get course recommendations
 router.get('/recommendations', authenticate, async (req: Request, res: Response) => {
@@ -1227,14 +1090,14 @@ router.get('/leaderboard', authenticate, async (req: Request, res: Response) => 
         try {
           const enrollments = await enrollmentModel.getUserEnrollments(user.id, { limit: 1000 });
           const progress = await progressModel.getUserProgress(user.id, { limit: 1000 });
-          const streak = await progressModel.getUserLearningStreak(user.id);
+
           
           const completedCourses = enrollments.enrollments.filter(e => e.status === 'completed').length;
           const totalTimeSpent = progress.progress.reduce((sum, p) => sum + p.timeSpent, 0);
           const totalLessonsCompleted = progress.progress.reduce((sum, p) => sum + p.completedLessons.length, 0);
           
           // Calculate overall score
-          const score = (completedCourses * 100) + (totalLessonsCompleted * 10) + (streak.currentStreak * 5) + Math.floor(totalTimeSpent / 60);
+          const score = (completedCourses * 100) + (totalLessonsCompleted * 10) + Math.floor(totalTimeSpent / 60);
           
           return {
             id: user.id,
@@ -1242,7 +1105,7 @@ router.get('/leaderboard', authenticate, async (req: Request, res: Response) => 
             avatar: user.avatar,
             completedCourses,
             totalTimeSpent: Math.round(totalTimeSpent / 60), // in hours
-            streak,
+
             totalLessonsCompleted,
             score,
           };
@@ -1297,10 +1160,9 @@ router.get('/dashboard-stats', authenticate, async (req: Request, res: Response)
     logger.info('Getting dashboard stats for user:', { userId: req.user.id });
 
     // Get comprehensive user statistics
-    const [enrollments, progress, streak] = await Promise.all([
+    const [enrollments, progress] = await Promise.all([
       enrollmentModel.getUserEnrollments(req.user.id, { limit: 1000 }),
-      progressModel.getUserProgress(req.user.id, { limit: 1000 }),
-      progressModel.getUserLearningStreak(req.user.id)
+      progressModel.getUserProgress(req.user.id, { limit: 1000 })
     ]);
 
     // Calculate basic stats
@@ -1396,11 +1258,7 @@ router.get('/dashboard-stats', authenticate, async (req: Request, res: Response)
         next: completedCourses < 5 ? 5 : completedCourses < 10 ? 10 : 20,
         title: completedCourses < 5 ? 'Course Enthusiast' : completedCourses < 10 ? 'Learning Master' : 'Course Expert',
       },
-      streak: {
-        current: streak.currentStreak,
-        next: streak.currentStreak < 7 ? 7 : streak.currentStreak < 30 ? 30 : 100,
-        title: streak.currentStreak < 7 ? 'Week Warrior' : streak.currentStreak < 30 ? 'Monthly Champion' : 'Streak Legend',
-      },
+
       timeSpent: {
         current: Math.round(totalTimeSpent / 60), // in hours
         next: Math.round(totalTimeSpent / 60) < 10 ? 10 : Math.round(totalTimeSpent / 60) < 50 ? 50 : 100,
@@ -1417,20 +1275,19 @@ router.get('/dashboard-stats', authenticate, async (req: Request, res: Response)
         totalTimeSpent: Math.round(totalTimeSpent / 60), // in hours
         totalLessonsCompleted,
 
-        currentStreak: streak.currentStreak,
-        longestStreak: streak.longestStreak,
+
       },
       recentActivity: limitedActivity,
       weeklyProgress,
       achievementProgress,
-      learningStreak: streak,
+
     };
 
     logger.info('Dashboard stats calculated successfully:', { 
       userId: req.user.id, 
       totalCourses,
       completedCourses,
-      streak: streak.currentStreak,
+
     });
 
     return res.json({

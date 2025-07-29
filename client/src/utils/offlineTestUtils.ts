@@ -255,7 +255,7 @@ export const investigateCourseCaching = async () => {
         const module = row.doc?.module || row.doc;
         console.log(`  ${index + 1}. ${module?.title || 'Unknown'} (Course: ${module?.courseId || 'Unknown'})`);
         console.log(`     - Completed: ${module?.isCompleted || false}`);
-        console.log(`     - Unlocked: ${module?.isUnlocked || false}`);
+
         console.log(`     - Duration: ${module?.estimatedDuration || 0} min`);
       });
     }
@@ -332,7 +332,7 @@ export const checkCourseCacheCompleteness = async (courseId: string) => {
       id: module._id || module.id,
       courseId: module.courseId,
       isCompleted: module.isCompleted,
-      isUnlocked: module.isUnlocked,
+
       hasQuiz: module.hasQuiz
     }));
     
@@ -502,7 +502,114 @@ export const preCacheCourses = async (courseIds: string[]) => {
   }
 };
 
-// Make functions available globally
+// Offline Authentication Test Utilities
+import { authenticateOffline } from '../offline/cacheService';
+import { getLearnerOfflineStatus } from '../offline/cacheService';
+
+export const testOfflineAuthentication = async () => {
+  console.log('🧪 Testing offline authentication system...');
+  
+  try {
+    // Test 1: Check if user data exists in localStorage
+    const storedEmail = localStorage.getItem('userEmail');
+    const storedUserId = localStorage.getItem('currentUserId');
+    
+    console.log('📱 localStorage data:', {
+      email: storedEmail,
+      userId: storedUserId,
+      name: localStorage.getItem('userName'),
+      role: localStorage.getItem('userRole'),
+      verified: localStorage.getItem('userVerified'),
+      termsAgreement: localStorage.getItem('userTermsAgreement')
+    });
+    
+    if (!storedEmail || !storedUserId) {
+      console.log('❌ No cached user data found in localStorage');
+      return {
+        success: false,
+        message: 'No cached user data found. Please login online first.'
+      };
+    }
+    
+    // Test 2: Try offline authentication
+    console.log('🔐 Attempting offline authentication...');
+    const authResult = await authenticateOffline(storedEmail, 'test-password');
+    
+    console.log('🔐 Offline authentication result:', authResult);
+    
+    // Test 3: Check learner offline status
+    if (authResult.success && authResult.user?.role === 'learner') {
+      const learnerStatus = await getLearnerOfflineStatus();
+      console.log('📊 Learner offline status:', learnerStatus);
+    }
+    
+    return {
+      success: authResult.success,
+      message: authResult.message,
+      user: authResult.user,
+      localStorageData: {
+        email: storedEmail,
+        userId: storedUserId,
+        name: localStorage.getItem('userName'),
+        role: localStorage.getItem('userRole')
+      }
+    };
+    
+  } catch (error) {
+    console.error('❌ Offline authentication test failed:', error);
+    return {
+      success: false,
+      message: 'Test failed: ' + (error as Error).message
+    };
+  }
+};
+
+export const clearOfflineTestData = () => {
+  console.log('🧹 Clearing offline test data...');
+  
+  // Clear localStorage
+  localStorage.removeItem('currentUserId');
+  localStorage.removeItem('userName');
+  localStorage.removeItem('userEmail');
+  localStorage.removeItem('userRole');
+  localStorage.removeItem('userAvatar');
+  localStorage.removeItem('userVerified');
+  localStorage.removeItem('userTermsAgreement');
+  
+  console.log('✅ Offline test data cleared');
+};
+
+export const simulateOfflineMode = () => {
+  console.log('📱 Simulating offline mode...');
+  
+  // Override navigator.onLine
+  Object.defineProperty(navigator, 'onLine', {
+    writable: true,
+    value: false
+  });
+  
+  // Trigger offline event
+  window.dispatchEvent(new Event('offline'));
+  
+  console.log('✅ Offline mode simulated');
+};
+
+export const simulateOnlineMode = () => {
+  console.log('📱 Simulating online mode...');
+  
+  // Override navigator.onLine
+  Object.defineProperty(navigator, 'onLine', {
+    writable: true,
+    value: true
+  });
+  
+  // Trigger online event
+  window.dispatchEvent(new Event('online'));
+  
+  console.log('✅ Online mode simulated');
+};
+
+// Global test functions for browser console
 if (typeof window !== 'undefined') {
   (window as any).offlineTest = {
     checkCachedData,
@@ -517,6 +624,11 @@ if (typeof window !== 'undefined') {
     testOfflineCourseAccess,
     preCacheCourses
   };
+  
+  (window as any).testOfflineAuth = testOfflineAuthentication;
+  (window as any).clearOfflineData = clearOfflineTestData;
+  (window as any).simulateOffline = simulateOfflineMode;
+  (window as any).simulateOnline = simulateOnlineMode;
   
   console.log(`
 🔧 Offline Test Utilities Available:

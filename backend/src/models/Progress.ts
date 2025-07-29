@@ -71,13 +71,8 @@ export class ProgressModel extends BaseModel<Progress> {
             longestSession: 0,
             totalActiveTime: 0,
             lastActiveAt: new Date().toISOString(),
-            streakDays: 0,
             completionVelocity: 0,
             interactionRate: 0
-          },
-          achievements: {
-            earnedAchievements: [],
-            progressTowardsAchievements: {}
           }
         });
       }
@@ -534,60 +529,7 @@ export class ProgressModel extends BaseModel<Progress> {
     }
   }
 
-  // Get user learning streak (consecutive days of learning activity)
-  async getUserLearningStreak(userId: string): Promise<{
-    currentStreak: number;
-    longestStreak: number;
-    lastActivityDate: string | null;
-  }> {
-    try {
-      // Get user progress entries
-      const result = await databases.progress.view('progress', 'by_user', {
-        key: userId,
-        include_docs: true,
-      });
 
-      const progressEntries = result.rows.map(row => row.doc as Progress);
-
-      if (progressEntries.length === 0) {
-        return {
-          currentStreak: 0,
-          longestStreak: 0,
-          lastActivityDate: null,
-        };
-      }
-
-      // Find the most recent activity and count basic streak
-      let lastActivity: string | null = null;
-      let activityCount = 0;
-
-      for (const progress of progressEntries) {
-        if (progress.lastWatched) {
-          activityCount++;
-          if (!lastActivity || progress.lastWatched > lastActivity) {
-            lastActivity = progress.lastWatched;
-          }
-        }
-      }
-
-      // Simple streak calculation based on recent activity
-      const currentStreak = activityCount > 0 ? Math.min(activityCount, 7) : 0;
-      const longestStreak = Math.min(activityCount, 30);
-
-      return {
-        currentStreak,
-        longestStreak,
-        lastActivityDate: lastActivity ? lastActivity.substring(0, 10) : null,
-      };
-    } catch (error) {
-      logger.error('Failed to get user learning streak:', { userId, error });
-      return {
-        currentStreak: 0,
-        longestStreak: 0,
-        lastActivityDate: null,
-      };
-    }
-  }
 
   // Enhanced video progress tracking with real-time updates
   async updateVideoProgress(
@@ -859,7 +801,7 @@ export class ProgressModel extends BaseModel<Progress> {
       return {
         overallProgress: progress.overallProgress,
         timeSpent: progress.timeSpent,
-        streak: progress.engagement.streakDays,
+        streak: 0,
         averageSessionLength: progress.engagement.averageSessionLength,
         completionVelocity: progress.engagement.completionVelocity,
         strongAreas,
@@ -938,7 +880,7 @@ export class ProgressModel extends BaseModel<Progress> {
 
   private calculateEngagementScore(progress: Progress): number {
     const factors = {
-      streakDays: Math.min(progress.engagement.streakDays * 2, 20),
+              streakDays: 0,
       sessionCount: Math.min(progress.engagement.sessionCount, 30),
       interactionRate: Math.min(progress.engagement.interactionRate * 10, 25),
       completionVelocity: Math.min(progress.engagement.completionVelocity * 5, 25)
@@ -964,12 +906,8 @@ export class ProgressModel extends BaseModel<Progress> {
       improvementAreas.push('Assessment Performance');
     }
 
-    // Analyze engagement
-    if (progress.engagement.streakDays >= 7) {
-      strongAreas.push('Consistency');
-    } else if (progress.engagement.streakDays < 3) {
-      improvementAreas.push('Study Consistency');
-    }
+    // Analyze engagement (streak-based analysis removed)
+    // Removed streak-based consistency analysis
 
     // Analyze completion velocity
     if (progress.engagement.completionVelocity >= 1) {
@@ -984,10 +922,8 @@ export class ProgressModel extends BaseModel<Progress> {
   private generateRecommendations(progress: Progress): string[] {
     const recommendations = [];
 
-    // Based on engagement
-    if (progress.engagement.streakDays < 3) {
-      recommendations.push('Try to study at least 20 minutes daily to build consistency');
-    }
+    // Based on engagement (streak-based recommendations removed)
+    // Removed streak-based consistency recommendations
 
     // Based on completion velocity
     if (progress.engagement.completionVelocity < 0.5) {
@@ -1019,7 +955,7 @@ export class ProgressModel extends BaseModel<Progress> {
 
     // Risk factors
     const riskFactors = {
-      lowEngagement: progress.engagement.streakDays < 3 ? 30 : 0,
+      lowEngagement: 0, // Removed streak-based risk assessment
       slowProgress: currentVelocity < 0.5 ? 25 : 0,
       poorQuizScores: Object.values(progress.quizScores).some(q => q.bestPercentage < 60) ? 20 : 0,
       longInactivity: (Date.now() - new Date(progress.engagement.lastActiveAt).getTime()) > 7 * 24 * 60 * 60 * 1000 ? 25 : 0

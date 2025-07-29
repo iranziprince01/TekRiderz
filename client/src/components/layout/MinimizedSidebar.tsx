@@ -5,13 +5,11 @@ import {
   BookOpen, 
   Upload, 
   User,
-  LogOut,
   Users,
-  BarChart3,
   Shield,
-  Activity,
-  Sparkles,
-  Award
+  Award,
+  BarChart3,
+  WifiOff
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -22,9 +20,27 @@ interface MinimizedSidebarProps {
 }
 
 const MinimizedSidebar: React.FC<MinimizedSidebarProps> = ({ isOpen = false, onClose }) => {
-  const { user, logout } = useAuth();
+  const { user, isOfflineMode } = useAuth();
   const { language } = useLanguage();
   const location = useLocation();
+  const [isOffline, setIsOffline] = React.useState(false);
+
+  // Detect offline mode
+  React.useEffect(() => {
+    const checkOfflineMode = () => {
+      const offline = isOfflineMode || !navigator.onLine;
+      setIsOffline(offline);
+    };
+
+    checkOfflineMode();
+    window.addEventListener('online', checkOfflineMode);
+    window.addEventListener('offline', checkOfflineMode);
+
+    return () => {
+      window.removeEventListener('online', checkOfflineMode);
+      window.removeEventListener('offline', checkOfflineMode);
+    };
+  }, [isOfflineMode]);
 
   // Navigation based on user role
   const getNavigation = () => {
@@ -43,7 +59,7 @@ const MinimizedSidebar: React.FC<MinimizedSidebarProps> = ({ isOpen = false, onC
           gradient: 'from-green-500 to-emerald-500'
         },
         { 
-          name: language === 'rw' ? 'Amasomo' : 'Courses', 
+          name: language === 'rw' ? 'Gukurikirana Amasomo' : 'Courses Moderation', 
           href: '/dashboard/courses', 
           icon: BookOpen,
           gradient: 'from-orange-500 to-red-500'
@@ -166,6 +182,13 @@ const MinimizedSidebar: React.FC<MinimizedSidebarProps> = ({ isOpen = false, onC
             `}>
               <roleConfig.icon className="h-5 w-5 text-white" />
             </div>
+            
+            {/* Offline Status Indicator */}
+            {isOffline && (
+              <div className="mt-1 flex justify-center">
+                <div className="w-2 h-2 bg-yellow-500 rounded-full" title="Offline Mode"></div>
+              </div>
+            )}
           </div>
 
           {/* Navigation Icons */}
@@ -176,7 +199,7 @@ const MinimizedSidebar: React.FC<MinimizedSidebarProps> = ({ isOpen = false, onC
                   key={item.name}
                   to={item.href}
                   onClick={handleLinkClick}
-                  title={item.name}
+                  title={`${item.name}${isOffline && item.href !== '/dashboard/profile' ? ' (Limited offline)' : ''}`}
                   className={`
                     group flex items-center justify-center w-10 h-10 rounded-xl 
                     transition-all duration-300 ease-out relative
@@ -185,6 +208,7 @@ const MinimizedSidebar: React.FC<MinimizedSidebarProps> = ({ isOpen = false, onC
                       : 'hover:bg-gray-100/50 dark:hover:bg-gray-700/50'
                     }
                     hover:scale-110 transform-gpu
+                    ${isOffline && item.href !== '/dashboard/profile' ? 'opacity-60' : ''}
                   `}
                 >
                   {/* Icon container with gradient background */}
@@ -198,44 +222,25 @@ const MinimizedSidebar: React.FC<MinimizedSidebarProps> = ({ isOpen = false, onC
                   `}>
                     <item.icon
                       className={`
-                        h-4 w-4 transition-all duration-300
+                        h-5 w-5 transition-all duration-300
                         ${isActive(item.href) 
                           ? 'text-white' 
-                          : 'text-gray-600/60 dark:text-gray-400/60 group-hover:text-gray-700 dark:group-hover:text-gray-300'
+                          : 'text-gray-600 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-300'
                         }
                       `}
                     />
                   </div>
                   
-                  {/* Active indicator */}
-                  {isActive(item.href) && (
-                    <div className="absolute right-0 w-1 h-6 bg-blue-500 rounded-l-full" />
+                  {/* Offline indicator */}
+                  {isOffline && item.href !== '/dashboard/profile' && (
+                    <div className="absolute -top-1 -right-1">
+                      <WifiOff className="w-3 h-3 text-yellow-500" />
+                    </div>
                   )}
                 </Link>
               ))}
             </nav>
           </div>
-
-          {/* Logout button - Icon only */}
-          <div className="flex-shrink-0 border-t border-gray-200/50 dark:border-gray-700/50 p-2">
-            <button
-              onClick={() => {
-                logout();
-                handleLinkClick();
-              }}
-              title="Logout"
-              className="group flex items-center justify-center w-10 h-10 rounded-xl hover:bg-red-500/10 transition-all duration-300 hover:scale-110"
-            >
-              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-red-500/20 group-hover:bg-red-500/30 transition-all duration-300">
-                <LogOut className="h-4 w-4 text-red-500" />
-              </div>
-            </button>
-          </div>
-        </div>
-
-        {/* Subtle background pattern */}
-        <div className="absolute inset-0 pointer-events-none opacity-5">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-transparent to-purple-500/10" />
         </div>
       </div>
     </>

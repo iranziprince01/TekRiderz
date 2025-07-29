@@ -1,9 +1,17 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../utils/api';
-import { cacheUser, removeCachedUser, updateCachedUser, getCachedUser, getAllCachedUsers } from '../offline/cacheService';
+import { 
+  cacheUser, 
+  removeCachedUser, 
+  updateCachedUser, 
+  getCachedUser, 
+  getAllCachedUsers, 
+  authenticateOffline,
+  autoCacheCourseOnAccess
+} from '../offline/cacheService';
 import { clearOfflineData } from '../offline/syncManager';
-import { authenticateOffline, getEssentialOfflineStatus } from '../offline/offlineEssentials';
+import { getEssentialOfflineStatus } from '../offline/offlineEssentials';
 
 // Types
 interface User {
@@ -13,6 +21,13 @@ interface User {
   role: 'learner' | 'tutor' | 'admin';
   avatar: string | null;
   verified: boolean;
+  termsAgreement?: {
+    agreedToTerms: boolean;
+    agreedToPrivacyPolicy: boolean;
+    agreedAt: string;
+    ipAddress?: string;
+    userAgent?: string;
+  };
   profile?: any;
   preferences?: any;
   lastLogin?: string;
@@ -53,7 +68,7 @@ interface AuthContextType {
   isOfflineMode: boolean;
   login: (email: string, password: string) => Promise<void>;
   loginOffline: (email: string, password: string) => Promise<void>;
-  signup: (name: string, email: string, password: string, role: 'learner' | 'tutor') => Promise<{ message: string }>;
+  signup: (name: string, email: string, password: string, role: 'learner' | 'tutor', agreeToTerms: boolean) => Promise<{ message: string }>;
   verifyOtp: (email: string, otp: string) => Promise<void>;
   resendOtp: (email: string) => Promise<{ message: string }>;
   logout: () => Promise<void>;
@@ -368,10 +383,10 @@ class SecureAuthService {
     };
   }
 
-  async signup(name: string, email: string, password: string, role: 'learner' | 'tutor'): Promise<{ message: string; otpSent: boolean }> {
+  async signup(name: string, email: string, password: string, role: 'learner' | 'tutor', agreeToTerms: boolean): Promise<{ message: string; otpSent: boolean }> {
     const data = await this.makeRequest('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ name, email, password, role }),
+      body: JSON.stringify({ name, email, password, role, agreeToTerms }),
     });
 
     // Store temporary user data for OTP verification
@@ -380,6 +395,7 @@ class SecureAuthService {
       email, 
       password, 
       role,
+      agreeToTerms,
       id: crypto.randomUUID()
     };
     await this.storage.storeTempUserData(tempUserData);
@@ -732,6 +748,120 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => clearInterval(refreshInterval);
   }, [authState.token, authState.user]);
 
+  // Pre-cache enrolled courses for offline access
+  const preCacheEnrolledCoursesOnLogin = async (user: User) => {
+    if (user.role !== 'learner') return;
+    
+    try {
+      console.log('🔄 Pre-caching enrolled courses on login...');
+      
+      // Fetch enrolled courses from API with proper error handling
+      let response;
+      try {
+        response = await apiClient.getEnrolledCourses();
+      } catch (apiError: any) {
+        console.warn('⚠️ Failed to fetch enrolled courses for pre-caching:', {
+          error: apiError?.message || apiError,
+          status: apiError?.status,
+          code: apiError?.code
+        });
+        return; // Exit gracefully if we can't fetch courses
+      }
+      
+      if (response?.success && response?.data) {
+        const courses = response.data.courses || response.data;
+        console.log(`📚 Found ${courses.length} enrolled courses to pre-cache`);
+        
+        // Only cache the first 3 courses to reduce load time
+        const coursesToCache = courses.slice(0, 3);
+        console.log(`📚 Caching first ${coursesToCache.length} courses for faster access`);
+        
+        // Cache courses in parallel with limited concurrency
+        const cachePromises = coursesToCache.map(async (course: any, index: number) => {
+          // Add small delay between requests to avoid overwhelming the server
+          if (index > 0) {
+            await new Promise(resolve => setTimeout(resolve, 200));
+          }
+          
+          try {
+            // Get course details with modules
+            let courseResponse;
+            try {
+              courseResponse = await apiClient.getCourse(course.id || course._id);
+            } catch (courseApiError: any) {
+              console.warn(`⚠️ Failed to fetch course ${course.id} for pre-caching:`, {
+                courseId: course.id,
+                error: courseApiError?.message || courseApiError,
+                status: courseApiError?.status,
+                code: courseApiError?.code
+              });
+              return; // Skip this course and continue with others
+            }
+            
+            if (courseResponse?.success && courseResponse?.data) {
+              const courseData = courseResponse.data.course || courseResponse.data;
+              
+              // Extract modules from course data
+              const modules: any[] = [];
+              if (courseData.sections && Array.isArray(courseData.sections)) {
+                courseData.sections.forEach((section: any, sectionIndex: number) => {
+                  if (section && section.lessons && Array.isArray(section.lessons)) {
+                    section.lessons.forEach((lesson: any, lessonIndex: number) => {
+                      if (lesson && lesson.type === 'video' && lesson.content?.videoUrl) {
+                        const moduleOrder = sectionIndex * 10 + lessonIndex + 1;
+                        modules.push({
+                          id: lesson.id || `lesson_${sectionIndex}_${lessonIndex}`,
+                          title: lesson.title || `Module ${moduleOrder}`,
+                          description: lesson.description || section.description || '',
+                          estimatedDuration: lesson.estimatedDuration || 15,
+                          videoUrl: lesson.content.videoUrl,
+                          videoProvider: 'youtube',
+                          pdfUrl: lesson.content.documentUrl || lesson.content.pdfUrl,
+                          order: moduleOrder,
+                          isCompleted: false,
+                          courseId: course.id || course._id
+                        });
+                      }
+                    });
+                  }
+                });
+              }
+              
+              // Auto-cache the course with its modules
+              try {
+                await autoCacheCourseOnAccess(courseData, modules, user);
+              } catch (cacheError: any) {
+                console.warn(`⚠️ Failed to auto-cache course ${course.id}:`, {
+                  courseId: course.id,
+                  error: cacheError?.message || cacheError
+                });
+              }
+            }
+          } catch (courseError: any) {
+            console.warn(`⚠️ Failed to pre-cache course ${course.id}:`, {
+              courseId: course.id,
+              error: courseError?.message || courseError,
+              status: courseError?.status,
+              code: courseError?.code
+            });
+          }
+        });
+        
+        // Wait for all caching to complete
+        await Promise.all(cachePromises);
+        
+        console.log('✅ Pre-caching of enrolled courses completed');
+      }
+    } catch (error: any) {
+      console.warn('⚠️ Failed to pre-cache enrolled courses on login:', {
+        error: error?.message || error,
+        status: error?.status,
+        code: error?.code
+      });
+      // Don't throw - this is a non-critical operation
+    }
+  };
+
   const login = async (email: string, password: string) => {
     setAuthState(prev => ({ ...prev, isLoading: true }));
     
@@ -748,7 +878,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Cache user for offline access (learners only)
         if (user.role === 'learner') {
           try {
-            await cacheUser(user);
+            // Cache user with credentials for offline authentication
+            await cacheUser(user, {
+              email: email,
+              passwordHash: btoa(password) // Simple encoding for demo purposes
+            });
+            console.log('✅ User cached with credentials for offline access');
           } catch (cacheError) {
             console.warn('Failed to cache user for offline access:', cacheError);
             // Don't block login if caching fails
@@ -773,13 +908,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         navigate(redirectTo, { replace: true });
         
         console.log('Login successful');
+        
+        // Pre-cache enrolled courses in the background (non-blocking)
+        if (user.role === 'learner') {
+          setTimeout(() => {
+            console.log('🔄 Starting background pre-caching...');
+            // Show a subtle notification that caching is happening
+            if (typeof window !== 'undefined' && (window as any).showNotification) {
+              (window as any).showNotification('info', 'Preparing Offline Access', 'Caching your courses for offline access...', 3000);
+            }
+            preCacheEnrolledCoursesOnLogin(user).catch(error => {
+              console.warn('Background pre-caching failed:', error);
+            });
+          }, 1000); // Start after 1 second to not block UI
+        }
+        
         return;
         
       } catch (error: any) {
         console.error('Login failed:', error?.message);
         setAuthState(prev => ({ ...prev, isLoading: false }));
         throw error;
-            }
+      }
     } catch (error: any) {
       console.error('❌ Login failed:', error?.message);
       setAuthState(prev => ({ ...prev, isLoading: false }));
@@ -799,7 +949,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Set user in auth state (no token for offline mode)
         setAuthState(prev => ({
           ...prev,
-          user: result.user,
+          user: result.user || null,
           token: null, // No token in offline mode
           isLoading: false,
           otpSent: false,
@@ -824,18 +974,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signup = async (name: string, email: string, password: string, role: 'learner' | 'tutor') => {
+  const signup = async (name: string, email: string, password: string, role: 'learner' | 'tutor', agreeToTerms: boolean) => {
     setAuthState(prev => ({ ...prev, isLoading: true }));
     
     try {
-      const { message, otpSent } = await authService.signup(name, email, password, role);
+      const { message, otpSent } = await authService.signup(name, email, password, role, agreeToTerms);
       
       setAuthState(prev => ({
         ...prev,
         isLoading: false,
         otpSent,
         tempEmail: email,
-        tempUserData: { name, email, password, role },
+        tempUserData: { name, email, password, role, agreeToTerms },
       }));
       
       return { message };
@@ -854,17 +1004,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Set token in apiClient for API requests
       await apiClient.setToken(token);
       
-      // Cache user for offline access (learners only)
-      if (user.role === 'learner') {
-        try {
-          await cacheUser(user);
-        } catch (cacheError) {
-          console.warn('Failed to cache user for offline access:', cacheError);
-          // Don't block verification if caching fails
+              // Cache user for offline access (learners only)
+        if (user.role === 'learner') {
+          try {
+            // Cache user for offline access (without credentials since we don't have password here)
+            await cacheUser(user);
+            console.log('✅ User cached for offline access after verification');
+          } catch (cacheError) {
+            console.warn('Failed to cache user for offline access:', cacheError);
+            // Don't block verification if caching fails
+          }
+        } else {
+          console.log('🔄 Skipping user cache - user is not a learner');
         }
-      } else {
-        console.log('🔄 Skipping user cache - user is not a learner');
-      }
       
       setAuthState(prev => ({
         ...prev,

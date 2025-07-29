@@ -12,7 +12,7 @@ import {
 import { useLanguage } from '../../contexts/LanguageContext';
 import { CoursePermissions } from '../../utils/coursePermissions';
 import { Button } from '../ui/Button';
-import { GamificationDisplay } from '../course/GamificationDisplay';
+
 
 interface CourseSidebarProps {
   isOpen?: boolean;
@@ -169,12 +169,7 @@ const CourseSidebar: React.FC<CourseSidebarProps> = ({
               </div>
             )}
 
-            {/* Gamification Display - Only show for enrolled users */}
-            {permissions?.canWatchVideos && id && (
-              <div className="px-3 mt-4">
-                <GamificationDisplay courseId={id} />
-              </div>
-            )}
+
           </div>
         </div>
       </div>

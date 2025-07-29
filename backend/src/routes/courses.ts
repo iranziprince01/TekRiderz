@@ -10,7 +10,7 @@ import { progressRateLimiter } from '../middleware/rateLimiter';
 const router = Router();
 
 // Get all published courses
-router.get('/', optionalAuth, normalizeCourseResponse, courseController.getAllCourses);
+router.get('/', optionalAuth, normalizeCourseResponse, courseController.getPublishedCourses);
 
 // Get single course by ID
 router.get('/:id', optionalAuth, courseController.getCourseById);

@@ -101,10 +101,10 @@ export const getCoursePermissions = (user: User | null, course: Course): CourseP
     }
   }
 
-  // Learner permissions - can only learn and interact with published courses
+  // Learner permissions - can learn and interact with published and approved courses
   if (isLearner) {
     return {
-      canView: course.status === 'published',
+      canView: course.status === 'published' || course.status === 'approved',
       canEdit: false,
       canDelete: false,
       canSubmitForReview: false,
@@ -112,9 +112,9 @@ export const getCoursePermissions = (user: User | null, course: Course): CourseP
       canReject: false,
       canPublish: false,
       canManageContent: false,
-      canTakeQuizzes: course.status === 'published',
-      canWatchVideos: course.status === 'published',
-      canViewGrades: course.status === 'published',
+      canTakeQuizzes: course.status === 'published' || course.status === 'approved',
+      canWatchVideos: course.status === 'published' || course.status === 'approved',
+      canViewGrades: course.status === 'published' || course.status === 'approved',
     };
   }
 

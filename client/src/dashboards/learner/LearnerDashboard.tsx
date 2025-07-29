@@ -22,11 +22,12 @@ import {
   getCachedCourses, 
   getEnrolledCoursesOffline, 
   cacheLearnerData,
-  getLearnerOfflineStatus
+  getLearnerOfflineStatus,
+  forceCacheAllEnrolledCourses
 } from '../../offline/cacheService';
 import { performOneTimeSync } from '../../offline/syncManager';
 import { useAuth } from '../../contexts/AuthContext';
-import OfflineStatus from '../../components/common/OfflineStatus';
+
 
 const LearnerDashboard: React.FC = () => {
   const { t } = useLanguage();
@@ -45,9 +46,9 @@ const LearnerDashboard: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false); // Track sync status
 
   // Load dashboard data
-  const loadDashboardData = useCallback(async () => {
-    // Prevent multiple simultaneous requests
-    if (isLoadingData) {
+  const loadDashboardData = useCallback(async (forceRefresh = false) => {
+    // Prevent multiple simultaneous requests, unless it's a forced refresh for enrollment updates
+    if (isLoadingData && !forceRefresh) {
       console.log('🔄 Dashboard data loading already in progress, skipping...');
       return;
     }
@@ -63,6 +64,15 @@ const LearnerDashboard: React.FC = () => {
         setIsOffline(true);
         
         try {
+          // First, check if we have any cached courses at all
+          const allCachedCourses = await getCachedCourses();
+          console.log('📚 Total cached courses found:', allCachedCourses.length);
+          
+          if (allCachedCourses.length === 0) {
+            setError('No courses available offline. Please access courses while online to enable offline viewing.');
+            return;
+          }
+          
           // Use the new learner-specific offline function
           const enrolledCourses = await getEnrolledCoursesOffline();
           console.log('📚 Loaded enrolled courses for offline dashboard:', enrolledCourses.length);
@@ -75,12 +85,27 @@ const LearnerDashboard: React.FC = () => {
             // Show offline status
             const offlineStatus = await getLearnerOfflineStatus();
             console.log('📱 Learner offline status:', offlineStatus);
+            
+            // Mark that we have cached courses
+            localStorage.setItem('hasCachedCourses', 'true');
           } else {
-            setError('No enrolled courses available offline. Please enroll in courses when online.');
+            // If no enrolled courses but we have cached courses, show them as available
+            const availableCourses = allCachedCourses.filter(course => 
+              course.status === 'published' || course.status === 'approved'
+            );
+            
+            if (availableCourses.length > 0) {
+              setCourses(availableCourses);
+              setEnrolledCourses([]);
+              setError(null);
+              console.log('📚 Showing available cached courses in offline mode:', availableCourses.length);
+            } else {
+              setError('No enrolled courses available offline. Please enroll in courses when online.');
+            }
           }
         } catch (cacheError) {
           console.error('Failed to load cached courses for dashboard:', cacheError);
-          setError('Failed to load cached courses');
+          setError('Failed to load cached courses. Please try refreshing the page.');
         }
         
         return;
@@ -91,12 +116,13 @@ const LearnerDashboard: React.FC = () => {
       console.log('🌐 Loading dashboard data from API (online mode)');
       
       const [coursesResponse, enrolledResponse] = await Promise.all([
-        apiClient.getPublishedCourses(),
+        apiClient.getPublishedCourses({ limit: 100 }), // Increase limit to get all courses
         apiClient.getEnrolledCourses()
       ]);
 
       if (coursesResponse.success) {
         const courses = coursesResponse.data.courses || [];
+
         setCourses(courses);
         
         // Cache all courses for offline access (learners only)
@@ -122,16 +148,50 @@ const LearnerDashboard: React.FC = () => {
         const enrolledCourses = enrolledResponse.data.courses || [];
         setEnrolledCourses(enrolledCourses);
         
+        // Merge enrollment data with courses for Dashboard display
+        if (coursesResponse.success) {
+          const courses = coursesResponse.data.courses || [];
+          const coursesWithEnrollment = courses.map((course: any) => {
+            // Find matching enrolled course
+            const enrolledCourse = enrolledCourses.find((enrolled: any) => 
+              (enrolled.id || enrolled._id) === (course.id || course._id)
+            );
+            
+            if (enrolledCourse) {
+              console.log('🔄 Found enrolled course for Dashboard:', {
+                courseId: course.id || course._id,
+                courseTitle: course.title,
+                enrollmentStatus: enrolledCourse.enrollment?.status,
+                progress: enrolledCourse.progress?.overallProgress
+              });
+              
+              return {
+                ...course,
+                isEnrolled: true,
+                enrollment: enrolledCourse.enrollment,
+                progress: enrolledCourse.progress
+              };
+            }
+            
+            return course;
+          });
+          
+          setCourses(coursesWithEnrollment);
+          console.log('🔄 Merged enrollment data with courses for Dashboard display');
+        }
+        
         // Cache enrolled courses for offline access (learners only)
         if (authUser?.role === 'learner') {
           try {
             console.log('💾 Caching enrolled courses for offline access...');
-            // Mark courses as enrolled before caching
-            const enrolledCoursesForCache = enrolledCourses.map((course: any) => ({
-              ...course,
-              isEnrolled: true,
-              enrollment: course.enrollment || {
-                id: `enrollment_${course._id || course.id}`,
+            // Mark courses as enrolled before caching with null checks
+            const enrolledCoursesForCache = enrolledCourses
+              .filter((course: any) => course && (course._id || course.id)) // Filter out null/undefined courses
+              .map((course: any) => ({
+                ...course,
+                isEnrolled: true,
+                enrollment: course.enrollment || {
+                  id: `enrollment_${course._id || course.id}`,
                 enrolledAt: new Date().toISOString(),
                 progress: course.progress?.overallProgress || 0,
                 status: 'active'
@@ -139,49 +199,95 @@ const LearnerDashboard: React.FC = () => {
               offlineAccessible: true,
               lastCached: new Date().toISOString()
             }));
-            
+
+            // Use stable enrolled courses cache
+            await cacheLearnerData(authUser, enrolledCoursesForCache);
+            console.log(`✅ Cached ${enrolledCourses.length} enrolled courses in stable cache`);
+
+            // Also cache individual courses for backward compatibility
             await Promise.all(enrolledCoursesForCache.map((course: any) => cacheCourse(course)));
-            console.log(`✅ Cached ${enrolledCourses.length} enrolled courses successfully`);
-            
-            // Cache complete learner data for offline access
-            if (authUser) {
-              await cacheLearnerData(authUser, enrolledCoursesForCache);
-              console.log('💾 Learner data cached for offline access');
-            }
-          } catch (cacheError) {
-            console.warn('Failed to cache some enrolled courses:', cacheError);
+            console.log(`✅ Cached ${enrolledCourses.length} individual courses for compatibility`);
+
+          } catch (cacheError: any) {
+            console.warn('⚠️ Failed to pre-cache enrolled courses:', {
+              error: cacheError?.message || cacheError,
+              coursesCount: enrolledCourses?.length || 0,
+              validCoursesCount: enrolledCourses?.filter((c: any) => c && (c.id || c._id))?.length || 0
+            });
           }
-        } else {
-          console.log('🔄 Skipping enrolled course cache - user is not a learner');
         }
       }
-    } catch (err: any) {
-      console.error('Error loading dashboard data:', err);
-      
-      // If online request fails, try to load cached courses (learners only)
-      if (!isOfflineMode && navigator.onLine && authUser?.role === 'learner') {
-        console.log('🔄 Online request failed, trying cached courses...');
-        try {
-          const enrolledCourses = await getEnrolledCoursesOffline();
-          if (enrolledCourses.length > 0) {
-            console.log('📚 Fallback to cached enrolled courses:', enrolledCourses.length);
-            setEnrolledCourses(enrolledCourses);
-            setCourses([]);
-            setIsOffline(true);
-            setError(null);
-            return;
-          }
-        } catch (cacheError) {
-          console.error('Failed to load cached courses as fallback:', cacheError);
-        }
+
+      // Handle errors
+      if (!coursesResponse.success) {
+        console.error('Failed to fetch courses:', coursesResponse.error);
+        setError(coursesResponse.error || 'Failed to load courses');
       }
-      
-      setError(err.message || 'Failed to load dashboard data');
+
+      if (!enrolledResponse.success) {
+        console.error('Failed to fetch enrolled courses:', enrolledResponse.error);
+        // Don't set error for enrolled courses failure as it's not critical
+      }
+
+    } catch (error: any) {
+      console.error('Error loading dashboard data:', error);
+      setError(error.message || 'Failed to load dashboard data');
     } finally {
       setIsLoading(false);
       setIsLoadingData(false);
     }
-  }, [isOfflineMode]); // Removed isLoadingData to prevent dependency loop
+  }, [authUser, isOfflineMode]);
+
+  // Specific function for enrollment updates that forces refresh
+  const handleEnrollmentUpdate = useCallback(async (courseId: string) => {
+    console.log('🔄 Enrollment update detected for course:', courseId);
+    
+    // Force refresh enrollment data
+    try {
+      setIsLoadingData(true);
+      
+      // Fetch fresh enrollment data
+      const enrolledResponse = await apiClient.getEnrolledCourses();
+      
+      if (enrolledResponse.success) {
+        const enrolledCourses = enrolledResponse.data.courses || [];
+        setEnrolledCourses(enrolledCourses);
+        
+        // Update the courses state with fresh enrollment data
+        setCourses(prevCourses => {
+          return prevCourses.map((course: any) => {
+            const enrolledCourse = enrolledCourses.find((enrolled: any) => 
+              (enrolled.id || enrolled._id) === (course.id || course._id)
+            );
+            
+            if (enrolledCourse) {
+              console.log('🔄 Updated enrollment data for course:', {
+                courseId: course.id || course._id,
+                courseTitle: course.title,
+                enrollmentStatus: enrolledCourse.enrollment?.status,
+                progress: enrolledCourse.progress?.overallProgress
+              });
+              
+              return {
+                ...course,
+                isEnrolled: true,
+                enrollment: enrolledCourse.enrollment,
+                progress: enrolledCourse.progress
+              };
+            }
+            
+            return course;
+          });
+        });
+        
+        console.log('🔄 Enrollment data refreshed successfully');
+      }
+    } catch (error) {
+      console.error('Failed to refresh enrollment data:', error);
+    } finally {
+      setIsLoadingData(false);
+    }
+  }, []);
 
   // Handle enrollment change - update local state immediately
   const handleEnrollmentChange = useCallback((updatedCourse?: any) => {
@@ -233,31 +339,63 @@ const LearnerDashboard: React.FC = () => {
     return () => clearTimeout(timeoutId);
   }, []); // Empty dependency array - only run once on mount
 
+  // Proactive caching: Cache all enrolled courses when user is online
+  useEffect(() => {
+    const cacheAllEnrolledCourses = async () => {
+      if (authUser?.role === 'learner' && navigator.onLine && !isOfflineMode) {
+        try {
+          console.log('🔄 Proactive caching: Caching all enrolled courses for offline access...');
+          const result = await forceCacheAllEnrolledCourses(authUser);
+          if (result.success) {
+            console.log('✅ Proactive caching completed:', result.message);
+          } else {
+            console.warn('⚠️ Proactive caching failed:', result.message);
+          }
+        } catch (error) {
+          console.warn('⚠️ Proactive caching error:', error);
+        }
+      }
+    };
+
+    // Cache courses after a short delay to avoid blocking the UI
+    const timeoutId = setTimeout(cacheAllEnrolledCourses, 3000);
+    
+    return () => clearTimeout(timeoutId);
+  }, [authUser, isOfflineMode]);
+
   // Listen for global enrollment events
   useEffect(() => {
-    const handleEnrollmentEvent = () => {
-      loadDashboardData();
+    const handleEnrollmentEvent = (event: CustomEvent) => {
+      const courseId = event.detail?.courseId;
+      if (courseId) {
+        handleEnrollmentUpdate(courseId);
+      } else {
+        // Fallback to full refresh if no courseId provided
+        loadDashboardData(true);
+      }
     };
 
     // Listen for enrollment events from other components
-    window.addEventListener('courseEnrollmentUpdated', handleEnrollmentEvent);
+    window.addEventListener('courseEnrollmentUpdated', handleEnrollmentEvent as EventListener);
     
     // Listen for course progress updates
-    window.addEventListener('courseProgressUpdated', handleEnrollmentEvent);
+    window.addEventListener('courseProgressUpdated', handleEnrollmentEvent as EventListener);
 
     return () => {
-      window.removeEventListener('courseEnrollmentUpdated', handleEnrollmentEvent);
-      window.removeEventListener('courseProgressUpdated', handleEnrollmentEvent);
+      window.removeEventListener('courseEnrollmentUpdated', handleEnrollmentEvent as EventListener);
+      window.removeEventListener('courseProgressUpdated', handleEnrollmentEvent as EventListener);
     };
-  }, []); // Empty dependency array - listeners should only be set up once
+  }, [handleEnrollmentUpdate, loadDashboardData]); // Include dependencies
 
   // Calculate simple dashboard statistics
   const dashboardStats = useMemo(() => {
     const totalAvailable = courses?.length || 0;
-    const totalEnrolled = enrolledCourses?.length || 0;
-    const completed = enrolledCourses?.filter((course: any) => 
-      course.enrollment?.status === 'completed' || 
-      course.progress?.percentage >= 100
+    const totalEnrolled = courses?.filter((course: any) => course.isEnrolled || course.enrollment).length || 0;
+    const completed = courses?.filter((course: any) => 
+      (course.isEnrolled || course.enrollment) && 
+      (course.enrollment?.status === 'completed' || 
+       course.progress?.percentage >= 100 ||
+       course.progress?.overallProgress >= 100)
     ).length || 0;
 
     return {
@@ -265,46 +403,57 @@ const LearnerDashboard: React.FC = () => {
       totalEnrolled,
       completed
     };
-  }, [courses, enrolledCourses]);
+  }, [courses]);
 
-  // Filter available courses (all approved courses, showing both enrolled and non-enrolled)
+  // Filter available courses (all published/approved courses with enrollment status)
   const availableCourses = useMemo(() => {
     if (!courses || !Array.isArray(courses)) {
       return [];
     }
-    
-    const enrolledCourseIds = new Set(
-      enrolledCourses?.map((course: any) => course.id || course._id) || []
-    );
-    
+
     return courses
       .filter((course: any) => {
-        const isPublished = course.status === 'published';
+        const isAvailable = course.status === 'published' || course.status === 'approved';
         const matchesSearch = !searchTerm || 
           course.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           course.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           course.instructorName?.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesCategory = categoryFilter === 'all' || course.category === categoryFilter;
         const matchesLevel = levelFilter === 'all' || course.level === levelFilter;
-        
-        return isPublished && matchesSearch && matchesCategory && matchesLevel;
+        return isAvailable && matchesSearch && matchesCategory && matchesLevel;
       })
       .map((course: any) => {
-        // Add enrollment info to each course
-        const isEnrolled = enrolledCourseIds.has(course.id || course._id);
-        const enrolledCourse = enrolledCourses?.find((ec: any) => (ec.id || ec._id) === (course.id || course._id));
+        // The backend already provides enrollment status in the course object
+        // Use the enrollment data directly from the course object
+        const isEnrolled = course.isEnrolled || course.enrollment;
+        const enrollment = course.enrollment || null;
+        const progress = course.progress || enrollment?.progress || 0;
+        
+        // Debug: Log specific course enrollment check
+        if (course.title === 'Intro to AI') {
+          console.log('🔍 Intro to AI enrollment check:', {
+            courseId: course.id || course._id,
+            isEnrolled,
+            enrollment,
+            progress,
+            courseIsEnrolled: course.isEnrolled,
+            courseEnrollment: course.enrollment
+          });
+        }
         
         const processedCourse = {
           ...course,
           isEnrolled,
-          enrollment: enrolledCourse?.enrollment || null,
-          progress: enrolledCourse?.progress || null
+          enrollment,
+          progress
         };
         
         return processedCourse;
       })
       .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-  }, [courses, enrolledCourses, searchTerm, categoryFilter, levelFilter]);
+
+
+  }, [courses, searchTerm, categoryFilter, levelFilter]);
 
   // Get unique categories and levels for filtering
   const { categories, levels } = useMemo(() => {
@@ -322,7 +471,7 @@ const LearnerDashboard: React.FC = () => {
         <div className="text-center">
           <LoadingSpinner size="lg" className="text-blue-600 dark:text-blue-400" />
           <p className="text-gray-600 dark:text-gray-400 mt-4 text-lg">
-            {t('Loading your dashboard...')}
+            {t('learner.loadingDashboard')}
           </p>
         </div>
       </div>
@@ -335,16 +484,16 @@ const LearnerDashboard: React.FC = () => {
         <Card className="p-8 text-center max-w-md border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
           <BookOpen className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-            {t('Unable to load dashboard')}
+            {t('learner.unableToLoad')}
           </h3>
           <p className="text-gray-600 dark:text-gray-400 mb-6">
             {error}
           </p>
           <Button 
-            onClick={loadDashboardData}
+            onClick={() => loadDashboardData()}
             className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white"
           >
-            {t('Try Again')}
+            {t('learner.tryAgain')}
           </Button>
         </Card>
       </div>
@@ -357,14 +506,14 @@ const LearnerDashboard: React.FC = () => {
       <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900 border border-blue-200 dark:border-gray-700 rounded-2xl p-8">
         <div className="max-w-4xl">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            {t('Welcome back')}, {authUser?.name || t('Learner')}!
+            {t('learner.welcomeBack')}, {authUser?.name || t('auth.learner')}!
           </h1>
           <div className="flex items-center justify-between">
             <p className="text-gray-700 dark:text-gray-300 text-lg">
-              {t('Continue your learning journey with our latest courses')}
+              {t('learner.continueJourney')}
             </p>
             <div className="flex items-center gap-4">
-              <OfflineStatus />
+
               {navigator.onLine && (
                 <Button
                   onClick={handleManualSync}
@@ -376,14 +525,14 @@ const LearnerDashboard: React.FC = () => {
                   {isSyncing ? (
                     <>
                       <LoadingSpinner size="sm" />
-                      {t('Syncing...')}
+                      {t('learner.syncing')}
                     </>
                   ) : (
                     <>
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                       </svg>
-                      {t('Sync')}
+                      {t('learner.sync')}
                     </>
                   )}
                 </Button>
@@ -400,7 +549,7 @@ const LearnerDashboard: React.FC = () => {
                 </div>
                 <div>
                   <div className="text-2xl font-bold text-gray-900 dark:text-white">{dashboardStats.totalAvailable}</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">{t('Available Courses')}</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">{t('learner.availableCourses')}</div>
                 </div>
               </div>
             </div>
@@ -412,7 +561,7 @@ const LearnerDashboard: React.FC = () => {
                 </div>
                 <div>
                   <div className="text-2xl font-bold text-gray-900 dark:text-white">{dashboardStats.totalEnrolled}</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">{t('Enrolled Courses')}</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">{t('learner.enrolledCourses')}</div>
                 </div>
               </div>
             </div>
@@ -424,7 +573,7 @@ const LearnerDashboard: React.FC = () => {
                 </div>
                 <div>
                   <div className="text-2xl font-bold text-gray-900 dark:text-white">{dashboardStats.completed}</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">{t('Completed')}</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">{t('learner.completed')}</div>
                 </div>
               </div>
             </div>
@@ -441,7 +590,7 @@ const LearnerDashboard: React.FC = () => {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5" />
               <Input
                 type="text"
-                placeholder={t('Search courses...')}
+                placeholder={t('learner.searchCourses')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-11 h-12 border-gray-300 dark:border-gray-600 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
@@ -457,7 +606,7 @@ const LearnerDashboard: React.FC = () => {
                 onChange={(e) => setCategoryFilter(e.target.value)}
                 className="w-full h-12 px-4 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500 dark:focus:border-blue-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white appearance-none [&::-ms-expand]:hidden"
               >
-                <option value="all">{t('All Categories')}</option>
+                <option value="all">{t('learner.allCategories')}</option>
                 {categories.map((category: string) => (
                   <option key={category} value={category}>
                     {t(category)}
@@ -480,7 +629,7 @@ const LearnerDashboard: React.FC = () => {
                 onChange={(e) => setLevelFilter(e.target.value)}
                 className="w-full h-12 px-4 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500 dark:focus:border-blue-400 bg-white dark:bg-gray-700 text-gray-900 dark:text-white appearance-none [&::-ms-expand]:hidden"
               >
-                <option value="all">{t('All Levels')}</option>
+                <option value="all">{t('learner.allLevels')}</option>
                 {levels.map((level: string) => (
                   <option key={level} value={level}>
                     {t(level)}
@@ -497,12 +646,12 @@ const LearnerDashboard: React.FC = () => {
         </div>
       </Card>
 
-      {/* Courses Section */}
+      {/* All Courses Section */}
       <div>
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{t('Available Courses')}</h2>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{t('learner.allCourses')}</h2>
           <Badge variant="default" className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-3 py-1 text-sm">
-            {availableCourses.length} {t('courses')}
+            {availableCourses.length} {t('learner.courses')}
           </Badge>
         </div>
 
@@ -523,10 +672,12 @@ const LearnerDashboard: React.FC = () => {
               <Search className="w-12 h-12 text-gray-400 dark:text-gray-500" />
             </div>
             <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
-              {t('No courses match your search')}
+              {t('learner.noCoursesFound')}
             </h3>
             <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
-              {t('Try adjusting your search terms or filters')}
+              {searchTerm || categoryFilter !== 'all' || levelFilter !== 'all' 
+                ? t('learner.tryAdjustingSearch') 
+                : t('learner.noCoursesAvailable')}
             </p>
             <Button
               variant="outline"
@@ -537,7 +688,7 @@ const LearnerDashboard: React.FC = () => {
               }}
               className="border-blue-200 dark:border-blue-700 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
             >
-              {t('Clear Search')}
+              {t('learner.clearSearch')}
             </Button>
           </Card>
         )}

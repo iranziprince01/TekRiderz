@@ -7,8 +7,10 @@ import NotificationProvider from './contexts/NotificationContext';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { NotificationManager } from './components/ui/NotificationManager';
 import ProtectedRoute from './components/ProtectedRoute';
-import OfflineStatus from './components/common/OfflineStatus';
+import UnifiedOfflineStatus from './components/common/UnifiedOfflineStatus';
 import OfflineInitializer from './components/common/OfflineInitializer';
+import PWAInstallPrompt from './components/common/PWAInstallPrompt';
+import PWAStatus from './components/common/PWAStatus';
 
 import { performOneTimeSync, checkSyncNeeded, clearOfflineData } from './offline/syncManager';
 import { localDB } from './offline/db';
@@ -26,62 +28,15 @@ import Course from './pages/Course';
 import Profile from './pages/Profile';
 import Analytics from './pages/Analytics';
 import Certificates from './pages/Certificates';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsAndConditions from './pages/TermsAndConditions';
+import Notifications from './pages/Notifications';
 import NotFound from './pages/NotFound';
 
 
-// Offline Status Hook
-const useOfflineStatus = () => {
-  const [isOffline, setIsOffline] = React.useState(!navigator.onLine);
 
-  React.useEffect(() => {
-    const handleOnline = () => {
-      // Reduce logging to prevent console spam
-      // console.log('App came online');
-      setIsOffline(false);
-    };
 
-    const handleOffline = () => {
-      // Reduce logging to prevent console spam
-      // console.log('App went offline');
-      setIsOffline(true);
-    };
 
-    // Set initial state
-    setIsOffline(!navigator.onLine);
-
-    // Add event listeners
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    // Cleanup
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-  return isOffline;
-};
-
-// Offline Banner Component
-const OfflineBanner: React.FC = () => {
-  const isOffline = useOfflineStatus();
-
-  if (!isOffline) {
-    return null;
-  }
-
-  return (
-    <div className="fixed top-0 left-0 right-0 z-50 bg-yellow-500 text-yellow-900 px-4 py-2 text-center text-sm font-medium shadow-md border-b border-yellow-600">
-      <div className="flex items-center justify-center space-x-2">
-        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-        </svg>
-        <span>Offline Mode: Viewing cached content</span>
-      </div>
-    </div>
-  );
-};
 
 // Sync Initializer Component
 const SyncInitializer: React.FC = () => {
@@ -121,7 +76,6 @@ const SyncInitializer: React.FC = () => {
 
 
 function App() {
-  const isOffline = useOfflineStatus();
 
   // Initialize app systems after mount
   useEffect(() => {
@@ -142,23 +96,57 @@ function App() {
         // Initialize offline essentials
         try {
           console.log('🔧 Initializing offline essentials...');
+          const { initializeOfflineEssentials, testOfflineSystem } = await import('./offline/offlineEssentials');
+          
           const offlineInit = await initializeOfflineEssentials();
           if (offlineInit.success) {
             console.log('✅ Offline essentials initialized:', offlineInit.message);
           } else {
             console.warn('⚠️ Offline essentials initialization failed:', offlineInit.message);
           }
+          
+          // Test the offline system
+          const testResult = await testOfflineSystem();
+          console.log('🧪 Offline system test result:', testResult);
+          
+          // Set global offline status
+          if (testResult.success) {
+            localStorage.setItem('offline_system_ready', 'true');
+            console.log('✅ Offline system is ready for use');
+          } else {
+            localStorage.setItem('offline_system_ready', 'false');
+            console.warn('⚠️ Offline system has issues:', testResult.message);
+          }
         } catch (error) {
           console.warn('⚠️ Failed to initialize offline essentials:', error);
+          localStorage.setItem('offline_system_ready', 'false');
         }
 
         console.log('App initialization completed successfully');
         
         // Dev tools message
         if (import.meta.env.DEV) {
+          // Add global offline test function
+          (window as any).testOfflineSystem = async () => {
+            const { testOfflineSystem } = await import('./offline/offlineEssentials');
+            const result = await testOfflineSystem();
+            console.log('🧪 Offline System Test Result:', result);
+            return result;
+          };
+          
+          // Add global cache status function
+          (window as any).getOfflineStatus = () => {
+            const { getEssentialOfflineStatus } = require('./offline/offlineEssentials');
+            const status = getEssentialOfflineStatus();
+            console.log('📊 Offline Status:', status);
+            return status;
+          };
+          
           console.log(`
       TekRiders Development Tools Available:
    🧹 clearAllStorage()        - Clear all browser storage
+   🧪 testOfflineSystem()      - Test offline system components
+   📊 getOfflineStatus()       - Get current offline status
    
 Type any command in the console to use these tools.
           `);
@@ -171,15 +159,22 @@ Type any command in the console to use these tools.
 
     // Global error handler for unhandled promises
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      console.error('Unhandled promise rejection caught:', event.reason);
-      // Log additional details if available
-      if (event.reason?.message) {
-        console.error('Error message:', event.reason.message);
+      console.error('🚨 Unhandled promise rejection caught:', {
+        reason: event.reason,
+        message: event.reason?.message,
+        status: event.reason?.status,
+        code: event.reason?.code,
+        stack: event.reason?.stack
+      });
+      
+      // Prevent the error from being logged as an uncaught exception
+      event.preventDefault();
+      
+      // Don't show user-facing errors for non-critical promise rejections
+      // These are usually background operations that failed
+      if (event.reason?.code === 403) {
+        console.warn('⚠️ 403 Forbidden error caught - likely a background API call that failed');
       }
-      if (event.reason?.stack) {
-        console.error('Error stack:', event.reason.stack);
-      }
-      event.preventDefault(); // Prevent default browser behavior
     };
 
     // Global error handler
@@ -215,12 +210,14 @@ Type any command in the console to use these tools.
       <LanguageProvider>
           <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <AuthProvider>
-              <OfflineInitializer>
-                <SyncInitializer />
-                <div className={`App ${isOffline ? 'pt-10' : ''}`}>
-                  <OfflineBanner />
-                  <NotificationManager />
-                  <OfflineStatus showDetails={false} />
+              <NotificationProvider>
+                <OfflineInitializer>
+                  <SyncInitializer />
+                  <div className="App">
+                    <NotificationManager />
+                    <UnifiedOfflineStatus showForLearnersOnly={true} />
+                    <PWAStatus />
+                    <PWAInstallPrompt />
                 
                 <Routes>
                   {/* Public routes */}
@@ -229,6 +226,8 @@ Type any command in the console to use these tools.
                   <Route path="/signup" element={<Signup />} />
                   <Route path="/verify-otp" element={<OTPVerify />} />
                   <Route path="/forgot-password" element={<ForgotPassword />} />
+                  <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+                  <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
 
                   {/* Protected routes */}
                   <Route path="/dashboard/*" element={
@@ -260,12 +259,19 @@ Type any command in the console to use these tools.
                         <Certificates />
                       </ProtectedRoute>
                   } />
+                  
+                  <Route path="/notifications" element={
+                      <ProtectedRoute>
+                        <Notifications />
+                      </ProtectedRoute>
+                  } />
 
                   {/* 404 */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>
-              </div>
+                                </div>
                 </OfflineInitializer>
+              </NotificationProvider>
             </AuthProvider>
           </Router>
         </LanguageProvider>

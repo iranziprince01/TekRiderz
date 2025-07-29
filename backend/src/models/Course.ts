@@ -490,17 +490,38 @@ export class CourseModel extends BaseModel<Course> {
       pages: number;
     };
   }> {
-    const result = await this.findCourses({
+    // Get all courses and filter for published and approved status
+    const allCoursesResult = await this.findCourses({
       ...options,
-      status: 'published',
+      // Don't specify status to get all courses, then filter
     });
     
-    // Validate and fix URLs for all courses
-    result.courses = await Promise.all(
-      result.courses.map((course: Course) => this.validateAndFixFileUrls(course))
+    // Filter for published and approved courses
+    const filteredCourses = allCoursesResult.courses.filter(
+      course => course.status === 'published' || course.status === 'approved'
     );
     
-    return result;
+    // Apply pagination manually
+    const page = options.page || 1;
+    const limit = options.limit || 10;
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+    const paginatedCourses = filteredCourses.slice(startIndex, endIndex);
+    
+    // Validate and fix URLs for all courses
+    const validatedCourses = await Promise.all(
+      paginatedCourses.map((course: Course) => this.validateAndFixFileUrls(course))
+    );
+    
+    return {
+      courses: validatedCourses,
+      pagination: {
+        page,
+        limit,
+        total: filteredCourses.length,
+        pages: Math.ceil(filteredCourses.length / limit),
+      },
+    };
   }
 
   // Get courses by instructor
@@ -985,8 +1006,8 @@ export class CourseModel extends BaseModel<Course> {
         courses = result.docs;
       }
 
-      // Filter published courses only
-      let filteredCourses = courses.filter(course => course.status === 'published');
+      // Filter published and approved courses
+      let filteredCourses = courses.filter(course => course.status === 'published' || course.status === 'approved');
 
       // Apply category filter if specified
       if (category) {
@@ -1175,8 +1196,8 @@ export class CourseModel extends BaseModel<Course> {
         courses = result.docs;
       }
 
-      // Filter published courses only
-      const publishedCourses = courses.filter(course => course.status === 'published');
+      // Filter published and approved courses
+      const publishedCourses = courses.filter(course => course.status === 'published' || course.status === 'approved');
 
       // Count courses by category
       const categoryCount = new Map<string, number>();

@@ -82,12 +82,35 @@ const EnhancedCourseCard: React.FC<EnhancedCourseCardProps> = ({
   // Check if course is completed (100% progress)
   const isFullyCompleted = isCompleted || progressPercentage >= 100;
 
+  // Debug: Log enrollment data for specific course
+  useEffect(() => {
+    if (course.title === 'Intro to AI') {
+      console.log('🔍 EnhancedCourseCard enrollment data:', {
+        courseId: course.id || course._id,
+        courseTitle: course.title,
+        courseEnrollment: course.enrollment,
+        courseIsEnrolled: course.isEnrolled,
+        enrollmentStatus,
+        isEnrolled,
+        progressPercentage,
+        isFullyCompleted
+      });
+    }
+  }, [course.enrollment, course.isEnrolled, enrollmentStatus, isEnrolled, progressPercentage, isFullyCompleted]);
+
   // Format duration helper
   const formatDuration = (minutes: number) => {
-    if (minutes < 60) return `${minutes}m`;
+    // Handle NaN, undefined, or invalid values
+    if (!minutes || isNaN(minutes) || minutes < 0) {
+      return 'N/A';
+    }
+    
+    if (minutes < 60) {
+      return `${minutes}m`;
+    }
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = minutes % 60;
-    return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+    return `${hours}h ${remainingMinutes}m`;
   };
 
   // Handle course enrollment with improved error handling
@@ -104,7 +127,7 @@ const EnhancedCourseCard: React.FC<EnhancedCourseCardProps> = ({
       if (response.success) {
         // Immediately update local state to show enrolled status
         setEnrollmentStatus('enrolled');
-        setEnrollmentMessage(t('Successfully enrolled! Redirecting to course...'));
+        setEnrollmentMessage(t('learner.successfullyEnrolled'));
         
         // Update the course object to reflect enrollment
         const updatedCourse = {
@@ -134,11 +157,11 @@ const EnhancedCourseCard: React.FC<EnhancedCourseCardProps> = ({
         
       } else {
         console.error('❌ Enrollment failed:', response.error);
-        throw new Error(response.error || t('Enrollment failed. Please try again.'));
+        throw new Error(response.error || t('learner.enrollmentFailed'));
       }
     } catch (error: any) {
       console.error('💥 Failed to enroll in course:', error);
-      setEnrollmentMessage(error.message || t('Failed to enroll. Please check your connection and try again.'));
+      setEnrollmentMessage(error.message || t('learner.failedToEnroll'));
     } finally {
       setIsEnrolling(false);
     }
@@ -166,17 +189,17 @@ const EnhancedCourseCard: React.FC<EnhancedCourseCardProps> = ({
             {isFullyCompleted ? (
               <>
                 <Award className="w-4 h-4 mr-2" />
-                {t('Review Course')}
+                {t('learner.reviewCourse')}
               </>
             ) : isInProgress ? (
               <>
                 <Play className="w-4 h-4 mr-2" />
-                {t('Continue Learning')}
+                {t('learner.continueLearning')}
               </>
             ) : (
               <>
                 <Play className="w-4 h-4 mr-2" />
-                {t('Go To Course')}
+                {t('learner.goToCourse')}
               </>
             )}
           </Button>
@@ -191,7 +214,7 @@ const EnhancedCourseCard: React.FC<EnhancedCourseCardProps> = ({
           className="w-full bg-orange-100 text-orange-700 border border-orange-200 cursor-not-allowed"
         >
           <Clock className="w-4 h-4 mr-2" />
-          {t('Enrollment Pending')}
+          {t('learner.enrollmentPending')}
         </Button>
       );
     }
@@ -205,12 +228,12 @@ const EnhancedCourseCard: React.FC<EnhancedCourseCardProps> = ({
         {isEnrolling ? (
           <>
             <LoadingSpinner size="sm" className="mr-2" />
-            {t('Enrolling...')}
+            {t('learner.enrolling')}
           </>
         ) : (
           <>
             <Plus className="w-4 h-4 mr-2" />
-            {t('Enroll Now')}
+            {t('learner.enrollNow')}
           </>
         )}
       </Button>
@@ -234,16 +257,37 @@ const EnhancedCourseCard: React.FC<EnhancedCourseCardProps> = ({
   return (
     <Card className="overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-lg transition-all duration-300 bg-white dark:bg-gray-800">
       {/* Course Thumbnail */}
-      <div className="relative h-48 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-700 dark:to-gray-800">
+      <div className="relative h-48 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-700 dark:to-gray-800 overflow-hidden">
         {course.thumbnail ? (
           <img
             src={getFileUrl(course.thumbnail, 'thumbnail')}
             alt={course.title}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover object-center"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.style.display = 'none';
+              // Show fallback when image fails to load
+              const parent = target.parentElement;
+              if (parent) {
+                parent.innerHTML = `
+                  <div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-700 dark:to-gray-800">
+                    <div class="text-center">
+                      <svg class="w-12 h-12 text-blue-400 dark:text-blue-500 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                      </svg>
+                      <p class="text-xs text-gray-500 dark:text-gray-400">Course</p>
+                    </div>
+                  </div>
+                `;
+              }
+            }}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <BookOpen className="w-16 h-16 text-blue-400 dark:text-blue-500" />
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-700 dark:to-gray-800">
+            <div className="text-center">
+              <BookOpen className="w-12 h-12 text-blue-400 dark:text-blue-500 mx-auto mb-2" />
+              <p className="text-xs text-gray-500 dark:text-gray-400">Course</p>
+            </div>
           </div>
         )}
         
@@ -268,7 +312,7 @@ const EnhancedCourseCard: React.FC<EnhancedCourseCardProps> = ({
           <div className="absolute bottom-3 left-3 right-3">
             <div className="bg-white dark:bg-gray-800 bg-opacity-90 dark:bg-opacity-90 rounded-lg p-2">
               <div className="flex justify-between text-xs mb-1">
-                <span className="text-gray-600 dark:text-gray-400">{t('Progress')}</span>
+                <span className="text-gray-600 dark:text-gray-400">{t('learner.progress')}</span>
                 <span className="font-medium text-gray-900 dark:text-white">{Math.round(progressPercentage)}%</span>
               </div>
               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
@@ -304,7 +348,7 @@ const EnhancedCourseCard: React.FC<EnhancedCourseCardProps> = ({
               {cleanInstructorName(course.instructorName)}
             </p>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              {t('Instructor')}
+              {t('learner.instructor')}
             </p>
           </div>
         </div>
@@ -317,11 +361,11 @@ const EnhancedCourseCard: React.FC<EnhancedCourseCardProps> = ({
           </div>
           <div className="flex items-center">
             <Users className="h-4 w-4 mr-1" />
-            <span>{course.enrollmentCount || 0} {t('students')}</span>
+            <span>{course.enrollmentCount || course.students || 0} {t('learner.students')}</span>
           </div>
           <div className="flex items-center">
             <BookOpen className="h-4 w-4 mr-1" />
-            <span>{course.totalModules || course.sections?.length || 0} {t('modules')}</span>
+            <span>{course.totalModules || course.sections?.length || 0} {t('learner.modules')}</span>
           </div>
         </div>
 

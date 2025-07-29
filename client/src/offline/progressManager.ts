@@ -115,22 +115,28 @@ class ProgressManager {
       }
 
       const docId = `progress_${userId}_${courseId}_${lessonId || 'overall'}`;
-      const doc = await this.db.get(docId);
       
-      if (doc && doc.type === 'progress') {
-        console.log('📊 Retrieved progress from database:', {
+      try {
+        const doc = await this.db.get(docId) as ProgressData;
+        console.log('✅ Progress retrieved from database:', {
           docId,
           percentage: doc.progress.percentage,
           isCompleted: doc.progress.isCompleted
         });
         return doc.progress;
+      } catch (error: any) {
+        if (error.name === 'not_found') {
+          console.log('No progress found for:', docId);
+          return null;
+        }
+        throw error;
       }
     } catch (error) {
-      console.warn('Failed to get progress from database, trying localStorage:', error);
+      console.error('❌ Failed to get progress from database:', error);
+      
+      // Fallback to localStorage
+      return this.getProgressFromLocalStorage(userId, courseId, lessonId);
     }
-
-    // Fallback to localStorage
-    return this.getProgressFromLocalStorage(userId, courseId, lessonId);
   }
 
   /**
@@ -151,6 +157,7 @@ class ProgressManager {
       });
 
       if (result.rows.length === 0) {
+        console.log('No progress found for course:', courseId);
         return null;
       }
 
@@ -161,22 +168,22 @@ class ProgressManager {
 
       result.rows.forEach((row: any) => {
         const doc = row.doc as ProgressData;
-        if (doc.type === 'progress' && doc.lessonId) {
-          lessons[doc.lessonId] = doc.progress;
-          totalTimeSpent += doc.progress.timeSpent || 0;
-          
-          if (doc.progress.isCompleted) {
-            completedLessons++;
-          }
-
-          if (doc.progress.lastUpdated > lastActivity) {
-            lastActivity = doc.progress.lastUpdated;
-          }
+        const lessonId = doc.lessonId || 'overall';
+        
+        lessons[lessonId] = doc.progress;
+        totalTimeSpent += doc.progress.timeSpent || 0;
+        
+        if (doc.progress.isCompleted) {
+          completedLessons++;
+        }
+        
+        if (doc.progress.lastUpdated > lastActivity) {
+          lastActivity = doc.progress.lastUpdated;
         }
       });
 
       const totalLessons = Object.keys(lessons).length;
-      const overallPercentage = totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0;
+      const overallPercentage = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
 
       const courseProgress: CourseProgress = {
         courseId,
@@ -188,11 +195,11 @@ class ProgressManager {
         lessons
       };
 
-      console.log('📊 Retrieved course progress from database:', {
+      console.log('✅ Course progress retrieved:', {
         courseId,
         totalLessons,
         completedLessons,
-        overallPercentage: `${overallPercentage.toFixed(1)}%`
+        overallPercentage
       });
 
       return courseProgress;
@@ -220,9 +227,7 @@ class ProgressManager {
         endkey: `progress_${userId}_\ufff0`
       });
 
-      return result.rows
-        .map((row: any) => row.doc as ProgressData)
-        .filter((doc: ProgressData) => doc.type === 'progress');
+      return result.rows.map((row: any) => row.doc as ProgressData);
     } catch (error) {
       console.error('❌ Failed to get all user progress from database:', error);
       
@@ -242,11 +247,19 @@ class ProgressManager {
       }
 
       const docId = `progress_${userId}_${courseId}_${lessonId || 'overall'}`;
-      const doc = await this.db.get(docId);
-      await this.db.remove(doc);
       
-      console.log('🗑️ Progress deleted successfully:', docId);
-      return true;
+      try {
+        const doc = await this.db.get(docId);
+        const result = await this.db.remove(doc);
+        console.log('✅ Progress deleted successfully:', docId);
+        return result.ok;
+      } catch (error: any) {
+        if (error.name === 'not_found') {
+          console.log('No progress found to delete:', docId);
+          return true;
+        }
+        throw error;
+      }
     } catch (error) {
       console.error('❌ Failed to delete progress from database:', error);
       
@@ -270,17 +283,12 @@ class ProgressManager {
         endkey: `progress_${userId}_\ufff0`
       });
 
-      const deletePromises = result.rows.map(async (row: any) => {
-        try {
-          const doc = await this.db.get(row.id);
-          await this.db.remove(doc);
-        } catch (error) {
-          console.warn('Failed to delete progress document:', row.id, error);
-        }
-      });
+      const deletePromises = result.rows.map((row: any) => 
+        this.db.remove(row.id, row.value.rev)
+      );
 
       await Promise.all(deletePromises);
-      console.log('🗑️ All progress cleared successfully for user:', userId);
+      console.log('✅ All progress cleared for user:', userId);
       return true;
     } catch (error) {
       console.error('❌ Failed to clear all progress from database:', error);
@@ -290,21 +298,80 @@ class ProgressManager {
     }
   }
 
+  /**
+   * Sync progress with server when online
+   */
+  async syncProgressWithServer(userId: string, courseId: string): Promise<boolean> {
+    try {
+      console.log('🔄 Syncing progress with server...');
+      
+      // Get local progress
+      const localProgress = await this.getCourseProgress(userId, courseId);
+      if (!localProgress) {
+        console.log('No local progress to sync');
+        return true;
+      }
+
+      // TODO: Implement server sync when API is ready
+      // For now, just log the sync attempt
+      console.log('📊 Progress to sync:', {
+        courseId,
+        totalLessons: localProgress.totalLessons,
+        completedLessons: localProgress.completedLessons,
+        overallPercentage: localProgress.overallPercentage
+      });
+
+      return true;
+    } catch (error) {
+      console.error('❌ Failed to sync progress with server:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get database information
+   */
+  async getDatabaseInfo(): Promise<any> {
+    try {
+      if (!this.db) {
+        return { error: 'Database not available' };
+      }
+
+      const info = await this.db.info();
+      const allDocs = await this.db.allDocs();
+      
+      const progressDocs = allDocs.rows.filter((row: any) => row.id.startsWith('progress_'));
+      
+      return {
+        databaseName: info.db_name,
+        documentCount: info.doc_count,
+        updateSeq: info.update_seq,
+        progressDocuments: progressDocs.length,
+        totalDocuments: allDocs.rows.length
+      };
+    } catch (error) {
+      console.error('Failed to get database info:', error);
+      return { error: 'Failed to get database info' };
+    }
+  }
+
   // LocalStorage fallback methods
   private saveProgressToLocalStorage(progressData: Omit<ProgressData, '_id' | '_rev' | 'type'>): boolean {
     try {
       const key = `progress_${progressData.userId}_${progressData.courseId}_${progressData.lessonId || 'overall'}`;
       const data = {
         ...progressData,
-        type: 'progress',
-        lastUpdated: new Date().toISOString()
+        progress: {
+          ...progressData.progress,
+          lastUpdated: new Date().toISOString()
+        }
       };
       
       localStorage.setItem(key, JSON.stringify(data));
-      console.log('💾 Progress saved to localStorage:', key);
+      console.log('✅ Progress saved to localStorage:', key);
       return true;
     } catch (error) {
-      console.error('❌ Failed to save progress to localStorage:', error);
+      console.error('Failed to save progress to localStorage:', error);
       return false;
     }
   }
@@ -316,14 +383,14 @@ class ProgressManager {
       
       if (data) {
         const parsed = JSON.parse(data);
-        console.log('📊 Retrieved progress from localStorage:', key);
         return parsed.progress;
       }
+      
+      return null;
     } catch (error) {
-      console.error('❌ Failed to get progress from localStorage:', error);
+      console.error('Failed to get progress from localStorage:', error);
+      return null;
     }
-    
-    return null;
   }
 
   private getCourseProgressFromLocalStorage(userId: string, courseId: string): CourseProgress | null {
@@ -336,29 +403,33 @@ class ProgressManager {
       // Get all localStorage keys for this user and course
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && key.startsWith(`progress_${userId}_${courseId}_`) && key !== `progress_${userId}_${courseId}_overall`) {
+        if (key && key.startsWith(`progress_${userId}_${courseId}_`)) {
           try {
             const data = JSON.parse(localStorage.getItem(key) || '');
-            if (data.type === 'progress' && data.lessonId) {
-              lessons[data.lessonId] = data.progress;
-              totalTimeSpent += data.progress.timeSpent || 0;
-              
-              if (data.progress.isCompleted) {
-                completedLessons++;
-              }
-
-              if (data.progress.lastUpdated > lastActivity) {
-                lastActivity = data.progress.lastUpdated;
-              }
+            const lessonId = data.lessonId || 'overall';
+            
+            lessons[lessonId] = data.progress;
+            totalTimeSpent += data.progress.timeSpent || 0;
+            
+            if (data.progress.isCompleted) {
+              completedLessons++;
+            }
+            
+            if (data.progress.lastUpdated > lastActivity) {
+              lastActivity = data.progress.lastUpdated;
             }
           } catch (error) {
-            console.warn('Failed to parse localStorage progress:', key, error);
+            console.warn('Failed to parse localStorage progress:', key);
           }
         }
       }
 
+      if (Object.keys(lessons).length === 0) {
+        return null;
+      }
+
       const totalLessons = Object.keys(lessons).length;
-      const overallPercentage = totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0;
+      const overallPercentage = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
 
       return {
         courseId,
@@ -370,7 +441,7 @@ class ProgressManager {
         lessons
       };
     } catch (error) {
-      console.error('❌ Failed to get course progress from localStorage:', error);
+      console.error('Failed to get course progress from localStorage:', error);
       return null;
     }
   }
@@ -378,24 +449,22 @@ class ProgressManager {
   private getAllUserProgressFromLocalStorage(userId: string): ProgressData[] {
     try {
       const progress: ProgressData[] = [];
-      
+
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (key && key.startsWith(`progress_${userId}_`)) {
           try {
             const data = JSON.parse(localStorage.getItem(key) || '');
-            if (data.type === 'progress') {
-              progress.push(data);
-            }
+            progress.push(data);
           } catch (error) {
-            console.warn('Failed to parse localStorage progress:', key, error);
+            console.warn('Failed to parse localStorage progress:', key);
           }
         }
       }
-      
+
       return progress;
     } catch (error) {
-      console.error('❌ Failed to get all user progress from localStorage:', error);
+      console.error('Failed to get all user progress from localStorage:', error);
       return [];
     }
   }
@@ -404,10 +473,10 @@ class ProgressManager {
     try {
       const key = `progress_${userId}_${courseId}_${lessonId || 'overall'}`;
       localStorage.removeItem(key);
-      console.log('🗑️ Progress deleted from localStorage:', key);
+      console.log('✅ Progress deleted from localStorage:', key);
       return true;
     } catch (error) {
-      console.error('❌ Failed to delete progress from localStorage:', error);
+      console.error('Failed to delete progress from localStorage:', error);
       return false;
     }
   }
@@ -415,79 +484,27 @@ class ProgressManager {
   private clearAllProgressFromLocalStorage(userId: string): boolean {
     try {
       const keysToRemove: string[] = [];
-      
+
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (key && key.startsWith(`progress_${userId}_`)) {
           keysToRemove.push(key);
         }
       }
-      
+
       keysToRemove.forEach(key => localStorage.removeItem(key));
-      console.log('🗑️ All progress cleared from localStorage for user:', userId);
+      console.log('✅ All progress cleared from localStorage for user:', userId);
       return true;
     } catch (error) {
-      console.error('❌ Failed to clear all progress from localStorage:', error);
+      console.error('Failed to clear all progress from localStorage:', error);
       return false;
-    }
-  }
-
-  /**
-   * Sync progress with remote server when online
-   */
-  async syncProgressWithServer(userId: string, courseId: string): Promise<boolean> {
-    try {
-      const courseProgress = await this.getCourseProgress(userId, courseId);
-      if (!courseProgress) {
-        console.log('No local progress to sync');
-        return true;
-      }
-
-      // Here you would implement the actual sync with your backend
-      // For now, we'll just log the sync attempt
-      console.log('🔄 Syncing progress with server:', {
-        courseId,
-        overallPercentage: `${courseProgress.overallPercentage.toFixed(1)}%`,
-        completedLessons: courseProgress.completedLessons,
-        totalLessons: courseProgress.totalLessons
-      });
-
-      return true;
-    } catch (error) {
-      console.error('❌ Failed to sync progress with server:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Get database info for debugging
-   */
-  async getDatabaseInfo(): Promise<any> {
-    try {
-      if (!this.db) {
-        return { status: 'fallback', name: 'localStorage' };
-      }
-
-      const info = await this.db.info();
-      const allDocs = await this.db.allDocs({ include_docs: true });
-      
-      return {
-        status: 'active',
-        name: info.db_name,
-        docCount: info.doc_count,
-        progressDocs: allDocs.rows.filter((row: any) => row.doc?.type === 'progress').length
-      };
-    } catch (error) {
-      console.error('❌ Failed to get database info:', error);
-      return { status: 'error', error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }
 }
 
-// Export singleton instance
-export const progressManager = new ProgressManager();
+const progressManager = new ProgressManager();
 
-// Export convenience functions
+// Export functions
 export const saveProgress = (progressData: Omit<ProgressData, '_id' | '_rev' | 'type'>) => 
   progressManager.saveProgress(progressData);
 

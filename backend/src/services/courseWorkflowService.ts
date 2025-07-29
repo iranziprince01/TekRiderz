@@ -1,5 +1,6 @@
 import { courseModel } from '../models/Course';
 import { userModel } from '../models/User';
+import { notificationModel } from '../models/Notification';
 import { emailService } from './emailService';
 import { logger } from '../utils/logger';
 import { config } from '../config/config';
@@ -235,6 +236,9 @@ export class CourseWorkflowService {
 
       // Notify instructor of approval and auto-publishing
       await this.notifyInstructorOfApproval(updatedCourse, approvalFeedback);
+
+      // Notify learners about new published course
+      await this.notifyLearnersOfNewCourse(updatedCourse);
 
       logger.info('Course approved and auto-published', {
         courseId,
@@ -801,9 +805,33 @@ export class CourseWorkflowService {
       const admins = await userModel.findAll({ limit: 100 });
       const adminUsers = admins.docs.filter(user => user.role === 'admin');
 
+      // Send email notifications
       for (const admin of adminUsers) {
         await emailService.sendCourseSubmissionNotification(admin.email, course);
       }
+
+      // Create in-app notifications for admins
+      const { NotificationService } = await import('./notificationService');
+      const notificationService = new NotificationService();
+      
+      for (const admin of adminUsers) {
+        await notificationModel.createNotification({
+          id: `course_submission_${course._id}_${admin.id}_${Date.now()}`,
+          userId: admin.id,
+          title: 'New Course Submission',
+          message: `Course "${course.title}" has been submitted for approval by ${course.instructorName}`,
+          notificationType: 'course_announcement',
+          priority: 'high',
+          actionUrl: `/admin/courses`,
+          actionText: 'Review Course',
+          metadata: { courseId: course._id || '', instructorId: course.instructorId },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          isRead: false
+        });
+      }
+
+      logger.info('Admin notifications sent for course submission:', { courseId: course._id, adminCount: adminUsers.length });
     } catch (error) {
       logger.error('Failed to notify admins of course submission:', error);
     }
@@ -824,7 +852,24 @@ export class CourseWorkflowService {
     try {
       const instructor = await userModel.findById(course.instructorId);
       if (instructor) {
+        // Send email notification
         await emailService.sendCourseApprovalEmail(instructor.email, course.title, course._id!, true, undefined, feedback);
+        
+        // Create in-app notification
+        await notificationModel.createNotification({
+          id: `course_approval_${course._id}_${instructor.id}_${Date.now()}`,
+          userId: instructor.id,
+          title: 'Course Approved!',
+          message: `Your course "${course.title}" has been approved and is now published!`,
+          notificationType: 'course_approval',
+          priority: 'high',
+          actionUrl: `/course/${course._id}`,
+          actionText: 'View Course',
+          metadata: { courseId: course._id || '', approvalScore: feedback.overallScore },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          isRead: false
+        });
       }
     } catch (error) {
       logger.error('Failed to notify instructor of approval:', error);
@@ -839,6 +884,36 @@ export class CourseWorkflowService {
       }
     } catch (error) {
       logger.error('Failed to notify instructor of rejection:', error);
+    }
+  }
+
+  private async notifyLearnersOfNewCourse(course: Course): Promise<void> {
+    try {
+      // Get all learners
+      const allUsers = await userModel.findAll({ limit: 1000 });
+      const learners = allUsers.docs.filter(user => user.role === 'learner');
+
+      // Create notifications for all learners
+      for (const learner of learners) {
+        await notificationModel.createNotification({
+          id: `new_course_${course._id}_${learner.id}_${Date.now()}`,
+          userId: learner.id,
+          title: 'New Course Available!',
+          message: `A new course "${course.title}" is now available for enrollment!`,
+          notificationType: 'course_announcement',
+          priority: 'medium',
+          actionUrl: `/course/${course._id}`,
+          actionText: 'View Course',
+          metadata: { courseId: course._id || '', category: course.category },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          isRead: false
+        });
+      }
+
+      logger.info('Learner notifications sent for new course:', { courseId: course._id, learnerCount: learners.length });
+    } catch (error) {
+      logger.error('Failed to notify learners of new course:', error);
     }
   }
 }

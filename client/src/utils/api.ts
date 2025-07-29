@@ -1055,22 +1055,7 @@ class ApiClient {
     }
   }
 
-  // Learner achievements - for dynamic achievements data
-  async getLearnerAchievements(params?: any): Promise<ApiResponse> {
-    const queryParams = new URLSearchParams();
-    if (params) {
-      Object.keys(params).forEach(key => {
-        if (params[key] !== undefined && params[key] !== null) {
-          queryParams.append(key, params[key].toString());
-        }
-    });
-  }
 
-    const queryString = queryParams.toString();
-    const endpoint = queryString ? `/users/achievements?${queryString}` : '/users/achievements';
-    
-    return this.makeRequest(endpoint);
-  }
 
   // Health check
   async healthCheck(): Promise<ApiResponse> {
@@ -1115,14 +1100,7 @@ class ApiClient {
     return this.makeRequest(`/analytics/tutor${params}`);
   }
 
-  // Gamification methods
-  async getGamificationData(courseId: string): Promise<ApiResponse> {
-    return this.makeRequest(`/gamification/course/${courseId}`);
-  }
 
-  async getOverallGamificationStats(): Promise<ApiResponse> {
-    return this.makeRequest('/gamification/overall');
-  }
 }
 
 export const apiClient = new ApiClient();
@@ -1253,7 +1231,7 @@ export const uploadAvatar = (file: File) => apiClient.uploadAvatar(file);
 export const submitQuizAttempt = (courseId: string, attemptData: any) => apiClient.submitQuizAttempt(courseId, attemptData);
 
 // Achievement exports
-export const getLearnerAchievements = (params?: any) => apiClient.getLearnerAchievements(params);
+
 
 // Quiz and analytics exports removed - using mock data in frontend
 
@@ -1268,14 +1246,7 @@ export const getAnalytics = () => apiClient.getAnalytics();
 export const getAdminAnalytics = (period?: string) => apiClient.getAdminAnalytics(period);
 export const getTutorAnalytics = (period?: string) => apiClient.getTutorAnalytics(period);
 
-// Gamification API
-export const getGamificationData = async (courseId: string): Promise<ApiResponse> => {
-  return await apiClient.getGamificationData(courseId);
-};
 
-export const getOverallGamificationStats = async (): Promise<ApiResponse> => {
-  return await apiClient.getOverallGamificationStats();
-};
 
 // File URL Service with comprehensive handling
 class FileUrlService {

@@ -25,6 +25,7 @@ const Signup: React.FC = () => {
     confirmPassword: '',
     role: 'learner'
   });
+  const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
@@ -60,6 +61,10 @@ const Signup: React.FC = () => {
       return language === 'rw' ? 'Imeli ntibifite uburyo' : 'Please enter a valid email address';
     }
 
+    if (!agreeToTerms) {
+      return language === 'rw' ? 'Ugomba kwemera amabwiriza n\'ibikorwa' : 'You must agree to the terms and conditions';
+    }
+
     return null;
   };
 
@@ -76,7 +81,7 @@ const Signup: React.FC = () => {
     setError('');
 
     try {
-      await signup(formData.name, formData.email, formData.password, formData.role as 'learner' | 'tutor');
+      await signup(formData.name, formData.email, formData.password, formData.role as 'learner' | 'tutor', agreeToTerms);
       navigate('/verify-otp', { 
         state: { 
           email: formData.email,
@@ -233,6 +238,62 @@ const Signup: React.FC = () => {
                     {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
                 </div>
+              </div>
+
+              {/* Terms and Conditions Checkbox */}
+              <div className="flex items-start space-x-3">
+                <input
+                  type="checkbox"
+                  id="agreeToTerms"
+                  checked={agreeToTerms}
+                  onChange={(e) => setAgreeToTerms(e.target.checked)}
+                  className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="agreeToTerms" className="text-sm text-gray-700 dark:text-gray-300">
+                  {language === 'rw' ? (
+                    <>
+                      Ndemera{' '}
+                      <a
+                        href="/terms-and-conditions"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 underline"
+                      >
+                        amabwiriza n'ibikorwa
+                      </a>
+                      {' '}na{' '}
+                      <a
+                        href="/privacy-policy"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 underline"
+                      >
+                        politiki y'amahame
+                      </a>
+                    </>
+                  ) : (
+                    <>
+                      I agree to the{' '}
+                      <a
+                        href="/terms-and-conditions"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 underline"
+                      >
+                        Terms and Conditions
+                      </a>
+                      {' '}and{' '}
+                      <a
+                        href="/privacy-policy"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 underline"
+                      >
+                        Privacy Policy
+                      </a>
+                    </>
+                  )}
+                </label>
               </div>
 
               <Button

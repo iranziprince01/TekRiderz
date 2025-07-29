@@ -12,7 +12,7 @@ export class AuthController {
   // User registration
   async register(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { name, email, password, role = 'learner' } = req.body;
+      const { name, email, password, role = 'learner', agreeToTerms } = req.body;
 
       // Validate required fields
       if (!name || !email || !password) {
@@ -22,6 +22,11 @@ export class AuthController {
       // Validate role
       if (!['learner', 'tutor'].includes(role)) {
         return next(AuthErrorUtil.createError(AuthErrorType.INVALID_ROLE));
+      }
+
+      // Validate terms agreement
+      if (!agreeToTerms) {
+        return next(AuthErrorUtil.createError(AuthErrorType.TERMS_NOT_AGREED));
       }
 
       // Check if user already exists
@@ -47,6 +52,13 @@ export class AuthController {
         type: 'user',
         verified: false, // User starts unverified
         status: 'active',
+        termsAgreement: {
+          agreedToTerms: agreeToTerms,
+          agreedToPrivacyPolicy: agreeToTerms, // Assuming agreement to both when terms are agreed
+          agreedAt: new Date().toISOString(),
+          ...(req.ip && { ipAddress: req.ip }),
+          ...(req.get('User-Agent') && { userAgent: req.get('User-Agent')! }),
+        },
         profile: {
           bio: '',
           expertise: [],

@@ -135,10 +135,8 @@ const Landing: React.FC = () => {
       {/* Header */}
       <Header showAuth={true} />
 
-
-
       {/* Hero Section */}
-      <section className="relative py-16 lg:py-24 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 overflow-hidden">
+      <section className="relative pt-32 pb-24 lg:pt-40 lg:pb-32 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 overflow-hidden">
         {/* Background Pattern */}
         <div className="absolute inset-0 bg-grid-pattern opacity-[0.02] dark:opacity-[0.05]"></div>
         <div className="absolute top-0 right-0 w-72 h-72 bg-blue-400/5 dark:bg-blue-400/10 rounded-full blur-3xl"></div>
@@ -147,8 +145,8 @@ const Landing: React.FC = () => {
         <div className="relative container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
             {/* Left Content */}
-            <div className="space-y-8">
-              <div className="space-y-6">
+            <div className="space-y-12">
+              <div className="space-y-8">
                 <div className="inline-flex items-center px-4 py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full text-sm font-medium">
                   <Zap className="w-4 h-4 mr-2" />
                   {t('landing.hero.subtitle') || 'Modern E-Learning Platform'}
@@ -164,7 +162,7 @@ const Landing: React.FC = () => {
               </div>
 
               {/* CTA Buttons */}
-              <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex flex-col sm:flex-row gap-4 pt-4">
                 <Link to="/signup" className="flex-1 sm:flex-none">
                   <Button size="lg" className="w-full sm:w-auto shadow-lg hover:shadow-xl transition-shadow">
                     {t('landing.hero.cta') || 'Start Learning Today'}
@@ -179,7 +177,7 @@ const Landing: React.FC = () => {
               </div>
 
               {/* Trust Indicators */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-8">
                 <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                   <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
                   <span>{t('landing.trust.freeCourses')}</span>
@@ -193,8 +191,8 @@ const Landing: React.FC = () => {
 
             {/* Right Content - Feature Card */}
             <div className="relative">
-              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6 lg:p-8 backdrop-blur-sm">
-                <div className="space-y-6">
+              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-8 lg:p-10 backdrop-blur-sm">
+                <div className="space-y-8">
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{t('landing.featuredCourse.title') || 'Featured Course'}</h3>
                                           <span className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 text-sm font-medium rounded-full">
@@ -454,8 +452,16 @@ const Landing: React.FC = () => {
               <h4 className="font-semibold mb-4 text-white">{t('footer.company.title') || 'Company'}</h4>
               <ul className="space-y-3 text-sm text-gray-400">
                 <li className="hover:text-white transition-colors cursor-pointer">{t('footer.company.aboutUs') || 'About Us'}</li>
-                <li className="hover:text-white transition-colors cursor-pointer">{t('footer.company.careers') || 'Careers'}</li>
-                <li className="hover:text-white transition-colors cursor-pointer">{t('footer.company.privacy') || 'Privacy Policy'}</li>
+                <li className="hover:text-white transition-colors cursor-pointer">
+                  <Link to="/terms-and-conditions" className="hover:text-white transition-colors">
+                    {t('footer.company.terms') || 'Terms & Conditions'}
+                  </Link>
+                </li>
+                <li className="hover:text-white transition-colors cursor-pointer">
+                  <Link to="/privacy-policy" className="hover:text-white transition-colors">
+                    {t('footer.company.privacy') || 'Privacy Policy'}
+                  </Link>
+                </li>
               </ul>
             </div>
           </div>

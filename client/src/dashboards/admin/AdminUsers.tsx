@@ -212,11 +212,11 @@ const AdminUsers: React.FC = () => {
     }
 
     const confirmMessages = {
-      activate: `Are you sure you want to activate ${user.name}?`,
-      deactivate: `Are you sure you want to deactivate ${user.name}?`,
+      activate: `Are you sure you want to activate ${user.name || user.email || 'this user'}?`,
+      deactivate: `Are you sure you want to deactivate ${user.name || user.email || 'this user'}?`,
       delete: force 
-        ? `FORCE DELETE: Are you sure you want to permanently delete ${user.name} and ALL associated data? This action cannot be undone.`
-        : `Are you sure you want to delete ${user.name}? This action cannot be undone.`
+        ? `FORCE DELETE: Are you sure you want to permanently delete ${user.name || user.email || 'this user'} and ALL associated data? This action cannot be undone.`
+        : `Are you sure you want to delete ${user.name || user.email || 'this user'}? This action cannot be undone.`
     };
 
     if (!window.confirm(confirmMessages[action])) return;
@@ -292,7 +292,7 @@ const AdminUsers: React.FC = () => {
 
     const actualUserId = user._id || user.id;
     
-    const confirmMessage = `Are you sure you want to change ${user.name}'s role from ${user.role} to ${newRole}? This will affect their permissions and access.`;
+    const confirmMessage = `Are you sure you want to change ${user.name || user.email || 'this user'}'s role from ${user.role} to ${newRole}? This will affect their permissions and access.`;
     
     if (!window.confirm(confirmMessage)) return;
 
@@ -304,7 +304,7 @@ const AdminUsers: React.FC = () => {
         addToast({
           type: 'success',
           title: 'Role Updated',
-          message: `${user.name}'s role has been changed to ${newRole}`
+          message: `${user.name || user.email || 'User'}'s role has been changed to ${newRole}`
         });
         
         if (selectedUser && (selectedUser.id === userId || selectedUser._id === userId)) {
@@ -414,9 +414,9 @@ const AdminUsers: React.FC = () => {
   }, [roleFilter, statusFilter, searchTerm]);
 
   const filteredUsers = users.filter(user => {
-    const matchesSearch = !searchTerm || 
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesSearch = !searchTerm || 
+          (user.name && user.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+          (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesRole = !roleFilter || user.role === roleFilter;
     const matchesStatus = !statusFilter || user.status === statusFilter;
     return matchesSearch && matchesRole && matchesStatus;
@@ -604,7 +604,7 @@ const AdminUsers: React.FC = () => {
                         {user.avatar ? (
                           <img
                             src={getFileUrl(user.avatar, 'avatar')}
-                            alt={user.name}
+                            alt={user.name || user.email || 'User avatar'}
                             className="w-10 h-10 rounded-full object-cover"
                             onError={(e) => {
                               // Fallback to initials if image fails to load
@@ -615,11 +615,11 @@ const AdminUsers: React.FC = () => {
                           />
                         ) : null}
                         <div className={`w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-sm ${user.avatar ? 'hidden' : ''}`}>
-                          {user.name.charAt(0).toUpperCase()}
+                          {(user.name || user.email || 'U').charAt(0).toUpperCase()}
                         </div>
                         <div className="ml-4">
                           <div className="text-sm font-medium text-gray-900 dark:text-white">
-                            {user.name}
+                            {user.name || user.email || 'Unknown User'}
                           </div>
                           <div className="text-sm text-gray-500 dark:text-gray-400">
                             {user.email}
@@ -775,7 +775,7 @@ const AdminUsers: React.FC = () => {
                   {selectedUser.avatar ? (
                     <img
                       src={getFileUrl(selectedUser.avatar, 'avatar')}
-                      alt={selectedUser.name}
+                      alt={selectedUser.name || selectedUser.email || 'User avatar'}
                       className="w-16 h-16 rounded-full object-cover"
                       onError={(e) => {
                         // Fallback to initials if image fails to load
@@ -786,11 +786,11 @@ const AdminUsers: React.FC = () => {
                     />
                   ) : null}
                   <div className={`w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-xl ${selectedUser.avatar ? 'hidden' : ''}`}>
-                    {selectedUser.name.charAt(0).toUpperCase()}
+                    {(selectedUser.name || selectedUser.email || 'U').charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                      {selectedUser.name}
+                      {selectedUser.name || selectedUser.email || 'Unknown User'}
                     </h3>
                     <p className="text-gray-600 dark:text-gray-400">{selectedUser.email}</p>
                     <div className="flex items-center gap-2 mt-2">

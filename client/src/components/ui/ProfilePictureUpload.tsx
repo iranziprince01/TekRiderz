@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Upload, Camera, X, Check, AlertCircle, Cloud, User } from 'lucide-react';
 import { Button } from './Button';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface ProfilePictureUploadProps {
   onImageUploaded: (url: string) => void;
@@ -21,6 +22,7 @@ export const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
   className = '',
   size = 'lg'
 }) => {
+  const { t } = useLanguage();
   const [uploading, setUploading] = useState(false);
   const [imageUrl, setImageUrl] = useState(currentImageUrl || '');
   const [error, setError] = useState('');
@@ -42,7 +44,7 @@ export const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
     
     if (!isCloudinaryConfigured) {
       console.warn('Cloud storage not configured. Missing required credentials.');
-      setError('Cloud storage unavailable');
+      setError(t('profilePicture.cloudStorageUnavailable'));
     } else {
       setError(''); // Clear any previous errors
       console.log('ProfilePictureUpload - Cloud storage properly configured and ready');
@@ -97,12 +99,12 @@ export const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
   const validateFile = (file: File): string | null => {
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      return 'Please select an image file (PNG, JPG, WebP, etc.)';
+      return t('profilePicture.pleaseSelectImage');
     }
 
     // Validate file size (5MB limit for profile pictures)
     if (file.size > 5 * 1024 * 1024) {
-      return 'File size must be less than 5MB';
+      return t('profilePicture.fileSizeLimit');
     }
 
     // Check file extension
@@ -111,7 +113,7 @@ export const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
     const hasValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
     
     if (!hasValidExtension) {
-      return 'File must have a valid image extension (.jpg, .png, .gif, .webp)';
+      return t('profilePicture.invalidExtension');
     }
 
     return null;
@@ -168,7 +170,7 @@ export const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
               })
             } as Response;
           } else {
-            throw new Error(result.error || 'Backend upload failed');
+            throw new Error(result.error || t('profilePicture.backendUploadFailed'));
           }
         }
         // NO Strategy 2 - Direct Cloudinary upload removed because preset has default folder
@@ -219,7 +221,7 @@ export const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
         console.error('ProfilePictureUpload - All cloud storage strategies failed:', lastError);
         throw new Error(`Cloud storage upload failed: ${lastError.message}`);
       } else {
-        throw new Error('No upload strategies available');
+        throw new Error(t('profilePicture.noUploadStrategies'));
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Upload failed';
@@ -256,11 +258,11 @@ export const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
         // Show the actual Cloudinary error, don't fall back to local storage
         const errorMsg = error instanceof Error ? error.message : 'Cloud storage upload failed';
         console.error('ProfilePictureUpload - Cloud storage failed:', error);
-        setError(`Upload failed: ${errorMsg}`);
+        setError(`${t('profilePicture.uploadFailed')}: ${errorMsg}`);
       }
     } else {
       console.log('ProfilePictureUpload - Cloud storage not configured');
-      setError('Cloud storage not configured');
+      setError(t('profilePicture.cloudStorageNotConfigured'));
     }
   };
 
@@ -329,7 +331,7 @@ export const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
           <div className="text-center text-white">
             <Camera className="w-6 h-6 mx-auto mb-1" />
             <span className="text-xs font-medium">
-              {uploading ? 'Uploading...' : 'Change'}
+              {uploading ? t('profilePicture.uploading') : t('profilePicture.change')}
             </span>
           </div>
         </div>
@@ -354,7 +356,7 @@ export const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
         <button
           onClick={removeImage}
           className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-lg transition-colors"
-          title="Remove profile picture"
+          title={t('profilePicture.removeProfilePicture')}
         >
           <X className="w-4 h-4" />
         </button>
@@ -383,7 +385,7 @@ export const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
           ) : (
             <Upload className="w-3 h-3 mr-1" />
           )}
-          {uploading ? 'Uploading...' : 'Choose Photo'}
+          {uploading ? t('profilePicture.uploading') : t('profilePicture.choosePhoto')}
         </Button>
       </div>
 
@@ -398,7 +400,7 @@ export const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
       {/* Configuration Status */}
       {isCloudinaryConfigured && (
         <div className="mt-2 text-xs text-gray-600 text-center">
-          Cloud storage ready
+          {t('profilePicture.cloudStorageReady')}
         </div>
       )}
     </div>

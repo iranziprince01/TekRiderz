@@ -43,7 +43,7 @@ export class NotificationService {
       await notificationModel.createNotification({
         id: `completion_${userId}_${courseId}_${Date.now()}`,
         userId,
-        title: 'Course Completed! 🎉',
+        title: 'Course Completed!',
         message: `Congratulations! You have successfully completed "${course.title}". Your certificate is ready!`,
         notificationType: 'course_completion',
         priority: 'high',
@@ -61,29 +61,7 @@ export class NotificationService {
     }
   }
 
-  // Create achievement unlocked notification
-  async createAchievementNotification(userId: string, achievementId: string, achievementName: string): Promise<void> {
-    try {
-      await notificationModel.createNotification({
-        id: `achievement_${userId}_${achievementId}_${Date.now()}`,
-        userId,
-        title: 'Achievement Unlocked! 🏆',
-        message: `You've earned the "${achievementName}" achievement! Keep up the great work!`,
-        notificationType: 'achievement_unlocked',
-        priority: 'high',
-        actionUrl: `/achievements`,
-        actionText: 'View Achievements',
-        metadata: { achievementId },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        isRead: false
-      });
 
-      logger.info('Achievement notification created:', { userId, achievementId });
-    } catch (error) {
-      logger.error('Failed to create achievement notification:', error);
-    }
-  }
 
   // Create quiz reminder notification
   async createQuizReminderNotification(userId: string, courseId: string, quizTitle: string): Promise<void> {
@@ -213,29 +191,7 @@ export class NotificationService {
     }
   }
 
-  // Create learning streak notification
-  async createStreakNotification(userId: string, streakDays: number): Promise<void> {
-    try {
-      await notificationModel.createNotification({
-        id: `streak_${userId}_${streakDays}_${Date.now()}`,
-        userId,
-        title: `Learning Streak: ${streakDays} Days! 🔥`,
-        message: `Amazing! You've maintained a ${streakDays}-day learning streak. Consistency is key to success!`,
-        notificationType: 'achievement_unlocked',
-        priority: 'medium',
-        actionUrl: '/dashboard',
-        actionText: 'View Dashboard',
-        metadata: { streakDays },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        isRead: false
-      });
 
-      logger.info('Streak notification created:', { userId, streakDays });
-    } catch (error) {
-      logger.error('Failed to create streak notification:', error);
-    }
-  }
 
   // Create grade posted notification
   async createGradeNotification(userId: string, courseId: string, quizTitle: string, score: number): Promise<void> {
@@ -276,7 +232,7 @@ export class NotificationService {
       await notificationModel.createNotification({
         id: `inactivity_${userId}_${daysInactive}_${Date.now()}`,
         userId,
-        title: 'We Miss You! 📚',
+        title: 'We Miss You!',
         message: `It's been ${daysInactive} days since your last learning session. Don't break your momentum - continue your learning journey!`,
         notificationType: 'assignment_reminder',
         priority: 'low',

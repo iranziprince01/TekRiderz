@@ -110,32 +110,32 @@ export const createRateLimiter = (config: RateLimitConfig) => {
 // Specific rate limiters for different use cases
 export const authRateLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  maxRequests: 5, // 5 attempts per 15 minutes
+  maxRequests: process.env.NODE_ENV === 'development' ? 50 : 5, // 50 in dev, 5 in prod
   message: 'Too many authentication attempts, please try again later.'
 });
 
 export const apiRateLimiter = createRateLimiter({
   windowMs: 60 * 1000, // 1 minute
-  maxRequests: 100, // 100 requests per minute
+  maxRequests: 500, // 500 requests per minute
   message: 'Too many API requests, please slow down.'
 });
 
 export const progressRateLimiter = createRateLimiter({
   windowMs: 60 * 1000, // 1 minute
-  maxRequests: 30, // 30 progress updates per minute
+  maxRequests: process.env.NODE_ENV === 'development' ? 200 : 30, // 200 in dev, 30 in prod
   message: 'Too many progress updates, please slow down.'
 });
 
 export const courseRateLimiter = createRateLimiter({
   windowMs: 60 * 1000, // 1 minute
-  maxRequests: 50, // 50 course requests per minute
+  maxRequests: process.env.NODE_ENV === 'development' ? 300 : 50, // 300 in dev, 50 in prod
   message: 'Too many course requests, please slow down.'
 });
 
 // Development rate limiter (more lenient)
 export const devRateLimiter = createRateLimiter({
   windowMs: 60 * 1000, // 1 minute
-  maxRequests: 1000, // 1000 requests per minute in development
+  maxRequests: 5000, // 5000 requests per minute in development
   message: 'Development rate limit exceeded.'
 });
 
