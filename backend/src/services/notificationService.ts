@@ -146,7 +146,7 @@ export class NotificationService {
       await notificationModel.createNotification({
         id: `welcome_${userId}_${Date.now()}`,
         userId,
-        title: 'Welcome to TekRiders! 🚀',
+        title: 'Welcome to TekRiders!',
         message: 'Welcome to our learning platform! Explore courses, track your progress, and earn achievements as you learn.',
         notificationType: 'welcome_email',
         priority: 'medium',
@@ -200,7 +200,7 @@ export class NotificationService {
       if (!course) return;
 
       const passed = score >= 50;
-      const title = passed ? 'Quiz Passed! ✅' : 'Quiz Results Available';
+      const title = passed ? 'Quiz Passed!' : 'Quiz Results Available';
       const message = passed 
         ? `Congratulations! You passed "${quizTitle}" with ${score}% in "${course.title}".`
         : `Your results for "${quizTitle}" in "${course.title}" are available. You scored ${score}%.`;

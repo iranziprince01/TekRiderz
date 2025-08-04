@@ -157,15 +157,15 @@ const Course: React.FC = () => {
     const cacheAllEnrolledCourses = async () => {
       if (user?.role === 'learner' && navigator.onLine && !isOfflineMode) {
         try {
-          console.log('🔄 Proactive caching: Caching all enrolled courses for offline access...');
+          console.log('Proactive caching: Caching all enrolled courses for offline access...');
           const result = await forceCacheAllEnrolledCourses(user);
           if (result.success) {
-            console.log('✅ Proactive caching completed:', result.message);
+                          console.log('Proactive caching completed:', result.message);
           } else {
-            console.warn('⚠️ Proactive caching failed:', result.message);
+                          console.warn('Proactive caching failed:', result.message);
           }
         } catch (error) {
-          console.warn('⚠️ Proactive caching error:', error);
+                      console.warn('Proactive caching error:', error);
         }
       }
     };
@@ -181,11 +181,11 @@ const Course: React.FC = () => {
     const autoCacheCurrentCourse = async () => {
       if (courseData && user?.role === 'learner' && courseData.isEnrolled && navigator.onLine && !isOfflineMode) {
         try {
-          console.log('🔄 Auto-caching current course for offline access...');
+          console.log('Auto-caching current course for offline access...');
           await autoCacheCourseOnAccess(courseData.course, courseData.modules, user);
-          console.log('✅ Current course auto-cached successfully');
+                      console.log('Current course auto-cached successfully');
         } catch (error) {
-          console.warn('⚠️ Auto-caching current course failed:', error);
+                      console.warn('Auto-caching current course failed:', error);
         }
       }
     };
@@ -238,7 +238,7 @@ const Course: React.FC = () => {
 
     // Check if we're in offline mode (for all users, not just learners)
     if (isOfflineMode || !navigator.onLine) {
-      console.log('🔄 Loading cached course data (offline mode)');
+              console.log('Loading cached course data (offline mode)');
       setIsOffline(true);
       
       try {
@@ -246,13 +246,13 @@ const Course: React.FC = () => {
         const cachedCourse = await getCourseOffline(courseId!);
         
         if (cachedCourse) {
-          console.log('📚 Found cached course:', cachedCourse.title);
+                      console.log('Found cached course:', cachedCourse.title);
           
           // Use the enhanced offline course data function
           const offlineData = await getOfflineCourseData(courseId!);
           
           if (offlineData) {
-            console.log('📚 Found cached course data:', offlineData.course.title);
+            console.log('Found cached course data:', offlineData.course.title);
             
             // Create course data with cached information
             const courseData: CourseData = {
@@ -393,7 +393,7 @@ const Course: React.FC = () => {
         });
       }
       
-      console.log('📊 Course structure analysis:', {
+              console.log('Course structure analysis:', {
         totalSections: course.sections?.length || 0,
         totalLessonCount,
         completedLessonsCount: completedLessons.length,
@@ -485,13 +485,13 @@ const Course: React.FC = () => {
             };
             await cacheModule(moduleForCache);
           }));
-          console.log(`✅ Cached ${modules.length} modules successfully`);
+          console.log(`Cached ${modules.length} modules successfully`);
         } catch (cacheError) {
           console.warn('Failed to cache some modules:', cacheError);
           // Don't block the UI if caching fails
         }
       } else {
-        console.log('🔄 Skipping module cache - user is not a learner');
+        console.log('Skipping module cache - user is not a learner');
       }
 
       // Transform quizzes with real data - fetch all quizzes and make them all unlocked
@@ -671,7 +671,7 @@ const Course: React.FC = () => {
         }
       }
       
-      console.log('📊 Progress calculation:', {
+              console.log('Progress calculation:', {
         totalLessonCount,
         modulesLength: modules.length,
         actualTotalLessons,
@@ -796,7 +796,7 @@ const Course: React.FC = () => {
         //   modules: adjustedModules,
         //   userProgress
         // });
-        // console.log('🧪 Progress calculation test result:', testResult);
+        // console.log('Progress calculation test result:', testResult);
       }
 
       const finalCourseData = {
@@ -827,7 +827,7 @@ const Course: React.FC = () => {
 
       // Auto-cache course data for offline access with enhanced error handling
       try {
-        console.log('🔄 Auto-caching course for offline access:', {
+        console.log('Auto-caching course for offline access:', {
           courseId: course.id || course._id,
           courseTitle: course.title,
           modulesCount: adjustedModules.length,
@@ -835,26 +835,26 @@ const Course: React.FC = () => {
         });
         
         await autoCacheCourseOnAccess(course, adjustedModules, user);
-        console.log('✅ Course auto-cached successfully for offline access');
+                  console.log('Course auto-cached successfully for offline access');
         
         // Verify caching was successful
         try {
           const courseId = course.id || course._id;
           if (!courseId) {
-            console.warn('⚠️ Course ID not found - cannot verify cache');
+            console.warn('Course ID not found - cannot verify cache');
             return;
           }
           const cachedCourse = await getCourseOffline(courseId);
           if (cachedCourse) {
-            console.log('✅ Verification: Course successfully cached and retrievable offline');
+            console.log('Verification: Course successfully cached and retrievable offline');
           } else {
-            console.warn('⚠️ Verification failed: Course not found in cache after auto-caching');
+                          console.warn('Verification failed: Course not found in cache after auto-caching');
           }
         } catch (verifyError) {
-          console.warn('⚠️ Failed to verify course cache:', verifyError);
+                      console.warn('Failed to verify course cache:', verifyError);
         }
       } catch (cacheError: any) {
-        console.error('❌ Failed to auto-cache course data for offline access:', {
+                  console.error('Failed to auto-cache course data for offline access:', {
           error: cacheError?.message || cacheError,
           courseId: course.id || course._id,
           courseTitle: course.title
@@ -901,19 +901,19 @@ const Course: React.FC = () => {
     
     try {
       setLoading(true);
-      console.log('🔄 Force caching all enrolled courses...');
+              console.log('Force caching all enrolled courses...');
       
       const result = await forceCacheAllEnrolledCourses(user);
       
       if (result.success) {
         setSuccess(`Successfully cached ${result.cached} courses for offline access!`);
-        console.log('✅ Force caching completed:', result.message);
+                  console.log('Force caching completed:', result.message);
       } else {
         setError(`Failed to cache courses: ${result.message}`);
-        console.error('❌ Force caching failed:', result.message);
+                  console.error('Force caching failed:', result.message);
       }
     } catch (error) {
-      console.error('❌ Error during force caching:', error);
+              console.error('Error during force caching:', error);
       setError('Failed to cache courses. Please try again.');
     } finally {
       setLoading(false);

@@ -43,11 +43,11 @@ class ProgressService {
    */
   async getUnifiedProgress(userId: string, courseId: string): Promise<UnifiedProgress | null> {
     try {
-      console.log('🔄 Fetching unified progress for:', { userId, courseId });
+      console.log('Fetching unified progress for:', { userId, courseId });
       
       // Get offline progress first
       const offlineProgress = await getOfflineProgress(userId, courseId);
-      console.log('📱 Offline progress:', offlineProgress);
+              console.log('Offline progress:', offlineProgress);
       
       // Get online progress
       let onlineProgress = null;
@@ -58,16 +58,16 @@ class ProgressService {
           console.log('🌐 Online progress:', onlineProgress);
         }
       } catch (error) {
-        console.warn('⚠️ Failed to fetch online progress, using offline only:', error);
+        console.warn('Failed to fetch online progress, using offline only:', error);
       }
 
       // Merge progress data with validation
       const mergedProgress = this.mergeProgress(offlineProgress, onlineProgress, courseId);
-      console.log('✅ Merged progress:', mergedProgress);
+              console.log('Merged progress:', mergedProgress);
       
       return mergedProgress;
     } catch (error) {
-      console.error('❌ Failed to get unified progress:', error);
+      console.error('Failed to get unified progress:', error);
       return null;
     }
   }
@@ -98,7 +98,7 @@ class ProgressService {
 
   private async performMarkComplete(userId: string, courseId: string, lessonId: string, timeSpent: number): Promise<boolean> {
     try {
-      console.log('🎯 Marking lesson complete:', { userId, courseId, lessonId, timeSpent });
+      console.log('Marking lesson complete:', { userId, courseId, lessonId, timeSpent });
       
       const completedAt = new Date().toISOString();
       const progressData = {
@@ -117,7 +117,7 @@ class ProgressService {
         progress: progressData
       });
       
-      console.log('📱 Offline save result:', offlineSuccess);
+              console.log('Offline save result:', offlineSuccess);
       
       // Step 2: Save to online storage (with retry)
       let onlineSuccess = false;
@@ -132,12 +132,12 @@ class ProgressService {
           if (onlineSuccess) {
             console.log('🌐 Online save successful on attempt:', retryCount + 1);
           } else {
-            console.warn('⚠️ Online save failed, retrying...');
+            console.warn('Online save failed, retrying...');
             retryCount++;
             await new Promise(resolve => setTimeout(resolve, 1000 * retryCount)); // Exponential backoff
           }
         } catch (error) {
-          console.warn(`⚠️ Online save attempt ${retryCount + 1} failed:`, error);
+                      console.warn(`Online save attempt ${retryCount + 1} failed:`, error);
           retryCount++;
           if (retryCount < maxRetries) {
             await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
@@ -149,12 +149,12 @@ class ProgressService {
       if (offlineSuccess) {
         // Always validate the saved data
         const validationResult = await this.validateProgressConsistency(userId, courseId, lessonId);
-        console.log('✅ Progress validation result:', validationResult);
+        console.log('Progress validation result:', validationResult);
         
         // Trigger a sync to ensure consistency
         setTimeout(() => {
           this.syncProgressWithServer(userId, courseId).catch(error => {
-            console.warn('⚠️ Background sync failed:', error);
+            console.warn('Background sync failed:', error);
           });
         }, 1000);
       }
@@ -180,7 +180,7 @@ class ProgressService {
     currentPosition?: number
   ): Promise<boolean> {
     try {
-      console.log('📊 Updating lesson progress:', { userId, courseId, lessonId, percentage, timeSpent });
+      console.log('Updating lesson progress:', { userId, courseId, lessonId, percentage, timeSpent });
       
       const progressData = {
         percentage: Math.min(100, Math.max(0, percentage)),
@@ -212,7 +212,7 @@ class ProgressService {
         });
         onlineSuccess = response.success;
       } catch (error) {
-        console.warn('⚠️ Failed to update online progress:', error);
+        console.warn('Failed to update online progress:', error);
       }
       
       console.log('✅ Progress update result:', { offlineSuccess, onlineSuccess });
@@ -243,7 +243,7 @@ class ProgressService {
           onlineData = response.data;
         }
       } catch (error) {
-        console.warn('⚠️ Could not fetch online data for validation:', error);
+        console.warn('Could not fetch online data for validation:', error);
       }
       
       const discrepancies = [];
@@ -302,7 +302,7 @@ class ProgressService {
       const totalLessons = Object.keys(offlineProgress.lessons).length;
       const overallProgress = totalLessons > 0 ? Math.round((completedLessons.length / totalLessons) * 100) : 0;
       
-      console.log('📊 Progress calculation:', {
+      console.log('Progress calculation:', {
         completedLessons: completedLessons.length,
         totalLessons,
         overallProgress,
@@ -351,7 +351,7 @@ class ProgressService {
                 console.log('✅ Cached course progress updated');
               }
             } catch (cacheError) {
-              console.warn('⚠️ Failed to update cached course progress:', cacheError);
+              console.warn('Failed to update cached course progress:', cacheError);
             }
             
             // Force refresh of enrolled courses data to reflect the updated progress
@@ -367,7 +367,7 @@ class ProgressService {
               }));
               console.log('✅ Course progress update event dispatched');
             } catch (eventError) {
-              console.warn('⚠️ Failed to dispatch progress update event:', eventError);
+              console.warn('Failed to dispatch progress update event:', eventError);
             }
             
             return true;
@@ -376,8 +376,8 @@ class ProgressService {
             return false;
           }
         } catch (error) {
-          console.warn('⚠️ Sync request failed:', error);
-          console.error('❌ Detailed sync error:', {
+          console.warn('Sync request failed:', error);
+                      console.error('Detailed sync error:', {
             courseId,
             offlineProgress: offlineProgress?.overallPercentage,
             completedLessons,

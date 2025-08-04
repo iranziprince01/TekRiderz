@@ -160,7 +160,7 @@ export const cacheUser = async (user: User, credentials?: { email: string; passw
     try {
       // Check if localDB is available
       if (!localDB || !localDB.put) {
-        console.warn('⚠️ LocalDB not available, skipping PouchDB cache');
+        console.warn('LocalDB not available, skipping PouchDB cache');
         return;
       }
 
@@ -221,7 +221,7 @@ export const getCachedUser = async (userId: string): Promise<User | null> => {
     try {
       // Check if localDB is available
       if (!localDB || !localDB.get) {
-        console.warn('⚠️ LocalDB not available, using localStorage fallback');
+        console.warn('LocalDB not available, using localStorage fallback');
         throw new Error('LocalDB not available');
       }
 
@@ -531,7 +531,7 @@ export const cacheCourse = async (course: Course): Promise<void> => {
   try {
     const db = await getPouchDB();
     if (!db) {
-      console.warn('⚠️ Database not available for course caching');
+      console.warn('Database not available for course caching');
       return;
     }
 
@@ -589,7 +589,7 @@ export const cacheCourse = async (course: Course): Promise<void> => {
     };
     
     await db.put(courseDoc);
-    console.log(`📚 Course cached for offline access: ${courseId} - ${enhancedCourse.title}`);
+          console.log(`Course cached for offline access: ${courseId} - ${enhancedCourse.title}`);
     
     // Mark that we have cached courses
     localStorage.setItem('hasCachedCourses', 'true');
@@ -609,7 +609,7 @@ export const getCachedCourse = async (courseId: string): Promise<Course | null> 
   try {
     const db = await getPouchDB();
     if (!db) {
-      console.warn('⚠️ Database not available for course retrieval');
+      console.warn('Database not available for course retrieval');
       return null;
     }
 
@@ -632,7 +632,7 @@ export const getCachedCourses = async (): Promise<Course[]> => {
   try {
     const db = await getPouchDB();
     if (!db) {
-      console.warn('⚠️ Database not available for courses retrieval');
+      console.warn('Database not available for courses retrieval');
       return [];
     }
 
@@ -646,7 +646,7 @@ export const getCachedCourses = async (): Promise<Course[]> => {
       .map((row: any) => (row.doc as CourseCacheDoc)?.course)
       .filter(Boolean) as Course[];
     
-    console.log(`📚 Retrieved ${courses.length} cached courses from database`);
+          console.log(`Retrieved ${courses.length} cached courses from database`);
     return courses;
       
   } catch (error) {
@@ -810,7 +810,7 @@ export const getCachedModulesByCourse = async (courseId: string): Promise<Module
     // Sort by order
     const sortedModules = uniqueModules.sort((a, b) => a.order - b.order);
     
-    console.log(`📚 Retrieved ${sortedModules.length} unique modules for course ${courseId} (filtered from ${allModules.length} total modules)`);
+          console.log(`Retrieved ${sortedModules.length} unique modules for course ${courseId} (filtered from ${allModules.length} total modules)`);
     
     return sortedModules;
   } catch (error) {
@@ -968,7 +968,7 @@ export const getEnrolledCoursesOffline = async (): Promise<Course[]> => {
           course.status === 'active'
         );
         
-        console.log(`📚 Retrieved ${verifiedEnrolledCourses.length} verified enrolled courses from dedicated cache`);
+        console.log(`Retrieved ${verifiedEnrolledCourses.length} verified enrolled courses from dedicated cache`);
         return verifiedEnrolledCourses;
       }
     } catch (cacheError) {
@@ -984,7 +984,7 @@ export const getEnrolledCoursesOffline = async (): Promise<Course[]> => {
       course.status === 'active'
     );
     
-    console.log(`📚 Found ${enrolledCourses.length} enrolled courses for offline access (filtered from ${allCourses.length} total courses)`);
+          console.log(`Found ${enrolledCourses.length} enrolled courses for offline access (filtered from ${allCourses.length} total courses)`);
     return enrolledCourses;
   } catch (error) {
     console.error('Failed to get enrolled courses for offline access:', error);
@@ -1241,7 +1241,7 @@ export const refreshEnrolledCoursesCache = async (userId: string): Promise<{
       // Remove the enrolled courses cache if no enrolled courses
       try {
         await localDB.remove('enrolled_courses_cache');
-        console.log('🗑️ Removed empty enrolled courses cache');
+        console.log('Removed empty enrolled courses cache');
       } catch (error) {
         // Cache doesn't exist, which is fine
       }
@@ -1285,7 +1285,7 @@ export const getCourseOffline = async (courseId: string): Promise<Course | null>
     if (!course) {
       console.log(`🔍 Searching all cached courses for match...`);
       const allCourses = await getCachedCourses();
-      console.log(`📚 Found ${allCourses.length} cached courses`);
+      console.log(`Found ${allCourses.length} cached courses`);
       
       // Log all course IDs for debugging
       allCourses.forEach((c, index) => {
@@ -1318,7 +1318,7 @@ export const getCourseOffline = async (courseId: string): Promise<Course | null>
     }
     
     if (course) {
-      console.log(`📚 Found cached course: ${course.title} (ID: ${course._id || course.id})`);
+      console.log(`Found cached course: ${course.title} (ID: ${course._id || course.id})`);
       
       // Enhanced offline access check
       const isOfflineAccessible = course.isEnrolled || 
@@ -1331,9 +1331,9 @@ export const getCourseOffline = async (courseId: string): Promise<Course | null>
         console.log(`✅ Course available offline: ${courseId} - ${course.title}`);
         return course;
       } else {
-        console.log(`⚠️ Course found but not marked for offline access: ${courseId}`);
+        console.log(`Course found but not marked for offline access: ${courseId}`);
         // For demonstration purposes, allow access if course is found
-        console.log(`🎯 Allowing offline access for demonstration`);
+                  console.log(`Allowing offline access for demonstration`);
         return course;
       }
     }
@@ -1343,10 +1343,10 @@ export const getCourseOffline = async (courseId: string): Promise<Course | null>
     // Additional debugging - check if we have any courses at all
     const allCourses = await getCachedCourses();
     if (allCourses.length === 0) {
-      console.log(`⚠️ No courses cached at all. Please access courses while online to enable offline viewing.`);
+              console.log(`No courses cached at all. Please access courses while online to enable offline viewing.`);
     } else {
-      console.log(`⚠️ Course ${courseId} not found among ${allCourses.length} cached courses.`);
-      console.log(`📋 Available course IDs:`, allCourses.map(c => c._id || c.id));
+              console.log(`Course ${courseId} not found among ${allCourses.length} cached courses.`);
+              console.log(`Available course IDs:`, allCourses.map(c => c._id || c.id));
     }
     
     return null;

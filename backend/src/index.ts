@@ -1,3 +1,15 @@
+/**
+ * TekRiders Backend Server
+ * 
+ * Main entry point for the TekRiders e-learning platform backend API.
+ * Provides RESTful endpoints for user management, course operations,
+ * offline synchronization, and administrative functions.
+ * 
+ * @author TekRiders Team
+ * @version 1.0.0
+ */
+
+// Core dependencies
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -6,11 +18,15 @@ import cookieParser from 'cookie-parser';
 import { createServer } from 'http';
 import path from 'path';
 import fs from 'fs/promises';
+
+// Configuration and utilities
 import { config } from './config/config';
 import { logger } from './utils/logger';
 import { errorHandler } from './middleware/errorHandler';
 import { notFoundHandler } from './middleware/notFoundHandler';
 import { connectToDatabases } from './config/database';
+
+// Route imports
 import { authRoutes } from './routes/auth';
 import { userRoutes } from './routes/users';
 import courseRoutes from './routes/courses';
@@ -19,22 +35,27 @@ import uploadRoutes from './routes/upload';
 import firebasePdfRoutes from './routes/firebasePdf';
 import cleanupRoutes from './routes/cleanup';
 import { cleanupService } from './services/cleanupService';
-
-
 import speechRoutes from './routes/speech';
 import { certificateRoutes } from './routes/certificates';
 import analyticsRoutes from './routes/analytics';
-
 import notificationRoutes from './routes/notifications';
-import { apiRateLimiter, progressRateLimiter, courseRateLimiter, dynamicRateLimiter } from './middleware/rateLimiter';
 import { dbUrlsRoutes } from './routes/db-urls';
 
+// Rate limiting middleware
+import { apiRateLimiter, progressRateLimiter, courseRateLimiter, dynamicRateLimiter } from './middleware/rateLimiter';
+
+// Initialize Express application and HTTP server
 const app = express();
 const server = createServer(app);
 
-// Upload directory structure removed - using external services only
+/**
+ * Security and Middleware Configuration
+ * 
+ * Configure CORS, security headers, and request processing middleware
+ * for the TekRiders API server.
+ */
 
-// Configure CORS with specific origins
+// Configure CORS with specific origins for security
 const corsOptions = {
   origin: config.cors.allowedOrigins,
   credentials: true,
@@ -44,7 +65,7 @@ const corsOptions = {
   maxAge: 86400, // 24 hours
 };
 
-// Basic middleware
+// Apply security and request processing middleware
 app.use(cors(corsOptions));
 app.use(helmet({
   crossOriginEmbedderPolicy: false, // Allow embedding for video content
@@ -59,38 +80,43 @@ app.use(helmet({
     },
   },
 }));
-app.use(compression());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use(cookieParser());
+app.use(compression()); // Enable response compression
+app.use(express.json({ limit: '10mb' })); // Parse JSON requests
+app.use(express.urlencoded({ extended: true, limit: '10mb' })); // Parse URL-encoded requests
+app.use(cookieParser()); // Parse cookies
 
 // Apply dynamic rate limiting based on environment
 app.use(dynamicRateLimiter);
 
-// Upload CORS middleware removed - no local file serving
-
-// Static file serving removed - using external services only
-
-// Request logging
+/**
+ * Request Logging Middleware
+ * 
+ * Log all incoming requests for monitoring and debugging purposes.
+ */
 app.use((req, res, next) => {
   logger.info(`${req.method} ${req.path} - ${req.ip}`);
   next();
 });
 
-// API Routes - Version 1
-app.use('/api/v1/auth', authRoutes);
-app.use('/api/v1/users', userRoutes);
-app.use('/api/v1/courses', courseRoutes);
-app.use('/api/v1/admin', adminRoutes);
-app.use('/api/v1/upload', uploadRoutes);
-app.use('/api/v1/firebase-pdf', firebasePdfRoutes);
-app.use('/api/v1/speech', speechRoutes);
-app.use('/api/v1/certificates', certificateRoutes);
-app.use('/api/v1/analytics', analyticsRoutes);
-
-app.use('/api/v1/notifications', notificationRoutes);
-app.use('/api/v1/cleanup', cleanupRoutes);
-app.use('/api/v1/db-urls', dbUrlsRoutes);
+/**
+ * API Routes Configuration
+ * 
+ * Define all RESTful API endpoints for the TekRiders platform.
+ * Routes are organized by functionality and include authentication,
+ * user management, course operations, and administrative functions.
+ */
+app.use('/api/v1/auth', authRoutes);           // Authentication endpoints
+app.use('/api/v1/users', userRoutes);          // User management
+app.use('/api/v1/courses', courseRoutes);      // Course operations
+app.use('/api/v1/admin', adminRoutes);         // Administrative functions
+app.use('/api/v1/upload', uploadRoutes);       // File upload handling
+app.use('/api/v1/firebase-pdf', firebasePdfRoutes); // PDF document management
+app.use('/api/v1/speech', speechRoutes);       // Speech-to-text services
+app.use('/api/v1/certificates', certificateRoutes); // Certificate generation
+app.use('/api/v1/analytics', analyticsRoutes); // Analytics and reporting
+app.use('/api/v1/notifications', notificationRoutes); // Notification system
+app.use('/api/v1/cleanup', cleanupRoutes);     // Data cleanup operations
+app.use('/api/v1/db-urls', dbUrlsRoutes);      // Database URL management
 
 
 

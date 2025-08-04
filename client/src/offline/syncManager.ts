@@ -30,42 +30,42 @@ export const performOneTimeSync = async (): Promise<void> => {
     // Check if user is a learner
     const userRole = localStorage.getItem('userRole');
     if (userRole !== 'learner') {
-      console.log('🔄 Sync skipped - user is not a learner');
+      console.log('Sync skipped - user is not a learner');
       return;
     }
 
     // Check if app is online
     if (!navigator.onLine) {
-      console.log('🔄 Sync skipped - app is offline');
+      console.log('Sync skipped - app is offline');
       return;
     }
 
     // Check if sync is already active
     if (syncStatus.isActive) {
-      console.log('🔄 Sync already in progress, skipping...');
+      console.log('Sync already in progress, skipping...');
       return;
     }
 
-    console.log('🔄 Starting one-time sync for learner...');
+    console.log('Starting one-time sync for learner...');
     syncStatus.isActive = true;
     syncStatus.error = null;
 
     // Get cached user data
     const userId = localStorage.getItem('currentUserId');
     if (!userId) {
-      console.log('🔄 No cached user found, skipping sync');
+      console.log('No cached user found, skipping sync');
       return;
     }
 
     const cachedUser = await getCachedUser(userId);
     if (!cachedUser) {
-      console.log('🔄 No cached user data found, skipping sync');
+      console.log('No cached user data found, skipping sync');
       return;
     }
 
     // Get cached enrolled courses
     const cachedCourses = await getEnrolledCoursesOffline();
-    console.log(`🔄 Found ${cachedCourses.length} cached courses to sync`);
+    console.log(`Found ${cachedCourses.length} cached courses to sync`);
 
     // Perform sync operations
     await Promise.all([
@@ -79,10 +79,10 @@ export const performOneTimeSync = async (): Promise<void> => {
     syncStatus.pendingChanges = 0;
     syncStatus.isActive = false;
 
-    console.log('✅ One-time sync completed successfully');
+    console.log('One-time sync completed successfully');
 
   } catch (error) {
-    console.error('❌ Sync failed:', error);
+    console.error('Sync failed:', error);
     syncStatus.error = error instanceof Error ? error.message : 'Unknown error';
     syncStatus.isActive = false;
     throw error;
@@ -94,7 +94,7 @@ export const performOneTimeSync = async (): Promise<void> => {
  */
 const syncUserData = async (user: any): Promise<void> => {
   try {
-    console.log('🔄 Syncing user data...');
+    console.log('Syncing user data...');
     
     // Update user profile if needed
     const response = await apiClient.updateProfile({
@@ -106,12 +106,12 @@ const syncUserData = async (user: any): Promise<void> => {
     });
 
     if (response.success) {
-      console.log('✅ User data synced successfully');
+      console.log('User data synced successfully');
     } else {
-      console.warn('⚠️ User data sync failed:', response.error);
+              console.warn('User data sync failed:', response.error);
     }
   } catch (error) {
-    console.error('❌ User data sync error:', error);
+    console.error('User data sync error:', error);
   }
 };
 
@@ -120,7 +120,7 @@ const syncUserData = async (user: any): Promise<void> => {
  */
 const syncCourseProgress = async (courses: any[]): Promise<void> => {
   try {
-    console.log('🔄 Syncing course progress...');
+    console.log('Syncing course progress...');
     
     const progressPromises = courses
       .filter(course => course.progress && course.progress.percentage > 0)
@@ -133,14 +133,14 @@ const syncCourseProgress = async (courses: any[]): Promise<void> => {
             lastUpdated: new Date().toISOString()
           });
         } catch (error) {
-          console.warn(`⚠️ Failed to sync progress for course ${course._id}:`, error);
+          console.warn(`Failed to sync progress for course ${course._id}:`, error);
         }
       });
 
     await Promise.all(progressPromises);
-    console.log('✅ Course progress synced successfully');
+    console.log('Course progress synced successfully');
   } catch (error) {
-    console.error('❌ Course progress sync error:', error);
+          console.error('Course progress sync error:', error);
   }
 };
 
@@ -149,13 +149,13 @@ const syncCourseProgress = async (courses: any[]): Promise<void> => {
  */
 const syncEnrollmentData = async (courses: any[]): Promise<void> => {
   try {
-    console.log('🔄 Syncing enrollment data...');
+    console.log('Syncing enrollment data...');
     
     // For now, just verify enrollments exist
     // In a real implementation, you might sync enrollment status changes
-    console.log(`✅ Verified ${courses.length} enrollments`);
+    console.log(`Verified ${courses.length} enrollments`);
   } catch (error) {
-    console.error('❌ Enrollment sync error:', error);
+          console.error('Enrollment sync error:', error);
   }
 };
 
@@ -207,9 +207,9 @@ export const clearOfflineData = async (): Promise<void> => {
       pendingChanges: 0,
       error: null
     };
-    console.log('✅ Offline data cleared successfully');
+    console.log('Offline data cleared successfully');
   } catch (error) {
-    console.error('❌ Failed to clear offline data:', error);
+          console.error('Failed to clear offline data:', error);
     throw error;
   }
 };
@@ -221,9 +221,9 @@ export const initializeOfflineData = async (user: any, courses: any[]): Promise<
   try {
     console.log('💾 Initializing offline data for learner...');
     await cacheLearnerData(user, courses);
-    console.log(`✅ Offline data initialized: ${courses.length} courses cached`);
+    console.log(`Offline data initialized: ${courses.length} courses cached`);
   } catch (error) {
-    console.error('❌ Failed to initialize offline data:', error);
+          console.error('Failed to initialize offline data:', error);
     throw error;
   }
 }; 

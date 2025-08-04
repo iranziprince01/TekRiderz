@@ -1,23 +1,41 @@
+/**
+ * TekRiders Frontend Application
+ * 
+ * Main React application for the TekRiders e-learning platform.
+ * Provides offline-first learning experience with PWA capabilities,
+ * multi-role user management, and real-time synchronization.
+ * 
+ * @author TekRiders Team
+ * @version 1.0.0
+ */
+
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+
+// Context providers for global state management
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { LanguageProvider } from './contexts/LanguageContext';
 import NotificationProvider from './contexts/NotificationContext';
+
+// Core UI components
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { NotificationManager } from './components/ui/NotificationManager';
 import ProtectedRoute from './components/ProtectedRoute';
+
+// Offline and PWA components
 import UnifiedOfflineStatus from './components/common/UnifiedOfflineStatus';
 import OfflineInitializer from './components/common/OfflineInitializer';
 import PWAInstallPrompt from './components/common/PWAInstallPrompt';
 import PWAStatus from './components/common/PWAStatus';
 
+// Offline functionality and synchronization
 import { performOneTimeSync, checkSyncNeeded, clearOfflineData } from './offline/syncManager';
 import { localDB } from './offline/db';
 import { initializeOfflineEssentials, cleanupOfflineEssentials, getEssentialOfflineStatus } from './offline/offlineEssentials';
 import './utils/offlineTestUtils';
 
-// Page imports
+// Application page components
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
@@ -38,7 +56,12 @@ import NotFound from './pages/NotFound';
 
 
 
-// Sync Initializer Component
+/**
+ * Sync Initializer Component
+ * 
+ * Manages online/offline state transitions and triggers synchronization
+ * when the application comes back online. Only runs for authenticated learners.
+ */
 const SyncInitializer: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
 
@@ -49,7 +72,7 @@ const SyncInitializer: React.FC = () => {
         // Check if sync is needed when coming back online
         const needsSync = await checkSyncNeeded();
         if (needsSync && isAuthenticated && user?.role === 'learner') {
-          console.log('🔄 App came online, performing one-time sync...');
+          console.log('App came online, performing one-time sync...');
           await performOneTimeSync();
         }
       } catch (error) {
@@ -58,7 +81,7 @@ const SyncInitializer: React.FC = () => {
     };
 
     const handleOffline = () => {
-      console.log('📱 App went offline - continuing with cached data');
+      console.log('App went offline - continuing with cached data');
     };
 
     window.addEventListener('online', handleOnline);
@@ -75,6 +98,12 @@ const SyncInitializer: React.FC = () => {
 };
 
 
+/**
+ * Main Application Component
+ * 
+ * Root component that initializes the TekRiders application,
+ * sets up offline functionality, and provides the routing structure.
+ */
 function App() {
 
   // Initialize app systems after mount
@@ -83,19 +112,19 @@ function App() {
       try {
         console.log('Initializing TekRiders App...');
         
-        // Initialize local database
+        // Initialize local database for offline functionality
         try {
-          console.log('🔗 Initializing local database...');
-          console.log('✅ Local database available:', localDB.name);
-          console.log('📱 App will work in offline mode with local database');
+          console.log('Initializing local database...');
+          console.log('Local database available:', localDB.name);
+          console.log('App will work in offline mode with local database');
         } catch (error) {
-          console.warn('⚠️ Failed to initialize local database:', error);
+          console.warn('Failed to initialize local database:', error);
           // Continue without database - app will work with basic functionality
         }
 
-        // Initialize offline essentials
+        // Initialize offline essentials for PWA functionality
         try {
-          console.log('🔧 Initializing offline essentials...');
+          console.log('Initializing offline essentials...');
           const { initializeOfflineEssentials, testOfflineSystem } = await import('./offline/offlineEssentials');
           
           const offlineInit = await initializeOfflineEssentials();

@@ -36,7 +36,7 @@ export class ProgressConsistencyService {
     preserved: boolean;
   }> {
     try {
-      logger.info('🔄 Updating lesson progress with consistency checks:', {
+      logger.info('Updating lesson progress with consistency checks:', {
         userId,
         courseId,
         lessonId,
@@ -54,7 +54,7 @@ export class ProgressConsistencyService {
 
       // Prevent downgrading completed lessons
       if (wasCompleted && !progressData.isCompleted) {
-        logger.warn('⚠️ Attempting to mark completed lesson as incomplete, preserving completion status');
+        logger.warn('Attempting to mark completed lesson as incomplete, preserving completion status');
         preserved = true;
         
         return {
@@ -94,7 +94,7 @@ export class ProgressConsistencyService {
           progress.completedLessons.push(lessonId);
           updatedLessonProgress.completedAt = new Date().toISOString();
           
-          logger.info('✅ Lesson marked as completed:', {
+          logger.info('Lesson marked as completed:', {
             userId,
             courseId,
             lessonId,
@@ -135,7 +135,7 @@ export class ProgressConsistencyService {
         throw new Error('Progress update verification failed');
       }
 
-      logger.info('✅ Lesson progress successfully updated and verified:', {
+      logger.info('Lesson progress successfully updated and verified:', {
         userId,
         courseId,
         lessonId,
@@ -153,7 +153,7 @@ export class ProgressConsistencyService {
       };
 
     } catch (error) {
-      logger.error('❌ Failed to update lesson progress with consistency:', error);
+      logger.error('Failed to update lesson progress with consistency:', error);
       throw error;
     }
   }
@@ -171,11 +171,11 @@ export class ProgressConsistencyService {
     fixes: string[];
   }> {
     try {
-      logger.info('🔄 Ensuring course progress consistency:', { userId, courseId });
+      logger.info('Ensuring course progress consistency:', { userId, courseId });
 
       const progress = await progressModel.findByUserAndCourse(userId, courseId);
       if (!progress) {
-        logger.info('📱 No progress found, creating new progress record');
+        logger.info('No progress found, creating new progress record');
         const newProgress = await progressModel.getOrCreateProgress(userId, courseId);
         return {
           success: true,
@@ -226,7 +226,7 @@ export class ProgressConsistencyService {
           lastWatched: new Date().toISOString()
         } as Partial<Progress>);
 
-        logger.info('✅ Course progress consistency fixes applied:', {
+        logger.info('Course progress consistency fixes applied:', {
           userId,
           courseId,
           fixes,
@@ -242,7 +242,7 @@ export class ProgressConsistencyService {
         };
       }
 
-      logger.info('✅ Course progress is consistent:', {
+              logger.info('Course progress is consistent:', {
         userId,
         courseId,
         progress: storedProgress,
@@ -257,7 +257,7 @@ export class ProgressConsistencyService {
       };
 
     } catch (error) {
-      logger.error('❌ Failed to ensure course progress consistency:', error);
+      logger.error('Failed to ensure course progress consistency:', error);
       throw error;
     }
   }
@@ -310,7 +310,7 @@ export class ProgressConsistencyService {
       if (Math.abs(progressPercentage - enrollmentProgress) > 5) {
         await enrollmentModel.updateProgress(enrollment._id!, progressPercentage);
         
-        logger.info('🔄 Enrollment progress synced:', {
+        logger.info('Enrollment progress synced:', {
           userId,
           courseId,
           oldProgress: enrollmentProgress,
@@ -323,7 +323,7 @@ export class ProgressConsistencyService {
       return { success: true, enrollmentUpdated: false };
 
     } catch (error) {
-      logger.error('❌ Failed to sync progress with enrollment:', error);
+      logger.error('Failed to sync progress with enrollment:', error);
       return { success: false, enrollmentUpdated: false };
     }
   }
